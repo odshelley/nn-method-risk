@@ -246,3 +246,6 @@ C_mismatch repricing RMSE @T=1: ridge 34.1bp (BEST of all four) vs NN 35.0 / spl
 B_same |L-1| mean: ridge 0.44% ~ NN 0.47%; spline 0.70%.
 **C10 SUPPORTED (single seed): ridge head matches full-NN accuracy at ~10x lower latency and wins the calibration head-to-head; spline head is the fastest method overall at mid accuracy.** Small-N caveat: both heads lose to NW at N=2k (body undertrained / oversmoothing); consistent with the small-N story.
 Residual ridge (centred on w_prev) was ON for ridge runs; ablation of centring still to do.
+
+### Decision 2026-09-01: SINGLE Risk paper (split rejected)
+One Cutting Edge paper (~3,500 words): problem / method+Fig1 / IS+Fig2 (centrepiece) / results+Fig3+Table1 / deployment+Fig4. Theory still goes to a separate maths paper (SIFIN). Remaining open decision: FX vs SPX for Table 1 (FX favoured). Priority build unchanged: Girsanov IS implementation for Fig 2.
