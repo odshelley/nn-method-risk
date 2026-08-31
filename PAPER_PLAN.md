@@ -233,3 +233,16 @@ Note: core experiments need NO leverage dataset (Exp B: same-Heston gives L*=1 b
 - **Exp C (mismatch xi 0.3->0.6, rho -0.7->-0.4)**: calibrated repricing RMSE 35bp@T=1 / 52bp@T=0.5 (NN), 39/59 (NW); UNCALIBRATED L=1: 123/204bp RMSE, max 500bp. Calibration cuts error ~4x; residual above noise floor -> Dupire FD bias + 50-step time discretisation + estimator error; refinement targets: more steps, finer T-grid near 0, mid-step sigma, IS for wings.
 - **Latency honesty**: NW 1.2s vs NN 31-34s per calibration at this config (warm start already on, 120 Adam steps/slice). In 1D NW is competitive and 25x faster -> confirms positioning: the NN case rests on estimator accuracy, the ridge/spline head for latency, IS synergy, and d>=2.
 - Claims: C1 partially supported (Exp A + Exp C), C2 supported (single pass, timings). Next: ridge-head config, alpha-sweep/implicit, IS wings.
+
+### Ridge/spline head results (2026-08-31, exp_d, same battery/seed as above)
+Exp A (rel RMSE): full ablation ladder now
+| N | NW | spline | ridge | full NN |
+|---|---|---|---|---|
+| 2k | 4.5% | 11.2% | 10.9% | 8.9% |
+| 10k | 2.6% | 2.3% | 1.05% | 0.98% |
+| 50k | 1.05% | 0.80% | 0.37% | 0.28% |
+Calibration runtime per full run: spline 0.9s < NW 1.2s < ridge 3.0-3.4s << full NN 31-34s.
+C_mismatch repricing RMSE @T=1: ridge 34.1bp (BEST of all four) vs NN 35.0 / spline 36.0 / NW 39.4.
+B_same |L-1| mean: ridge 0.44% ~ NN 0.47%; spline 0.70%.
+**C10 SUPPORTED (single seed): ridge head matches full-NN accuracy at ~10x lower latency and wins the calibration head-to-head; spline head is the fastest method overall at mid accuracy.** Small-N caveat: both heads lose to NW at N=2k (body undertrained / oversmoothing); consistent with the small-N story.
+Residual ridge (centred on w_prev) was ON for ridge runs; ablation of centring still to do.

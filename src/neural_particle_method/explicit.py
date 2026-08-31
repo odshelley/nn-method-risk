@@ -1,7 +1,7 @@
 """Explicit (per-slice) neural particle calibration of a Heston-type LSV model."""
 import numpy as np
 
-from .condexp import NNRegressor, nw_estimate
+from .condexp import NNRegressor, RidgeHead, nw_estimate, spline_estimate
 
 
 def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=200_000,
@@ -15,7 +15,7 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
 
     lnx = np.full(n_particles, np.log(s0))
     v = np.full(n_particles, v0)
-    reg = NNRegressor(seed=seed) if method == "nn" else None
+    reg = NNRegressor(seed=seed) if method == "nn" else (RidgeHead(seed=seed) if method == "ridge" else None)
 
     L_records, snapshots = [], {}
     snap_steps = {int(round(t / dt)): t for t in snapshot_times}
@@ -32,6 +32,12 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
             if method == "nn":
                 reg.fit(lnx[idx], v[idx], steps=first_steps if k == 1 else later_steps)
                 f_grid = reg.predict(grid)
+            elif method == "ridge":
+                if not reg.trained:
+                    reg.train_body(lnx[idx], v[idx], steps=first_steps)
+                f_grid = reg.fit_predict(lnx[idx], v[idx], grid)
+            elif method == "spline":
+                f_grid = spline_estimate(lnx[idx], v[idx], grid)
             else:
                 f_grid = nw_estimate(lnx[idx], v[idx], grid)
         f_grid = np.clip(f_grid, 1e-4, None)
