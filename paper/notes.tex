@@ -353,7 +353,7 @@ improves both.
   blow-up.
 \end{remark}
 
-\section{Warm starting and update scheduling}\label{sec:warmstart}
+\section{Acceleration and deployment}\label{sec:warmstart}
 
 \subsection{Across time slices in the explicit scheme}
 
@@ -368,12 +368,39 @@ Early in the simulation the cloud spreads from a point mass and the
 correlation structure between $X$ and $V$ builds quickly, so the conditional
 expectation surface changes fast; later, mean reversion of $V$ drives it
 toward quasi-stationarity and updates can be less frequent, improving
-latency. A caution: a stale $f$ biases $\Lev$ at the skipped times, and this
+latency. Unlike kernel estimators, which must be recomputed from the cloud
+at every step, a network generalises across time, so one may retrain only
+every $m$-th slice and reuse the estimator in between; the calibration
+identity needs the estimator refreshed only at the rate at which the
+conditional law moves. A caution: a stale $f$ biases $\Lev$ at the skipped times, and this
 error feeds forward through the SDE and compounds, which cuts against the
 exact-calibration selling point. Prefer an event-triggered refresh: monitor
 the regression loss of the current network on the fresh cloud and retrain
 when it crosses a threshold. This yields a latency-accuracy trade-off with a
 defensible rule, and a natural trade-off plot for the experiments.
+
+\subsection{Frozen features and a ridge head}
+
+Train the network body rarely (on the first slices, or offline) and treat it
+as a feature extractor; per slice, solve only a linear readout on the
+learned features by closed-form ridge least squares, at cost $O(Np + p^3)$
+for $p$ features, with no gradient descent inside the simulation loop. This
+is least-squares Monte Carlo with learned features. Beyond latency, the
+configuration has a theoretical payoff: a linear-in-features estimator with
+a ridge penalty recovers exactly the regularised structure for which
+\citet{bayer2022rkhs} prove Wasserstein Lipschitz stability, with the
+learned features in place of a hand-chosen basis. The objection that plain
+global regression loses stability as the function class grows is thereby
+answered within the method rather than around it. This is likely the
+workhorse configuration; a short lemma identifying the ridge head with RKHS
+regression on a learned kernel should be written.
+
+\subsection{Reducing the particle count}
+
+Orthogonal to everything above: conditioning estimators in the style of
+\citet{muguruza2019}, or control variates in the style of \citet{cozma2019},
+reduce the particle count needed per unit of estimator variance, and thereby
+shrink every regression in the chain. Stackable with the other levers.
 
 \subsection{Explicit output as initialiser for the implicit scheme}
 
@@ -388,6 +415,36 @@ point only by time-discretisation bias and regression noise. The explicit
 scheme is thus the initialiser that plausibly places the damped iteration
 inside its convergence basin. The engineering trick and the hypothesis of the
 local convergence theorem are the same statement.
+
+\subsection{Amortising the fixed point}
+
+For the implicit scheme the damped outer iteration is calibration-time
+cost, not pricing-time cost; an overnight calibration renders its latency
+nearly irrelevant. For intraday recalibration, amortise: train offline a map
+from market inputs (the Dupire surface and the variance parameters) to the
+fixed point itself, over a distribution of surfaces; online, evaluate the
+map and run one or two damped corrections from that initialisation to
+restore the by-construction vanilla fit. This differs from the neural
+operator of \citet{wang2026}, who amortise the whole calibration and accept
+the operator's error as final: here the operator supplies only the
+initialisation, and the particle method keeps its exactness. The convergence
+analysis quantifies the claim: with local contraction factor $r$ and
+warm-start error $\delta_0$, of order $\log(\mathrm{tol}/\delta_0)/\log r$
+corrections suffice, so the theory powers the latency claim as well as the
+accuracy claim. A riskier variant collapses the outer iteration into a
+single training run with a self-consistency loss, simulating under
+$\Lev_\theta = \sigDup/\sqrt{f_\theta}$ and differentiating through the
+simulation as in \citet{cuchiero2020}; this forfeits the damped-iteration
+theory and is parked unless the amortised initialisation disappoints.
+
+\subsection{Deployment}
+
+The intended desk pattern combines the schemes: a full implicit solve
+overnight, possibly amortiser-initialised, and warm-started explicit sweeps
+or a small number of damped corrections on the bumped surface intraday.
+Surfaces move little intraday, so warm starts land near the fixed point,
+and the contraction theory turns recalibration latency into a quantified
+prediction rather than a hope.
 
 \section{Positioning: the calibration landscape}\label{sec:positioning}
 
