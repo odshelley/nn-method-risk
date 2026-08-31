@@ -1,0 +1,1 @@
+- PAPER_PLAN_20260831_213139.md -> PAPER_PLAN.md | scrap idea-dump for NN LSV calibration paper | 2026-08-31
