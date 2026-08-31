@@ -137,8 +137,7 @@ Initialise $X^{(i)}_0 = X_0$, $V^{(i)}_0 = v_0$, weights $w^{(i)} = 1$,
 Structural observation to state early in any write-up: the explicit scheme
 contains \emph{no fixed point}. Since $\Lev(t_k,\cdot)$ depends only on
 $\Lev(t_j,\cdot)$ for $j < k$, the discretised problem is a causal forward
-recursion solved in a single pass by construction. The existence question of
-the convergence notes (\texttt{notes\_convergence.tex}) is therefore not
+recursion solved in a single pass by construction. The fixed-point existence question is therefore not
 load-bearing for the explicit scheme; it
 bites only for the implicit one.
 
@@ -445,9 +444,8 @@ shrink every regression in the chain. Stackable with the other levers.
 Run the explicit pass first and use it to initialise the implicit one:
 distil the per-slice networks into the global network $f_\theta(t,x)$ as
 supervised pretraining, and take $\Lev^{0} = \Lev_{\mathrm{explicit}}$. This
-is more than engineering. The Ostrowski route of the convergence notes
-(\texttt{notes\_convergence.tex}) delivers
-only local convergence from a sufficiently good initial guess, and the
+is more than engineering. The Ostrowski argument delivers only local
+convergence from a sufficiently good initial guess, and the
 explicit pass constructively supplies one: its output differs from the fixed
 point only by time-discretisation bias and regression noise. The explicit
 scheme is thus the initialiser that plausibly places the damped iteration
@@ -553,7 +551,7 @@ contraction property has never been proved anywhere in this literature: it
 is asserted by \citet{reghai2006}, quoted as ``stated but not proved'' by \citet{cozma2019}, and documented to fail at large log-moneyness by \citet{saporito2019}, who replace the iteration by Tikhonov regularisation. The only
 theory-adjacent entries are Anderson acceleration of the iteration with no analysis \citep{nastasi2020} and a rigorous linear-rate
 theorem for the related but different Bass local volatility fixed point \citep{acciaio2024bass}. A spectral analysis of the damped leverage
-iteration, as sketched in the convergence notes, therefore has no published
+iteration therefore has no published
 counterpart.
 
 \subsection{The closest approaches to the $L^2$ route}\label{subsec:closest}
