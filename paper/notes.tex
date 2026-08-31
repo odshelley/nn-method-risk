@@ -290,9 +290,29 @@ $\rho\theta + \sqrt{1-\rho^2}\theta^\perp = 0$ and therefore remains a
 Brownian motion, so the dynamics of $V$ are unchanged, and with the same
 realisation of $B$ the $V$ paths are literally identical. Meanwhile $W$
 acquires drift $\theta$, so the stock particles are pushed into the wings.
-This leaves a one-parameter family indexed by $\theta$, which may be
-deterministic in $t$ or state dependent. The density process is the explicit
-stochastic exponential accumulated along the simulation.
+The constraint \cref{eq:constraint} is one linear equation on the
+two-dimensional kernel, so $\theta^\perp = -\rho\theta/\sqrt{1-\rho^2}$ is
+forced once $\theta$ is chosen: in the $(W, W^\perp)$ coordinates the
+admissible tilts are exactly the orthogonal complement of the direction
+$(\rho, \sqrt{1-\rho^2})$ generating $B$, a one-parameter family indexed by
+$\theta$, which may be deterministic in $t$ or state dependent. The density
+process is the explicit stochastic exponential accumulated along the
+simulation.
+
+\begin{remark}[Variance cost of preserving the volatility]\label{rem:cost}
+  The Girsanov exponent is driven by the full kernel norm
+  \[
+    \theta^2 + (\theta^\perp)^2 = \frac{\theta^2}{1-\rho^2},
+  \]
+  so achieving stock drift $\theta$ while leaving $V$ untouched costs
+  quadratic variation $\int \theta_t^2/(1-\rho^2)\,dt$ rather than
+  $\int \theta_t^2\,dt$. The volatility-preserving tilt becomes expensive as
+  $\abs{\rho} \to 1$ and impossible at $\abs{\rho} = 1$, the same degeneracy
+  as the existence condition, now with a rate. For equity-index correlations
+  around $\rho = -0.7$ the factor is roughly $2$, material but benign; it
+  should enter the effective-sample-size tuning of $\theta$ in
+  \cref{rem:selfnorm}.
+\end{remark}
 
 \subsection{Weighted $L^2$ regression recovers the $P$-conditional expectation}
 
