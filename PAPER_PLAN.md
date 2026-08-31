@@ -226,3 +226,10 @@ Three sources, increasing cleverness:
 3. Realism anchor: SSVI/SVI params fitted to historical SPX/FX surfaces + bootstrap perturbations as the market-input distribution.
 Likely recipe: route 2 for volume, route 3 for realism.
 Note: core experiments need NO leverage dataset (Exp B: same-Heston gives L*=1 by symmetry; Exp C validated by repricing).
+
+### First synthetic results (2026-08-31, experiments/results/, single seed 42, N=200k particles, 50 steps, fits on 30k subsample)
+- **Exp A (estimator vs analytic truth, rel. RMSE)**: N=2k: NW 4.5% / NN 8.9% (NN loses at tiny N); N=10k: NW 2.6% / NN 0.98%; N=50k: NW 1.05% / NN 0.28%. NN wins 2.6-3.8x at realistic N, consistent with the small-N degradation pattern Li reports for global methods.
+- **Exp B (same-Heston, L*=1)**: mean |L-1| = 0.47% (NN) / 0.40% (NW) on 5-95% quantile band; max ~2%. Pipeline validated against known fixed point. Repricing RMSE 13-20bp (MC noise floor ~12bp at this N).
+- **Exp C (mismatch xi 0.3->0.6, rho -0.7->-0.4)**: calibrated repricing RMSE 35bp@T=1 / 52bp@T=0.5 (NN), 39/59 (NW); UNCALIBRATED L=1: 123/204bp RMSE, max 500bp. Calibration cuts error ~4x; residual above noise floor -> Dupire FD bias + 50-step time discretisation + estimator error; refinement targets: more steps, finer T-grid near 0, mid-step sigma, IS for wings.
+- **Latency honesty**: NW 1.2s vs NN 31-34s per calibration at this config (warm start already on, 120 Adam steps/slice). In 1D NW is competitive and 25x faster -> confirms positioning: the NN case rests on estimator accuracy, the ridge/spline head for latency, IS synergy, and d>=2.
+- Claims: C1 partially supported (Exp A + Exp C), C2 supported (single pass, timings). Next: ridge-head config, alpha-sweep/implicit, IS wings.
