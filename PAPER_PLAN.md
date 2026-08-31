@@ -143,3 +143,27 @@ Paper skeleton already exists at paper/main.tex (compiling scaffold with theorem
 - [ ] Prototype explicit scheme on 1D Heston-LSV in src/neural_particle_method (uv env ready: torch, numpy, scipy, matplotlib)
 - [ ] Prototype implicit scheme + alpha sweep
 - [ ] Then run /paper-plan properly (with cross-review) to freeze a real outline
+
+---
+
+## Addendum 2026-08-31 (evening): importance sampling + warm starting
+
+### Girsanov importance sampling for the tails (now in notes.tex sec 7)
+- 2-D measure change with kernel (theta, theta_perp), constraint rho*theta + sqrt(1-rho^2)*theta_perp = 0: B untouched (V paths literally identical), W gains drift theta -> stock pushed into wings. Needs |rho| < 1. Density = explicit stochastic exponential.
+- Weighted L2 with Z = dP/dQ recovers E_P[V|X] EXACTLY (abstract Bayes; ratio self-normalises pointwise). Tilt moves samples, weights fix estimand.
+- Self-normalisation means only Var(Z | X=x) adds noise (from vol path; zero in deterministic-vol limit). ESS per x-bucket = tuning diagnostic for theta.
+- Discrete-time: accumulate exact ratio of Gaussian step densities -> weights exact for the simulated chain.
+- Defensive mixture (+theta / -theta / 0 subclouds, balance heuristic) covers both wings, avoids weight blow-up.
+- Same weighting applies to NW kernel -> IS orthogonal to NN-vs-kernel comparison, keeps benchmark fair.
+
+### Warm starting (now in notes.tex sec 8)
+- Explicit: warm start theta_k from theta_{k-1}; target moves O(dt) -> few gradient steps per slice.
+- Later times: update less frequently (surface approaches quasi-stationarity via V mean reversion). Caution: stale f biases L, error compounds FORWARD. Prefer event-triggered refresh (monitor regression loss on fresh cloud, retrain on threshold). Latency-accuracy trade-off plot for the paper.
+- Explicit output warm-starts implicit: distil per-slice nets into global f_theta + L0 = L_explicit. KEY LINK: this constructively supplies the "sufficiently good initial guess" required by the Ostrowski local convergence theorem. Engineering trick = theorem hypothesis.
+
+### New claims for the matrix
+| # | Claim (draft) | Evidence | Status |
+|---|---|---|---|
+| C7 | Girsanov IS materially improves tail leverage accuracy at fixed particle budget (both NN and NW) | none yet | needs experiment (wing repricing error with/without IS) |
+| C8 | Event-triggered refresh cuts explicit-scheme training cost substantially at negligible repricing cost | none yet | needs experiment (latency-accuracy curve) |
+| C9 | Explicit warm start reduces implicit iterations to convergence vs cold start | none yet | needs experiment |

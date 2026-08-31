@@ -258,15 +258,116 @@ hypothesis, and not in a generality exceeding these results. See
   \item \emph{Tail weighting.} The $L^2$ loss is weighted by the sampling
     density of $X_t$, so errors in the tails are barely penalised, precisely
     where out-of-the-money leverage lives. The classical particle method papers
-    over this with capping. Candidate remedies: importance reweighting of the
-    loss, tail-emphasising sampling, and the cross-time strength borrowing of
-    the implicit scheme. Expect most engineering effort here.
+    over this with capping. The principal remedy is the Girsanov importance
+    sampling of \cref{sec:girsanov}; the cross-time strength borrowing of the
+    implicit scheme also helps.
   \item \emph{Dupire input.} $\sigDup$ requires an arbitrage-free implied
     volatility surface; treat as given and cite the standard machinery.
   \item \emph{Time interpolation (explicit scheme).} $\Lev$ is defined on grid
     times; intermediate times need interpolation, as in the classical particle
     method.
 \end{enumerate}
+
+\section{Importance sampling by change of measure}\label{sec:girsanov}
+
+As the particles spread, few of them populate the wings, and the regression
+estimate of $\E[V_t \mid X_t = x]$ degrades exactly where out-of-the-money
+leverage is needed. The kernel method suffers there too. The remedy is a
+Girsanov change of measure with an explicit density process, used as
+importance sampling.
+
+\subsection{A two-dimensional change that moves only the stock}
+
+Write the volatility driver as $B = \rho W + \sqrt{1-\rho^2}\, W^\perp$ with
+$(W, W^\perp)$ independent Brownian motions, and assume $\abs{\rho} < 1$.
+Perform a two-dimensional Girsanov change with kernel $(\theta, \theta^\perp)$
+subject to the constraint
+\begin{equation}\label{eq:constraint}
+  \rho\,\theta + \sqrt{1-\rho^2}\,\theta^\perp = 0 .
+\end{equation}
+Under the new measure $Q$, the process $B$ receives drift
+$\rho\theta + \sqrt{1-\rho^2}\theta^\perp = 0$ and therefore remains a
+Brownian motion, so the dynamics of $V$ are unchanged, and with the same
+realisation of $B$ the $V$ paths are literally identical. Meanwhile $W$
+acquires drift $\theta$, so the stock particles are pushed into the wings.
+This leaves a one-parameter family indexed by $\theta$, which may be
+deterministic in $t$ or state dependent. The density process is the explicit
+stochastic exponential accumulated along the simulation.
+
+\subsection{Weighted $L^2$ regression recovers the $P$-conditional expectation}
+
+Let $Z = dP/dQ$. For any measurable $f$, the weighted loss
+$\E_Q\!\left[ Z\,(V_t - f(X_t))^2 \right]$ is minimised pointwise by
+\begin{equation}\label{eq:weightedreg}
+  f(x) = \frac{\E_Q[Z V_t \mid X_t = x]}{\E_Q[Z \mid X_t = x]}
+       = \E_P[V_t \mid X_t = x],
+\end{equation}
+by the abstract Bayes formula. Importance-weighted $L^2$ minimisation
+therefore recovers the correct conditional expectation with no further
+correction: the tilt moves where the samples live, the weights fix the
+estimand. The identical weighting applies to Nadaraya--Watson regression, so
+importance sampling is orthogonal to the neural-versus-kernel comparison and
+improves both.
+
+\begin{remark}[Self-normalisation]\label{rem:selfnorm}
+  Importance sampling for conditional expectations is more favourable than
+  for unconditional ones. The ratio structure of \cref{eq:weightedreg}
+  self-normalises at each $x$, so the level of $Z$ at $x$ cancels; only the
+  conditional variability of $Z$ given $X_t = x$ contributes noise. That
+  variability comes from the volatility path and vanishes in the
+  deterministic-volatility limit. The effective sample size per spatial
+  bucket is the natural diagnostic for tuning $\theta$.
+\end{remark}
+
+\begin{remark}[Exact discrete-time weights]\label{rem:discrete}
+  In the simulated chain no continuous-time Girsanov argument is needed:
+  draw the tilted Gaussian increments under $Q$ and accumulate the exact
+  ratio of Gaussian densities step by step. The resulting weights are exact
+  for the discretised chain, with no discretisation error in the measure
+  change itself.
+\end{remark}
+
+\begin{remark}[Defensive mixtures]\label{rem:mixture}
+  A single tilt direction covers one wing. Splitting the cloud into
+  subpopulations with tilts $+\theta$, $-\theta$ and $0$, combined with
+  balance-heuristic mixture weights, covers both wings while avoiding weight
+  blow-up.
+\end{remark}
+
+\section{Warm starting and update scheduling}\label{sec:warmstart}
+
+\subsection{Across time slices in the explicit scheme}
+
+The target function $\E[V_{t_k} \mid X_{t_k} = \cdot\,]$ moves by $O(\Delta t)$
+between adjacent slices, so initialising $\theta_k$ at $\theta_{k-1}$ leaves
+only a few gradient steps of work per slice. This is a large constant-factor
+reduction in training cost.
+
+\subsection{Reduced update frequency at later times}
+
+Early in the simulation the cloud spreads from a point mass and the
+correlation structure between $X$ and $V$ builds quickly, so the conditional
+expectation surface changes fast; later, mean reversion of $V$ drives it
+toward quasi-stationarity and updates can be less frequent, improving
+latency. A caution: a stale $f$ biases $\Lev$ at the skipped times, and this
+error feeds forward through the SDE and compounds, which cuts against the
+exact-calibration selling point. Prefer an event-triggered refresh: monitor
+the regression loss of the current network on the fresh cloud and retrain
+when it crosses a threshold. This yields a latency-accuracy trade-off with a
+defensible rule, and a natural trade-off plot for the experiments.
+
+\subsection{Explicit output as initialiser for the implicit scheme}
+
+Run the explicit pass first and use it to initialise the implicit one:
+distil the per-slice networks into the global network $f_\theta(t,x)$ as
+supervised pretraining, and take $\Lev^{0} = \Lev_{\mathrm{explicit}}$. This
+is more than engineering. The Ostrowski route of \cref{sec:theory} delivers
+only local convergence from a sufficiently good initial guess, and the
+explicit pass constructively supplies one: its output differs from the fixed
+point only by time-discretisation bias and regression noise. The explicit
+scheme is thus the initialiser that plausibly places the damped iteration
+inside its convergence basin. The engineering trick and the hypothesis of the
+local convergence theorem are the same statement.
 
 \section{Positioning}\label{sec:positioning}
 
