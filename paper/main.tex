@@ -1,0 +1,269 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------------------------------------------------------------
+% Core mathematics packages
+% ---------------------------------------------------------------
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}            % bold math symbols
+\usepackage{dsfont}        % indicator function \mathds{1}
+
+% ---------------------------------------------------------------
+% Algorithms
+% ---------------------------------------------------------------
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+
+% ---------------------------------------------------------------
+% Graphics, figures, and plots
+% ---------------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{subfigure}     % side-by-side figures
+\usepackage{adjustbox}     % fallback rescaling for wide TikZ diagrams
+
+% ---------------------------------------------------------------
+% Tables
+% ---------------------------------------------------------------
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{siunitx}       % decimal-aligned columns, SI units
+
+% ---------------------------------------------------------------
+% Cross-referencing and citations
+% ---------------------------------------------------------------
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+
+% ---------------------------------------------------------------
+% Typography
+% ---------------------------------------------------------------
+\usepackage{microtype}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% ---------------------------------------------------------------
+% Page layout
+% ---------------------------------------------------------------
+\usepackage[margin=2.5cm]{geometry}
+
+% ---------------------------------------------------------------
+% Miscellaneous
+% ---------------------------------------------------------------
+\usepackage{xcolor}
+\usepackage{todonotes}     % \todo{} markers for placeholders (paragraph-mode only)
+% \todo{} relies on \marginpar and fails in restricted horizontal mode
+% (captions, table cells, optional arguments); use \inlinetodo{} there instead.
+\newcommand{\inlinetodo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+
+% ---------------------------------------------------------------
+% Theorem environments (amsthm)
+% ---------------------------------------------------------------
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}{Assumption}
+\newtheorem{example}[theorem]{Example}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% ---------------------------------------------------------------
+% Notation macros
+% ---------------------------------------------------------------
+% Norms and inner products
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\normF}[1]{\left\lVert #1 \right\rVert_{\mathrm{F}}}
+\newcommand{\ip}[2]{\left\langle #1,\, #2 \right\rangle}
+\newcommand{\abs}[1]{\left\lvert #1 \right\rvert}
+
+% Calculus and optimisation
+\newcommand{\grad}{\nabla}
+\newcommand{\Hess}{\nabla^2}
+\newcommand{\Lapl}{\Delta}
+\newcommand{\divergence}{\operatorname{div}}
+\newcommand{\curl}{\operatorname{curl}}
+
+% Function spaces
+\newcommand{\Lp}[1]{L^{#1}}
+\newcommand{\Sob}[2]{H^{#1}(#2)}
+\newcommand{\SobZ}[2]{H^{#1}_0(#2)}
+
+% Operators and matrices
+\newcommand{\bA}{\mathbf{A}}
+\newcommand{\bB}{\mathbf{B}}
+\newcommand{\bJ}{\mathbf{J}}
+\newcommand{\bK}{\mathbf{K}}
+\newcommand{\bI}{\mathbf{I}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bz}{\mathbf{z}}
+\newcommand{\bu}{\mathbf{u}}
+\newcommand{\bv}{\mathbf{v}}
+
+% Probability and statistics
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\indicator}{\mathbf{1}}
+
+% Asymptotic notation
+\newcommand{\bigO}[1]{\mathcal{O}\!\left(#1\right)}
+\newcommand{\smallO}[1]{o\!\left(#1\right)}
+
+% Common domains
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\C}{\mathbb{C}}
+
+% Particle-method notation
+\newcommand{\xk}{x_k}
+\newcommand{\xik}{x_k^{(i)}}
+\newcommand{\wik}{w_k^{(i)}}
+\newcommand{\Np}{N}
+\newcommand{\dt}{\Delta t}
+
+\title{Neural Particle Method}
+
+\author{Osian Shelley\\
+  \texttt{osiandshelley@gmail.com}}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  \todo{150--250 word abstract. State: the problem being solved (a particle-based
+  discretisation of a PDE / measure-valued evolution learned or accelerated with a
+  neural network), the method (neural particle method), the theoretical or empirical
+  guarantee obtained, and the significance relative to existing particle methods and
+  neural PDE solvers.}
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+
+\todo{Motivate the problem. Particle methods (e.g.\ SPH, vortex methods, interacting
+particle approximations of McKean--Vlasov / Fokker--Planck equations) discretise a
+measure-valued PDE by a finite collection of particles. State what is added by
+combining this discretisation with a neural network component (e.g.\ learned
+interaction kernel, learned drift, or learned closure).}
+
+\todo{Survey related work using \texttt{\textbackslash citet\{\}} and
+\texttt{\textbackslash citep\{\}}: classical particle methods, mean-field limits,
+and neural approaches to PDEs / interacting particle systems.}
+
+\todo{State the gap addressed and list contributions (numbered or itemised).}
+
+\todo{Outline the remainder of the paper.}
+
+\section{Problem Formulation}\label{sec:problem}
+
+\todo{State the PDE or measure-valued evolution of interest, e.g.\ a Fokker--Planck
+or McKean--Vlasov equation
+\[
+  \partial_t \rho_t = -\divergence\bigl(b[\rho_t]\,\rho_t\bigr)
+    + \tfrac{1}{2}\Lapl\bigl(\sigma^2 \rho_t\bigr),
+\]
+together with the empirical particle approximation
+\[
+  \rho_t \approx \rho_t^\Np \coloneqq \frac{1}{\Np}\sum_{i=1}^{\Np}
+    \indicator_{\{X_t^{(i)}\}},
+\]
+and describe where a neural network parametrises part of the dynamics.}
+
+\section{Neural Particle Method}\label{sec:method}
+
+\todo{Define the particle update rule. Example scaffold:
+\[
+  \xik[k+1] = \xik[k] + \dt\, b_\theta\bigl(\xik[k], \{\xik[k]\}_{j=1}^{\Np}\bigr)
+    + \sigma\sqrt{\dt}\,\xi_k^{(i)},
+\]
+where $b_\theta$ is a neural network with parameters $\theta$, and describe the loss
+used to train $\theta$.}
+
+\begin{algorithm}[H]
+\caption{Neural Particle Method}\label{alg:npm}
+\KwIn{Initial particles $\{x_0^{(i)}\}_{i=1}^{\Np}$; network $b_\theta$; step $\dt$;
+      number of steps $K$}
+\KwOut{Particle trajectories $\{x_k^{(i)}\}_{k=0}^{K}$}
+\For{$k = 0, 1, \ldots, K-1$}{
+  \For{$i = 1, \ldots, \Np$}{
+    Evaluate $b_\theta\bigl(\xik[k], \{\xik[k]\}_{j=1}^{\Np}\bigr)$\;
+    Update $\xik[k+1] \leftarrow \xik[k] + \dt\, b_\theta(\cdot) + \sigma\sqrt{\dt}\,\xi_k^{(i)}$\;
+  }
+}
+\Return{$\{x_k^{(i)}\}$}\;
+\end{algorithm}
+
+\section{Assumptions}\label{sec:assumptions}
+
+\begin{assumption}\label{ass:regularity}
+  \todo{State regularity conditions on the true drift / interaction kernel and on
+  the network parametrisation $b_\theta$ (e.g.\ Lipschitz continuity, boundedness).}
+\end{assumption}
+
+\section{Main Results}\label{sec:results}
+
+\begin{theorem}[Descriptive title, e.g.\ propagation of chaos / convergence rate]\label{thm:main}
+% TODO: replace the bracketed title above once the main result is fixed.
+  \todo{Under \cref{ass:regularity}, state the main theoretical result: convergence
+  of the neural particle approximation to the mean-field limit, or a generalisation
+  / approximation error bound.}
+\end{theorem}
+
+\begin{proof}
+  \todo{Proof to be completed.}
+\end{proof}
+
+\section{Numerical Experiments}\label{sec:experiments}
+
+\todo{Describe test problems, baselines (classical particle methods, exact/reference
+solutions where available), metrics, and present results as tables (\cref{tab:results})
+and figures.}
+
+\begin{table}[ht]
+\centering
+\caption{\inlinetodo{Comparison against baseline methods.}}\label{tab:results}
+\begin{tabular}{lccc}
+\toprule
+Method & \inlinetodo{Metric 1} & \inlinetodo{Metric 2} & \inlinetodo{Metric 3} \\
+\midrule
+\inlinetodo{Baseline} & -- & -- & -- \\
+\inlinetodo{Neural particle method} & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Conclusion}\label{sec:conclusion}
+
+\todo{Summarise contributions and results. State limitations and directions for
+future work.}
+
+\begin{thebibliography}{99}
+
+\bibitem{golub2013}
+G.~H.~Golub and C.~F.~Van~Loan,
+\textit{Matrix Computations},
+4th~ed.,
+Johns Hopkins University Press, Baltimore, MD, 2013.
+
+\bibitem{raissi2019}
+M.~Raissi, P.~Perdikaris, and G.~E.~Karniadakis,
+``Physics-informed neural networks: A deep learning framework for solving forward
+and inverse problems involving nonlinear partial differential equations,''
+\textit{Journal of Computational Physics},
+vol.~378, pp.~686--707, 2019.
+
+\end{thebibliography}
+
+\end{document}
