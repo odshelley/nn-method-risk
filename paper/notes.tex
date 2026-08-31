@@ -314,6 +314,72 @@ simulation.
   \cref{rem:selfnorm}.
 \end{remark}
 
+\subsection{The density process, explicitly}\label{subsec:density}
+
+Rotate to the basis adapted to the constraint. Set
+\[
+  B^\perp_t \coloneqq \sqrt{1-\rho^2}\,W_t - \rho\,W^\perp_t ,
+\]
+so that $\langle B^\perp\rangle_t = t$ and $\langle B, B^\perp\rangle_t = 0$:
+the pair $(B, B^\perp)$ consists of independent $P$-Brownian motions, and the
+stock driver decomposes as $W = \rho B + \sqrt{1-\rho^2}\,B^\perp$. With
+$\theta^\perp = -\rho\theta/\sqrt{1-\rho^2}$ forced by \cref{eq:constraint},
+\[
+  \theta\,dW + \theta^\perp\,dW^\perp
+  = \frac{\theta}{\sqrt{1-\rho^2}}
+    \bigl(\sqrt{1-\rho^2}\,dW - \rho\,dW^\perp\bigr)
+  = \eta\,dB^\perp,
+  \qquad
+  \eta_t \coloneqq \frac{\theta_t}{\sqrt{1-\rho^2}} .
+\]
+The constrained two-dimensional change of measure is therefore a
+one-dimensional exponential tilt of $B^\perp$, the component of the stock
+noise orthogonal to the volatility driver, which is the only direction the
+constraint leaves available. The density process is
+\begin{equation}\label{eq:density}
+  Z_t = \left.\frac{dQ}{dP}\right|_{\mathcal{F}_t}
+      = \mathcal{E}\Bigl(\int \eta\,dB^\perp\Bigr)_t
+      = \exp\Bigl( \int_0^t \eta_s\,dB^\perp_s
+        - \tfrac12 \int_0^t \eta_s^2\,ds \Bigr),
+\end{equation}
+a true martingale under the Novikov condition, automatic for bounded
+$\theta$, deterministic or state dependent. Its quadratic exponent
+$\int \eta_s^2\,ds = \int \theta_s^2/(1-\rho^2)\,ds$ recovers the cost of
+\cref{rem:cost} directly from the derivation.
+
+Under $Q$, Girsanov gives that $\widetilde{B}^\perp = B^\perp - \int \eta\,ds$
+is a Brownian motion while $B$, orthogonal to the kernel, is untouched, so
+$V$ is pathwise unchanged; the stock driver gains drift
+$\sqrt{1-\rho^2}\,\eta = \theta$ and
+\[
+  d\ln X_t = \Bigl( -\tfrac12 \Lev^2 V_t + \Lev\sqrt{V_t}\,\theta_t \Bigr) dt
+    + \Lev\sqrt{V_t}\,dW^Q_t .
+\]
+The importance weights, expressed in the $Q$-Brownian motion actually
+simulated, are
+\begin{equation}\label{eq:weights}
+  \left.\frac{dP}{dQ}\right|_{t} = Z_t^{-1}
+  = \exp\Bigl( -\int_0^t \eta_s\,d\widetilde{B}^\perp_s
+    - \tfrac12 \int_0^t \eta_s^2\,ds \Bigr),
+\end{equation}
+so each particle's log-weight updates recursively per Euler step as
+$\ln w \leftarrow \ln w - \eta\,\Delta\widetilde{B}^\perp
+- \tfrac12 \eta^2 \Delta t$ with
+$\Delta\widetilde{B}^\perp \sim N(0, \Delta t)$ the drawn increment. This
+coincides with the ratio of Gaussian step densities
+$\varphi_{N(0,\Delta t)}(\Delta B^\perp) /
+\varphi_{N(\eta\Delta t,\Delta t)}(\Delta B^\perp)$, so the continuous-time
+formula and the exact discrete-chain weights agree step by step: the
+exactness of \cref{rem:discrete} is an identity, not an approximation
+statement.
+
+\begin{remark}[Weights are independent of the volatility path]\label{rem:indep}
+  For deterministic $\eta$, $\ln Z$ is Gaussian and independent of $B$,
+  hence of the entire $V$ path: the weights live purely on the stock's
+  idiosyncratic noise $B^\perp$. This is the cleanest possible shape for the
+  conditional-variance term in \cref{rem:selfnorm}.
+\end{remark}
+
 \subsection{Weighted $L^2$ regression recovers the $P$-conditional expectation}
 
 Let $Z = dP/dQ$. For any measurable $f$, the weighted loss
