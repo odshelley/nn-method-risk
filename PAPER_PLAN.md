@@ -186,3 +186,32 @@ Li Imperial thesis: three-estimator comparison (NW, RKHS ridge, bin MC), RKHS de
 
 ### Caveat
 GHL book/SSRN originals, Ren-Madan-Qian, Tataru-Fisher paywalled; absences checked via secondary sources only.
+
+---
+
+## Addendum 2026-08-31 (latency analysis, from Osian via papers session)
+
+Concern: explicit is online (per-slice SGD inside the simulation loop) -> wants speedups. Implicit -> make it structurally offline.
+
+### Explicit: four levers, payoff order
+1. **Warm-start across slices** (already in notes sec 8; sweep confirmed unclaimed). Target moves O(dt) -> few SGD steps per slice, not a training loop per slice.
+2. **Freeze the body, solve the head.** Network as feature extractor trained rarely (first slices or offline); per slice solve ONLY a linear readout by closed-form ridge least squares, O(Np + p^3), no SGD in the inner loop. Learned-feature LSMC. Per-slice cost ~ Bayer RKHS solve but with adaptive features. KEY: linear-in-features + ridge recovers the regularised structure Bayer's Wasserstein-Lipschitz theory needs -> partially answers their objection AND is the best latency/rigour trade-off. Likely the workhorse configuration.
+3. **Retrain on a coarser grid than you simulate.** Kernel estimators must recompute every step; a network generalises in t. Retrain every m-th slice (or t-input net, sporadic fine-tune). Calibration identity only needs the estimator refreshed at the rate the conditional law moves. (Links to event-triggered refresh in notes sec 8.)
+4. **Reduce N, not steps.** Muguruza conditioning or Cozma control variates shrink particle count per unit estimator variance -> shrinks every regression. Orthogonal, stackable.
+
+### Implicit: make offline structural
+Plain observation: the damped outer iteration is calibration-time cost, not pricing-time cost. Overnight-calibrate/intraday-price makes latency nearly irrelevant; bites only on recalibration frequency.
+
+Intraday recalibration, two routes:
+1. **Amortise the fixed point, correct online.** Offline: train map from market inputs (Dupire surface, SV params) to the FIXED POINT (L* or f*) over a distribution of surfaces. Online: evaluate operator (sub-ms), then 1-2 damped corrections to restore by-construction vanilla fit. HONEST DIFFERENTIATOR vs arXiv:2608.01217 (they amortise and stop, accepting operator error; we amortise the INITIALISATION, keep particle-method exactness). Tagline: "operator speed, particle-method accuracy." Bonus: damping analysis gives local contraction rate r -> BOUND the number of corrections needed from warm-start quality (n >= log(tol/delta0)/log r). Theory section directly powers the latency claim.
+2. **Self-consistency loss** (riskier). Simulate under L_theta = sigma_Dup/sqrt(f_theta), minimise regression residual under the law f_theta itself induces, differentiate through the simulation (CKT machinery shows backprop through LSV sim workable). Fixed point becomes stationarity of one optimisation. Costs: differentiating through the McKean interaction is delicate; the clean damped-iteration theory is lost. Park unless route 1 disappoints.
+
+### Desk combination (the story for the paper's "practice" section)
+Overnight full implicit solve (possibly amortiser-initialised); intraday warm-started explicit sweeps or a couple of damped corrections on the bumped surface. Surfaces move little intraday -> warm starts near fixed point -> contraction theory QUANTIFIES convergence speed. A quantifiable latency claim, not a hope.
+
+### New claims
+| # | Claim (draft) | Evidence | Status |
+|---|---|---|---|
+| C10 | Frozen-body + ridge-head readout matches full per-slice training accuracy at a fraction of latency, and inherits Bayer-style stability | none yet | needs experiment + short lemma (ridge head = RKHS-with-learned-kernel) |
+| C11 | Amortised initialisation + k damped corrections restores vanilla fit with k predicted by local contraction rate | none yet | needs experiment (bumped-surface recalibration); theory from eps/(1-r) machinery |
+| C12 | Coarser retraining grid (every m-th slice) degrades repricing gracefully in m with event-triggered refresh as the adaptive variant | none yet | needs experiment (extends C8) |
