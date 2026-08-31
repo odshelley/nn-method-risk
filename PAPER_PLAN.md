@@ -167,3 +167,22 @@ Paper skeleton already exists at paper/main.tex (compiling scaffold with theorem
 | C7 | Girsanov IS materially improves tail leverage accuracy at fixed particle budget (both NN and NW) | none yet | needs experiment (wing repricing error with/without IS) |
 | C8 | Event-triggered refresh cuts explicit-scheme training cost substantially at negligible repricing cost | none yet | needs experiment (latency-accuracy curve) |
 | C9 | Explicit warm start reduces implicit iterations to convergence vs cold start | none yet | needs experiment |
+
+---
+
+## Addendum 2026-08-31 (prior-art check; full reports in papers/prior_art/)
+
+### Verdicts on the four novelty questions
+1. **NN L2 regression of E[V|X] inside the particle loop: CLEAN.** Slot held by kernels/bins/RKHS/exact-density. Near-misses that shape the paper: Hakala (Frontiers AI 2019) considered MLPs for this exact regression and explicitly deferred them on training cost -> we must beat his PURBF baseline (not just NW) AND answer the training-cost objection (our warm-starting is the answer). Bayer et al. p.5 tried global basis regression and abandoned it because Wasserstein-Lipschitz constants of the conditional-expectation map blow up as basis grows -> the referee objection to plain-L2 neural regression is already in print; inherit a regularisation controlling the constant or frame theory as explicitly open. van der Stoep-Grzelak-Oosterlee 2014 Rem 3.2 rejected polynomial L2 on positivity grounds -> softplus/log parametrisation answers directly; cite.
+2. **Spectral/damped analysis of leverage iteration: NO PUBLISHED ANALYSIS.** Contraction asserted never proved (Reghai 2006 via Cozma App E.3). Wyns & in 't Hout: undamped inner iteration, Q=2 fixed. Acceleration precedent: Anderson acceleration, Nastasi-Pallavicini-Sartorelli arXiv:1808.09685, zero theory. Rigorous template to position against: Acciaio-Marini-Pammer arXiv:2311.14567 (linear rate for Bass LV fixed point, different operator). False friend: Cozma's "dampened Kolmogorov PDE" is a change of variable, not iteration damping - pre-empt confusion.
+3. **Girsanov IS in particle LSV calibration: CLEAN.** Existing variance reduction = control variates (Cozma, Cuchiero) or conditioning/Rao-Blackwellisation (Muguruza - distinguish head-on: Gaussian per-particle weights are conditional MC, not a measure change). MUST CITE structural precedent: dos Reis-Smith-Tankov arXiv:1803.09320, IS for McKean-Vlasov SDEs - their decoupling (freeze law component, tilt decoupled SDE) is exactly our spot-only-drift structure; no finance/calibration in it.
+4. **Warm-starting/amortisation: unclaimed.** CKT: separate net per maturity interval, no warm-start statement. Hakala's "pretrained MLP" sentence is the 2019 seed, never executed.
+
+### Title decision (updated)
+"Neural Particle Method" has FOUR exact collisions (Wessels CMAME 2020 owns NPM acronym; MDPI 2023 INPM; arXiv:2508.16916; arXiv:2603.10874 math.NA Landau equation, Mar 2026 - reviewer overlap risk). Math-finance namespace clean but math.NA reviewers overlap. Checked and unused: "Neural leverage calibration", "neural Markovian projection". -> retitle; keep repo name.
+
+### Experimental design steal
+Li Imperial thesis: three-estimator comparison (NW, RKHS ridge, bin MC), RKHS degrades worst at small N and strong spot-vol correlation; mirror their Fig 5.2 design and add NN as fourth estimator.
+
+### Caveat
+GHL book/SSRN originals, Ren-Madan-Qian, Tataru-Fisher paywalled; absences checked via secondary sources only.
