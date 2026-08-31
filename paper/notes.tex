@@ -321,6 +321,47 @@ Adjacent literatures use neural $L^2$ conditional expectation regression as stan
 In one dimension the particle method is fast and works well, so the honest comparison targets are PURBF and bin Monte Carlo at realistic particle budgets, with tail accuracy under importance sampling as the differentiator. Kernel methods genuinely fail, and networks do not, in multi-asset LSV; if there is a dimensional story, that is the strongest version of the paper.
 
 
+\section{Risk paper outline}\label{sec:riskoutline}
+
+Working outline for a Cutting Edge submission. Target length is six pages in the magazine format, which forces the split recorded in \cref{subsec:split}. The framing sentence for the whole paper, in one line: the particle method without the kernel. Everything below serves that sentence.
+
+\subsection{Proposed structure}
+
+\begin{enumerate}
+\item \emph{The smile calibration problem and the kernel bottleneck.} One column. Recall \cref{eq:lsv,eq:leverage} and the particle method of \citet{guyon2012particular}, then name the three documented weaknesses (bandwidth selection, wing degradation, loss of convergence at large vol-of-vol) with the citations from \cref{sec:positioning}. No McKean--Vlasov language beyond a single sentence; Risk readers know the method, not the theory.
+\item \emph{Neural $L^2$ regression in the particle loop.} The projection identity \cref{eq:l2proj}, the explicit scheme and \cref{alg:explicit}, the softplus positivity layer presented as answering \citet[Remark~3.2]{vanderstoep2014}, and warm starting across slices presented as answering the training-cost objection of \citet{hakala2019}. The implicit scheme is mentioned in one paragraph as the overnight variant, with the damped iteration stated and the analysis deferred to the companion paper.
+\item \emph{The estimator spectrum.} Short section. Kernel, spline head, learned-feature ridge head, full per-slice network, as in \cref{sec:warmstart}, with the spline head flagged as the strongest classical baseline in one dimension and the network earning its keep in higher dimension. This section exists so that the ablation figure has a home and so that the paper cannot be read as claiming networks beat everything everywhere.
+\item \emph{Importance sampling for the wings.} The volatility-preserving tilt of \cref{sec:girsanov}, stated with the constraint \cref{eq:constraint}, the weight recursion from \cref{alg:explicit}, and \cref{rem:cost,rem:selfnorm} in words rather than displays. Emphasise that the device applies unchanged to the classical kernel method, which widens the readership beyond adopters of the neural estimator.
+\item \emph{Numerical results.} The experiment campaign of \cref{subsec:campaign}.
+\item \emph{Latency and deployment.} The desk pattern of \cref{sec:warmstart}, the event-triggered refresh rule, and the amortise-then-correct claim with the correction-count bound stated informally. One column.
+\item \emph{Conclusion.} Limitations stated plainly, including the regularisation caveat inherited from \citet{bayer2022rkhs} and the open theory for the unregularised limit.
+\end{enumerate}
+
+\subsection{Figures and the claims they carry}
+
+Each headline claim gets exactly one figure. Anything without a figure is prose.
+
+\begin{enumerate}
+\item \emph{Fig.~1, accuracy.} Repricing error in implied vol basis points across the full strike-maturity surface, four estimators (kernel, bins, spline head, network) at a fixed particle budget, synthetic Heston ground truth. Carries the claim that the neural estimator matches or beats the classical ones where they work.
+\item \emph{Fig.~2, wings.} Leverage function and repricing error in the wings, with and without the tilt, plus effective sample size per bucket. Carries the importance sampling claim, and is the figure the paper is sold on.
+\item \emph{Fig.~3, robustness.} Convergence and failure across the (vol-of-vol, mixing fraction) plane, kernel versus network, locating the documented failure region of \citet{muguruza2019} and showing where each method degrades. Carries the robustness claim.
+\item \emph{Fig.~4, latency.} The latency-accuracy trade-off traced by the event-triggered refresh threshold, with the warm-started and cold-started explicit schemes and the kernel method as reference lines. Carries the deployment claim.
+\item \emph{Table~1, market data.} Calibration on a real surface (FX or SPX, decision pending, \cref{subsec:campaign}) with repricing error, runtime, and one exotic (a no-touch, following \citet{cozma2019} for the market and instrument convention) repriced under the calibrated model.
+\end{enumerate}
+
+\subsection{Experiment campaign}\label{subsec:campaign}
+
+Minimum set behind the figures above, mirroring the design of \citet{li2023thesis} and adding the network as the fourth estimator. Synthetic Heston with known Dupire surface for Figs.~1--3; particle counts $N \in \{10^3, 10^4, 10^5\}$; repetitions with confidence bands, following their Fig.~5.2. Real data for Table~1. \inlinetodo{Decide FX (EUR/USD, matches \citet{cozma2019} and the thesis) versus SPX (matches the joint-calibration literature); FX currently favoured for the no-touch test.} PURBF \citep{hakala2019} joins the baseline set if time permits, since it is the strongest published classical estimator and the source of the deferred-MLP objection.
+
+\subsection{The split decision}\label{subsec:split}
+
+Recorded as an open decision with a recommendation. The material naturally makes two Cutting Edge papers rather than one. Paper A, the neural estimator paper, is the outline above. Paper B, the importance sampling paper, takes \cref{sec:girsanov} alone, applied to the \emph{classical kernel} particle method, with Fig.~2 as its centrepiece; it is self-contained, immediately usable by any desk running the standard method, and does not require the reader to adopt anything neural. If both are written, Paper B goes first and Paper A cites it, shortening Paper A by a section and strengthening both. The theory (spectral analysis of the damped iteration, the perturbed fixed point statement, Fr\'echet differentiability) is in neither; it is the companion mathematics paper, targeted at SIAM Journal on Financial Mathematics. \inlinetodo{Decide one Risk paper versus two before drafting; recommendation is two.}
+
+\subsection{Format constraints}
+
+Cutting Edge is roughly 3{,}500 words plus displays, technical appendices allowed online. The algorithms fit; the derivation of \cref{subsec:density} does not, and moves to the online appendix with only \cref{eq:constraint,eq:weights} in the body. House style forbids theorem environments; \cref{rem:selfnorm,rem:cost} become prose. All claims about the literature carry the citations already collected in \cref{sec:positioning}, which maps one-to-one onto the related-work paragraph Risk expects.
+
+
 \begin{thebibliography}{99}
 
 \bibitem[Gy\"ongy(1986)]{gyongy1986} I.~Gy\"ongy, ``Mimicking the one-dimensional marginal distributions of processes having an It\^o differential,'' \textit{Probability Theory and Related Fields}, vol.~71, no.~4, pp.~501--516, 1986.
