@@ -19,3 +19,6 @@ paper/*.fdb_latexmk
 paper/*.synctex.gz
 paper/*.bbl
 paper/*.blg
+
+# Paper PDFs (92MB, re-downloadable via papers/READING_LIST.md links)
+papers/pdf/
