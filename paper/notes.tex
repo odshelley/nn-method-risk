@@ -396,6 +396,21 @@ answered within the method rather than around
 it; a short lemma identifying the ridge head with RKHS regression on a
 learned kernel should be written.
 
+The residual view sharpens the estimator. Writing $w_k = w_{k-1} +
+\Delta$ and solving for the correction $\Delta$ is, unpenalised, identical
+to solving for $w_k$ directly, by linearity. The two differ once
+regularised: penalising $\lambda\norm{w_k}^2$ shrinks toward the zero
+function, while penalising $\lambda\norm{w_k - w_{k-1}}^2$ shrinks toward
+the previous slice's fit, the linear-head analogue of warm starting. The
+latter is the right prior here: the target moves by $O(\Delta t)$ between
+slices, so the true residual is small and strong shrinkage toward
+$w_{k-1}$ costs negligible bias while buying variance reduction precisely
+in the thin-data tails, and it makes the leverage surface coherent in time
+rather than independently noisy per slice. The cost is unchanged (same
+solve, shifted right-hand side); under a positivity layer the linearity is
+only approximate and the equivalence with the direct parametrisation
+breaks slightly.
+
 A fixed-basis instantiation of the same idea replaces the learned features
 with B-splines. Cubic B-splines on knots placed at quantiles of the particle
 cloud have local support, so the weighted normal equations are banded and
