@@ -381,8 +381,9 @@ defensible rule, and a natural trade-off plot for the experiments.
 
 \subsection{Frozen features and a ridge head}
 
-Train the network body rarely (on the first slices, or offline) and treat it
-as a feature extractor; per slice, solve only a linear readout on the
+This lever, like the two above, concerns the explicit scheme's per-slice
+regression. Train the network body rarely (on the first slices, or offline)
+and treat it as a feature extractor; per slice, solve only a linear readout on the
 learned features by closed-form ridge least squares, at cost $O(Np + p^3)$
 for $p$ features, with no gradient descent inside the simulation loop. This
 is least-squares Monte Carlo with learned features. Beyond latency, the
