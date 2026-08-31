@@ -31,6 +31,8 @@
 \newcommand{\inlinetodo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
 
 \newcommand{\E}{\mathbb{E}}
+\newcommand{\Pm}{\mathbb{P}}
+\newcommand{\Qm}{\mathbb{Q}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
 \newcommand{\abs}[1]{\left\lvert #1 \right\rvert}
@@ -285,7 +287,7 @@ subject to the constraint
 \begin{equation}\label{eq:constraint}
   \rho\,\theta + \sqrt{1-\rho^2}\,\theta^\perp = 0 .
 \end{equation}
-Under the new measure $Q$, the process $B$ receives drift
+Under the new measure $\Qm$, the process $B$ receives drift
 $\rho\theta + \sqrt{1-\rho^2}\theta^\perp = 0$ and therefore remains a
 Brownian motion, so the dynamics of $V$ are unchanged, and with the same
 realisation of $B$ the $V$ paths are literally identical. Meanwhile $W$
@@ -321,7 +323,7 @@ Rotate to the basis adapted to the constraint. Set
   B^\perp_t \coloneqq \sqrt{1-\rho^2}\,W_t - \rho\,W^\perp_t ,
 \]
 so that $\langle B^\perp\rangle_t = t$ and $\langle B, B^\perp\rangle_t = 0$:
-the pair $(B, B^\perp)$ consists of independent $P$-Brownian motions, and the
+the pair $(B, B^\perp)$ consists of independent $\Pm$-Brownian motions, and the
 stock driver decomposes as $W = \rho B + \sqrt{1-\rho^2}\,B^\perp$. With
 $\theta^\perp = -\rho\theta/\sqrt{1-\rho^2}$ forced by \cref{eq:constraint},
 \[
@@ -337,7 +339,7 @@ one-dimensional exponential tilt of $B^\perp$, the component of the stock
 noise orthogonal to the volatility driver, which is the only direction the
 constraint leaves available. The density process is
 \begin{equation}\label{eq:density}
-  Z_t = \left.\frac{dQ}{dP}\right|_{\mathcal{F}_t}
+  Z_t = \left.\frac{d\Qm}{d\Pm}\right|_{\mathcal{F}_t}
       = \mathcal{E}\Bigl(\int \eta\,dB^\perp\Bigr)_t
       = \exp\Bigl( \int_0^t \eta_s\,dB^\perp_s
         - \tfrac12 \int_0^t \eta_s^2\,ds \Bigr),
@@ -347,7 +349,7 @@ $\theta$, deterministic or state dependent. Its quadratic exponent
 $\int \eta_s^2\,ds = \int \theta_s^2/(1-\rho^2)\,ds$ recovers the cost of
 \cref{rem:cost} directly from the derivation.
 
-Under $Q$, Girsanov gives that $\widetilde{B}^\perp = B^\perp - \int \eta\,ds$
+Under $\Qm$, Girsanov gives that $\widetilde{B}^\perp = B^\perp - \int \eta\,ds$
 is a Brownian motion while $B$, orthogonal to the kernel, is untouched, so
 $V$ is pathwise unchanged; the stock driver gains drift
 $\sqrt{1-\rho^2}\,\eta = \theta$ and
@@ -355,10 +357,10 @@ $\sqrt{1-\rho^2}\,\eta = \theta$ and
   d\ln X_t = \Bigl( -\tfrac12 \Lev^2 V_t + \Lev\sqrt{V_t}\,\theta_t \Bigr) dt
     + \Lev\sqrt{V_t}\,dW^Q_t .
 \]
-The importance weights, expressed in the $Q$-Brownian motion actually
+The importance weights, expressed in the $\Qm$-Brownian motion actually
 simulated, are
 \begin{equation}\label{eq:weights}
-  \left.\frac{dP}{dQ}\right|_{t} = Z_t^{-1}
+  \left.\frac{d\Pm}{d\Qm}\right|_{t} = Z_t^{-1}
   = \exp\Bigl( -\int_0^t \eta_s\,d\widetilde{B}^\perp_s
     - \tfrac12 \int_0^t \eta_s^2\,ds \Bigr),
 \end{equation}
@@ -380,13 +382,13 @@ statement.
   conditional-variance term in \cref{rem:selfnorm}.
 \end{remark}
 
-\subsection{Weighted $L^2$ regression recovers the $P$-conditional expectation}
+\subsection{Weighted $L^2$ regression recovers the $\Pm$-conditional expectation}
 
-Let $Z = dP/dQ$. For any measurable $f$, the weighted loss
-$\E_Q\!\left[ Z\,(V_t - f(X_t))^2 \right]$ is minimised pointwise by
+Let $Z = d\Pm/d\Qm$. For any measurable $f$, the weighted loss
+$\E_{\Qm}\!\left[ Z\,(V_t - f(X_t))^2 \right]$ is minimised pointwise by
 \begin{equation}\label{eq:weightedreg}
-  f(x) = \frac{\E_Q[Z V_t \mid X_t = x]}{\E_Q[Z \mid X_t = x]}
-       = \E_P[V_t \mid X_t = x],
+  f(x) = \frac{\E_{\Qm}[Z V_t \mid X_t = x]}{\E_{\Qm}[Z \mid X_t = x]}
+       = \E_{\Pm}[V_t \mid X_t = x],
 \end{equation}
 by the abstract Bayes formula. Importance-weighted $L^2$ minimisation
 therefore recovers the correct conditional expectation with no further
@@ -407,7 +409,7 @@ improves both.
 
 \begin{remark}[Exact discrete-time weights]\label{rem:discrete}
   In the simulated chain no continuous-time Girsanov argument is needed:
-  draw the tilted Gaussian increments under $Q$ and accumulate the exact
+  draw the tilted Gaussian increments under $\Qm$ and accumulate the exact
   ratio of Gaussian densities step by step. The resulting weights are exact
   for the discretised chain, with no discretisation error in the measure
   change itself.
