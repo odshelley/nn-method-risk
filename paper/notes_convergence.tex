@@ -134,8 +134,7 @@ bound on $\norm{D\Phimap}$. Stronger hypothesis, global conclusion (existence,
 uniqueness, geometric convergence).
 
 \emph{Honest fallback structure.} Establish existence by a short-horizon
-contraction argument (Lipschitz constant of $\Phimap$ of order $CT$, matching
-the short-time results in the literature), or by Schauder compactness for the
+contraction argument (Lipschitz constant of $\Phimap$ of order $CT$, matching the short-time results of \citet{abergel2010}), or by Schauder compactness for the
 discretised problem (existence without uniqueness); then apply the Ostrowski
 route for local convergence of the damped iteration.
 
@@ -169,22 +168,55 @@ finite-particle error. Target statement: under \cref{ass:spectral} and for
 $\alpha$ below the threshold \cref{eq:threshold}, the damped iteration on
 $\widehat{\Phimap}$ converges to an $\varepsilon/(1-r)$-neighbourhood of
 $\Lev^*$, where $r < 1$ is the contraction factor of the linearised damped map.
-This has the same structure as the deep BSDE error analyses, and it is the
+This has the same structure as the deep BSDE error analyses \citep{hure2020}, and it is the
 statement the experiments can verify.
 
 \subsection{State of the well-posedness literature}
 
 Well-posedness of the calibrated McKean--Vlasov equation is open in full
-generality. Milestones: short-time existence for the associated nonlinear PIDE
-(Abergel--Tachet 2010); existence for finite-state volatility (Jourdain--Zhou);
-inversion of the Markovian projection and stationary solutions under
-restrictions (Lacker--Shkolnikov--Zhang 2019); existence under non-regular
-coefficients with propagation of chaos (Djete 2022); strong
-existence-uniqueness for finite-state volatility with propagation of chaos
-(Mustapha 2024). Continuous-state Heston-type LSV remains unresolved without
+generality. Milestones: short-time existence for the associated nonlinear PIDE \citep{abergel2010}; existence for finite-state volatility \citep{jourdainzhou2020}; inversion of the Markovian projection and stationary solutions under restrictions \citep{lacker2020}; existence under non-regular coefficients with propagation of chaos \citep{djete2022}; strong existence-uniqueness for finite-state volatility with propagation of chaos \citep{mustapha2024}. Continuous-state Heston-type LSV remains unresolved without
 regularisation. Any fixed-point claim should therefore be made for the
 discretised or regularised map, or under \cref{ass:spectral} as a named
 hypothesis, and not in a generality exceeding these results. See
 \texttt{papers/READING\_LIST.md} for the annotated list.
+
+
+\begin{thebibliography}{9}
+
+\bibitem[Abergel and Tachet(2010)]{abergel2010}
+F.~Abergel and R.~Tachet,
+``A nonlinear partial integro-differential equation from mathematical finance,''
+\textit{Discrete and Continuous Dynamical Systems A},
+vol.~27, no.~3, pp.~907--917, 2010.
+
+\bibitem[Jourdain and Zhou(2020)]{jourdainzhou2020}
+B.~Jourdain and A.~Zhou,
+``Existence of a calibrated regime switching local volatility model and new fake Brownian motions,''
+\textit{Mathematical Finance}, vol.~30, no.~2, 2020.
+\textit{arXiv preprint} arXiv:1607.00077.
+
+\bibitem[Lacker et~al.(2020)]{lacker2020}
+D.~Lacker, M.~Shkolnikov, and J.~Zhang,
+``Inverting the Markovian projection, with an application to local stochastic volatility models,''
+\textit{Annals of Probability}, vol.~48, no.~5, 2020.
+\textit{arXiv preprint} arXiv:1905.06213.
+
+\bibitem[Djete(2022)]{djete2022}
+M.~F. Djete,
+``Non-regular McKean--Vlasov equations and calibration problem in local stochastic volatility models,''
+\textit{arXiv preprint} arXiv:2208.09986, 2022 (revised 2024).
+
+\bibitem[Mustapha(2024)]{mustapha2024}
+S.~Mustapha,
+``Strong existence and uniqueness of a calibrated local stochastic volatility model,''
+\textit{arXiv preprint} arXiv:2406.14074, 2024.
+
+\bibitem[Hur\'e et~al.(2020)]{hure2020}
+C.~Hur\'e, H.~Pham, and X.~Warin,
+``Deep backward schemes for high-dimensional nonlinear PDEs,''
+\textit{Mathematics of Computation},
+vol.~89, no.~324, pp.~1547--1579, 2020.
+
+\end{thebibliography}
 
 \end{document}

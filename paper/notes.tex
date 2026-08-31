@@ -70,10 +70,9 @@ where $V$ is a stochastic variance factor (Heston or similar) driven by a
 Brownian motion $B$ with $d\langle W, B\rangle_t = \rho\,dt$, and
 $\Lev\colon [0,T]\times\R_+ \to \R_+$ is the leverage function.
 
-By Gy\"ongy's mimicking theorem, the Markovian projection of \cref{eq:lsv} has
+By Gy\"ongy's mimicking theorem \citep{gyongy1986}, the Markovian projection of \cref{eq:lsv} has
 local variance $\Lev^2(t,x)\,\E[V_t \mid X_t = x]$. The model reprices all
-vanilla options if and only if this equals the Dupire local variance, which
-forces
+vanilla options if and only if this equals the Dupire local variance \citep{dupire1994}, which forces
 \begin{equation}\label{eq:leverage}
   \Lev(t,x) = \frac{\sigDup(t,x)}{\sqrt{\E[V_t \mid X_t = x]}}.
 \end{equation}
@@ -99,8 +98,7 @@ functions $f$,
 Given a simulated particle cloud $\{(X^{(i)}_t, V^{(i)}_t)\}_{i=1}^{N}$, we
 train a neural network $f_\theta$ by minimising the empirical squared loss and
 read off the conditional expectation. No kernel, no bandwidth selection, no
-density estimation. This replaces the Nadaraya--Watson step of the
-Guyon--Henry-Labord\`ere particle method.
+density estimation. This replaces the Nadaraya--Watson step of the Guyon--Henry-Labord\`ere particle method \citep{guyon2011smile,guyon2012particular,guyon2013nonlinear}.
 
 \section{Explicit scheme}\label{sec:explicit}
 
@@ -198,7 +196,7 @@ into data-poor slices (tails, short maturities).
     sampling of \cref{sec:girsanov}; the cross-time strength borrowing of the
     implicit scheme also helps.
   \item \emph{Dupire input.} $\sigDup$ requires an arbitrage-free implied
-    volatility surface; treat as given and cite the standard machinery.
+    volatility surface; treat as given, with \citep{chataigner2020} for the standard machinery.
   \item \emph{Time interpolation (explicit scheme).} $\Lev$ is defined on grid
     times; intermediate times need interpolation, as in the classical particle
     method.
@@ -209,8 +207,7 @@ into data-poor slices (tails, short maturities).
 As the particles spread, few of them populate the wings, and the regression
 estimate of $\E[V_t \mid X_t = x]$ degrades exactly where out-of-the-money
 leverage is needed. The kernel method suffers there too. The remedy is a
-Girsanov change of measure with an explicit density process, used as
-importance sampling.
+Girsanov change of measure with an explicit density process, used as importance sampling, structurally as in the decoupling approach of \citet{dosreis2023}.
 
 \subsection{A two-dimensional change that moves only the stock}
 
@@ -392,28 +389,301 @@ scheme is thus the initialiser that plausibly places the damped iteration
 inside its convergence basin. The engineering trick and the hypothesis of the
 local convergence theorem are the same statement.
 
-\section{Positioning}\label{sec:positioning}
+\section{Positioning: the calibration landscape}\label{sec:positioning}
 
-\begin{itemize}
-  \item \emph{Versus Guyon--Henry-Labord\`ere.} Replace kernel regression with
-    neural $L^2$ regression: no bandwidth selection, and (to be demonstrated,
-    not asserted) better bias-variance behaviour in data-poor regions.
-  \item \emph{Versus Cuchiero--Khosrawi--Teichmann.} They parametrise $\Lev$
-    directly and calibrate to prices; we derive $\Lev$ from Gy\"ongy so vanilla
-    calibration holds by construction modulo regression error. Make the
-    contrast explicit.
-  \item \emph{Versus Bayer et al.\ 2022 (RKHS).} Closest prior work: a rigorous
-    version of smoothing the conditional-expectation estimator to make the
-    fixed-point map tractable. Our one-line positioning is to replace their
-    RKHS ridge regression with neural $L^2$ regression. Read before writing the
-    differentiability section.
-  \item \emph{Versus Reisinger--Tsianni.} Discretisation-error analysis of the
-    classical particle scheme; the natural baseline for the
-    $\varepsilon$-neighbourhood statement.
-  \item \emph{The high bar.} In one dimension the particle method is fast and
-    works well. Kernel regression genuinely fails, and networks do not, in
-    multi-asset LSV. If there is a dimensional story, that is the strongest
-    version of the paper.
-\end{itemize}
+Every method for LSV calibration computes, in some form, the conditional
+expectation $\E[V_t \mid X_t = x]$ under the law of the model being
+calibrated. The families differ in how they represent that law and that
+conditional expectation. Two families dominate: particle methods and PDE
+methods.
+
+\subsection{Particle methods and their flavours}
+
+All flavours simulate an interacting particle system and differ only in the
+estimator applied to the cloud.
+
+\begin{enumerate}
+  \item \emph{Kernel regression} \citep{guyon2011smile,guyon2012particular,guyon2013nonlinear}. The original: Nadaraya--Watson with a Gaussian kernel,
+    bandwidth of order $S_0 N^{-1/5}$, leverage evaluated on a coarse grid
+    with interpolation, kernel sums truncated for efficiency. One forward
+    pass, no outer iteration. Known weaknesses: bandwidth selection, the
+    kernel bias-variance trade-off, and degradation in the wings.
+  \item \emph{Bin Monte Carlo} \citep{vanderstoep2014}.
+    Partition the spot range into bins (equal width or equal frequency) and
+    average $V$ within each bin. Notable for our purposes: their Remark~3.2
+    considered $L^2$ projection onto polynomial bases, exactly least-squares
+    regression with a linear function class, and rejected it because an
+    unconstrained regressor of a conditional variance can go negative
+    precisely where the truth approaches zero, which then divides into the
+    leverage.
+  \item \emph{RKHS ridge regression} \citep{bayer2022rkhs}. Penalised projection onto a reproducing kernel
+    Hilbert space. The only flavour with serious theory: Wasserstein
+    Lipschitz stability of the regularised conditional expectation map with
+    constants of order $\lambda^{-2}$, well-posedness of the regularised
+    McKean--Vlasov system at each fixed $\lambda > 0$, propagation of chaos,
+    and convergence as $\lambda \to 0$ without a rate. The unregularised
+    limit is explicitly open.
+  \item \emph{Conditional Monte Carlo} \citep{muguruza2019}. Not regression at
+    all: under piecewise-constant leverage the conditional law of the log
+    spot is exactly Gaussian, so the Dirac masses are replaced by the model's
+    own conditional density. No bandwidth, guaranteed variance reduction by
+    Rao--Blackwellisation. Caveat in print: the algorithm fails to converge
+    for large vol-of-vol, with the threshold unidentified.
+  \item \emph{Machine-learning kernel flavours} \citep{hakala2019}. Benchmarks
+    Nadaraya--Watson, local linear regression, RBF and partition-of-unity
+    RBF for exactly our regression problem; PURBF with regularisation and
+    pruning wins. Considered multilayer perceptrons and deferred them, see
+    \cref{subsec:closest}.
+  \item \emph{Variance-reduced flavours} \citep{cozma2019}. Additive control variates from a coupled cheaper submodel
+    plus a finite-element forward solve, reported $625$-fold speed-up.
+    Subtraction of a correlated baseline, not reweighting: no measure change
+    anywhere in this family.
+\end{enumerate}
+
+Numerical analysis of the particle scheme itself (discretisation error,
+convergence rates) is due to Reisinger and Tsianni \citep{reisinger2023,reisinger2025}.
+
+\subsection{PDE methods}
+
+Solve the two-dimensional forward Kolmogorov equation for the joint density
+of $(X, V)$ on a grid and read the conditional expectation off the gridded
+density \citep{ren2007}; the inner fixed-point iteration per time step is credited to \citet{tataru2010}, and the modern finite-volume ADI treatment is \citep{wyns2017adjoint,wyns2017fv}. Deterministic and
+accurate in two dimensions; hits the curse of dimensionality beyond three
+factors; the thin-density wings and the $v = 0$ boundary under Feller
+violation need care. Two details matter for us. First, the inner leverage
+iteration is run \emph{undamped} with a fixed small iteration count
+($Q = 2$), with tail regularisation that pulls the quotient toward the mean
+reversion level where the density is thin. Second, the iteration's
+contraction property has never been proved anywhere in this literature: it
+is asserted by \citet{reghai2006}, quoted as ``stated but not proved'' by \citet{cozma2019}, and documented to fail at large log-moneyness by \citet{saporito2019}, who replace the iteration by Tikhonov regularisation. The only
+theory-adjacent entries are Anderson acceleration of the iteration with no analysis \citep{nastasi2020} and a rigorous linear-rate
+theorem for the related but different Bass local volatility fixed point \citep{acciaio2024bass}. A spectral analysis of the damped leverage
+iteration, as sketched in the convergence notes, therefore has no published
+counterpart.
+
+\subsection{The closest approaches to the $L^2$ route}\label{subsec:closest}
+
+The $L^2$ projection identity \cref{eq:l2proj} is known in this literature;
+what has never been done is to realise it with a trained neural network
+inside the particle loop. The near-misses, in increasing order of proximity:
+
+\begin{enumerate}
+  \item \emph{Linear basis, rejected on positivity} \citep[Remark~3.2]{vanderstoep2014}. Least squares onto polynomials, rejected because the
+    fit can go negative under Feller violation. The positivity-preserving
+    parametrisation $f_\theta = \operatorname{softplus}(g_\theta)$ answers
+    this objection directly and should be presented as doing so, with
+    citation.
+  \item \emph{Projection identity stated, then penalised} \citep{li2023thesis}. States $\E[v_t \mid S_t = \cdot\,] = \operatorname*{arg\,min}_{f
+    \in L^2} \E(v_t - f(S_t))^2$ explicitly, twice, and immediately replaces
+    it by RKHS ridge regression. The thesis also provides the ready-made
+    experimental design: a three-way comparison of Nadaraya--Watson, RKHS
+    ridge and bin Monte Carlo across particle counts, with RKHS degrading
+    worst at small $N$ and under strong spot-vol correlation. We mirror that
+    comparison and add the network as the fourth estimator.
+  \item \emph{Global regression attempted and abandoned} \citep[p.~5]{bayer2022rkhs}. Their stated starting point was global regression on $L$
+    basis functions, abandoned because the Lipschitz constants of the
+    resulting conditional expectation map with respect to the particle
+    distribution explode as $L \to \infty$ unless the basis is carefully
+    chosen. This is the referee objection to plain neural $L^2$ regression
+    already in print: our theory must either control the analogous constant
+    for the network class or scope it as explicitly open.
+  \item \emph{Neural networks named and deferred} \citep{hakala2019}. Frames the
+    problem identically as supervised learning of $R(S) = \E(V_t \mid S_t =
+    S)$ from observed pairs, rules out MLPs because ``the training is much
+    more involved'', and postpones a pretrained MLP ``for potential future
+    use''. The idea exists in print since 2019 and was never executed. The
+    warm-starting of \cref{sec:warmstart} is the direct answer to the
+    training-cost objection, and the benchmark to beat is his PURBF, not
+    just Nadaraya--Watson.
+\end{enumerate}
+
+Adjacent literatures use neural $L^2$ conditional expectation regression as
+standard technology (deep backward BSDE schemes \citep{hure2020}, deep Longstaff--Schwartz \citep{longstaff2001})
+but nobody has ported it to the leverage loop. The structural precedent for
+our importance sampling is \citet{dosreis2023}, whose decoupling
+algorithm for McKean--Vlasov SDEs freezes the law component and tilts the
+decoupled SDE, exactly our volatility-preserving drift, with no calibration
+application anywhere in it.
+
+\subsection{Other neural approaches, for contrast}
+
+\citet{cuchiero2020} parametrise the leverage directly and
+calibrate to option prices with generative-adversarial training; they call
+the conditional expectation ``a very challenging and still open problem''
+and concede no speed competition with the particle method. We solve exactly
+the problem they bypass, and vanilla calibration holds by construction
+modulo regression error. This is the paper a reviewer is most likely to
+confuse with ours; distinguish it early. Physics-informed networks on the
+Fokker--Planck equation \citep{hoshisashi2025} and neural
+operators amortising the whole quotes-to-calibration map \citep{wang2026} are
+different axes entirely: the former is the PDE route with a neural solver,
+the latter learns across surfaces rather than within one calibration.
+
+\subsection{Where the bar sits}
+
+In one dimension the particle method is fast and works well, so the honest
+comparison targets are PURBF and bin Monte Carlo at realistic particle
+budgets, with tail accuracy under importance sampling as the
+differentiator. Kernel methods genuinely fail, and networks do not, in
+multi-asset LSV; if there is a dimensional story, that is the strongest
+version of the paper.
+
+
+\begin{thebibliography}{99}
+
+\bibitem[Gy\"ongy(1986)]{gyongy1986}
+I.~Gy\"ongy,
+``Mimicking the one-dimensional marginal distributions of processes having an It\^o differential,''
+\textit{Probability Theory and Related Fields},
+vol.~71, no.~4, pp.~501--516, 1986.
+
+\bibitem[Dupire(1994)]{dupire1994}
+B.~Dupire,
+``Pricing with a smile,''
+\textit{Risk},
+vol.~7, no.~1, pp.~18--20, 1994.
+
+\bibitem[Guyon and Henry-Labord\`ere(2011)]{guyon2011smile}
+J.~Guyon and P.~Henry-Labord\`ere,
+``The smile calibration problem solved,''
+SSRN working paper 1885032, 2011.
+
+\bibitem[Guyon and Henry-Labord\`ere(2012)]{guyon2012particular}
+J.~Guyon and P.~Henry-Labord\`ere,
+``Being particular about calibration,''
+\textit{Risk}, vol.~25, no.~1, p.~88, 2012.
+
+\bibitem[Guyon and Henry-Labord\`ere(2013)]{guyon2013nonlinear}
+J.~Guyon and P.~Henry-Labord\`ere,
+\textit{Nonlinear Option Pricing},
+Chapman \& Hall/CRC Financial Mathematics Series, 2013.
+
+\bibitem[van der Stoep et~al.(2014)]{vanderstoep2014}
+A.~W. van~der Stoep, L.~A. Grzelak, and C.~W. Oosterlee,
+``The Heston stochastic-local volatility model: efficient Monte Carlo simulation,''
+\textit{International Journal of Theoretical and Applied Finance},
+vol.~17, no.~7, art.~1450045, 2014.
+
+\bibitem[Bayer et~al.(2024)]{bayer2022rkhs}
+C.~Bayer, D.~Belomestny, O.~Butkovsky, and J.~Schoenmakers,
+``A reproducing kernel Hilbert space approach to singular local stochastic volatility McKean--Vlasov models,''
+\textit{Finance and Stochastics}, 2024.
+\textit{arXiv preprint} arXiv:2203.01160.
+
+\bibitem[Muguruza(2019)]{muguruza2019}
+A.~Muguruza,
+``Not so particular about calibration: smile problem resolved,''
+\textit{arXiv preprint} arXiv:1909.13366, 2019.
+
+\bibitem[Hakala(2019)]{hakala2019}
+J.~Hakala,
+``Applied machine learning for stochastic local volatility calibration,''
+\textit{Frontiers in Artificial Intelligence}, vol.~2, art.~4, 2019.
+
+\bibitem[Cozma et~al.(2019)]{cozma2019}
+A.~Cozma, M.~Mariapragassam, and C.~Reisinger,
+``Calibration of a hybrid local-stochastic volatility stochastic rates model with a control variate particle method,''
+\textit{SIAM Journal on Financial Mathematics}, vol.~10, no.~1, 2019.
+\textit{arXiv preprint} arXiv:1701.06001.
+
+\bibitem[Reisinger and Tsianni(2023)]{reisinger2023}
+C.~Reisinger and M.~O. Tsianni,
+``Convergence of the Euler--Maruyama particle scheme for a regularised McKean--Vlasov equation arising from the calibration of local-stochastic volatility models,''
+\textit{arXiv preprint} arXiv:2302.00434, 2023.
+
+\bibitem[Reisinger and Tsianni(2025)]{reisinger2025}
+C.~Reisinger and M.~O. Tsianni,
+``Numerical analysis of a particle system for the calibrated Heston-type local stochastic volatility model,''
+\textit{arXiv preprint} arXiv:2504.14343, 2025.
+
+\bibitem[Ren et~al.(2007)]{ren2007}
+Y.~Ren, D.~Madan, and M.~Q. Qian,
+``Calibrating and pricing with embedded local volatility models,''
+\textit{Risk}, September 2007, pp.~138--143.
+
+\bibitem[Tataru and Fisher(2010)]{tataru2010}
+G.~Tataru and T.~Fisher,
+``Stochastic local volatility,''
+Quantitative Development Group, Bloomberg L.P., technical report, 2010.
+
+\bibitem[Wyns and in~'t~Hout(2017)]{wyns2017adjoint}
+M.~Wyns and K.~J. in~'t~Hout,
+``An adjoint method for the exact calibration of stochastic local volatility models,''
+\textit{Journal of Computational Science}, 2017.
+\textit{arXiv preprint} arXiv:1609.00232.
+
+\bibitem[Wyns and Du~Toit(2017)]{wyns2017fv}
+M.~Wyns and J.~Du~Toit,
+``A finite volume -- alternating direction implicit approach for the calibration of stochastic local volatility models,''
+\textit{International Journal of Computer Mathematics}, 2017.
+\textit{arXiv preprint} arXiv:1611.02961.
+
+\bibitem[Saporito et~al.(2019)]{saporito2019}
+Y.~F. Saporito, X.~Yang, and J.~P. Zubelli,
+``The calibration of stochastic local-volatility models: an inverse problem perspective,''
+\textit{Computers \& Mathematics with Applications},
+vol.~77, no.~12, pp.~3054--3067, 2019.
+
+\bibitem[Reghai(2006)]{reghai2006}
+A.~Reghai,
+``The hybrid most likely path,''
+\textit{Risk}, 2006.
+
+\bibitem[Nastasi et~al.(2020)]{nastasi2020}
+E.~Nastasi, A.~Pallavicini, and G.~Sartorelli,
+``Smile modelling in commodity markets,''
+\textit{arXiv preprint} arXiv:1808.09685, 2018 (revised 2020).
+
+\bibitem[Acciaio et~al.(2025)]{acciaio2024bass}
+B.~Acciaio, A.~Marini, and G.~Pammer,
+``Calibration of the Bass local volatility model,''
+\textit{SIAM Journal on Financial Mathematics}.
+\textit{arXiv preprint} arXiv:2311.14567, 2023 (revised 2025).
+
+\bibitem[Cuchiero et~al.(2020)]{cuchiero2020}
+C.~Cuchiero, W.~Khosrawi, and J.~Teichmann,
+``A generative adversarial network approach to calibration of local stochastic volatility models,''
+\textit{Risks}, vol.~8, no.~4, art.~101, 2020.
+
+\bibitem[Hoshisashi et~al.(2025)]{hoshisashi2025}
+K.~Hoshisashi, C.~E. Phelan, and P.~Barucca,
+``Physics-informed neural networks for solving derivative-constrained PDEs,''
+in \textit{Proceedings of the ACM International Conference on AI in Finance (ICAIF)}, 2025.
+\textit{arXiv preprint} arXiv:2604.13723.
+
+\bibitem[Wang et~al.(2026)]{wang2026}
+X.~Wang, A.~Despr\'es, M.~Dureau, and F.~Buet-Golfouse,
+``Amortizing the calibration triple: a projection-consistent neural operator for local-stochastic volatility,''
+\textit{arXiv preprint} arXiv:2608.01217, 2026.
+
+\bibitem[dos Reis et~al.(2023)]{dosreis2023}
+G.~dos~Reis, G.~Smith, and P.~Tankov,
+``Importance sampling for McKean--Vlasov SDEs,''
+\textit{Applied Mathematics and Computation}, vol.~453, 2023.
+\textit{arXiv preprint} arXiv:1803.09320.
+
+\bibitem[Li(2023)]{li2023thesis}
+M.~Li,
+``Simulations of calibrated local stochastic volatility models,''
+MSc thesis, Department of Mathematics, Imperial College London, 2023.
+
+\bibitem[Hur\'e et~al.(2020)]{hure2020}
+C.~Hur\'e, H.~Pham, and X.~Warin,
+``Deep backward schemes for high-dimensional nonlinear PDEs,''
+\textit{Mathematics of Computation},
+vol.~89, no.~324, pp.~1547--1579, 2020.
+
+\bibitem[Longstaff and Schwartz(2001)]{longstaff2001}
+F.~A. Longstaff and E.~S. Schwartz,
+``Valuing American options by simulation: a simple least-squares approach,''
+\textit{The Review of Financial Studies},
+vol.~14, no.~1, pp.~113--147, 2001.
+
+\bibitem[Chataigner et~al.(2020)]{chataigner2020}
+M.~Chataigner, S.~Cr\'epey, and M.~Dixon,
+``Deep local volatility,''
+\textit{Risks}, vol.~8, no.~3, art.~82, 2020.
+
+\end{thebibliography}
 
 \end{document}
