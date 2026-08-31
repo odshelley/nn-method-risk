@@ -218,3 +218,11 @@ Overnight full implicit solve (possibly amortiser-initialised); intraday warm-st
 
 ### B-spline head (2026-08-31, via Osian's boss)
 Fixed-basis instantiation of the ridge head: cubic B-splines, knots at cloud quantiles. Banded normal equations -> O(N+p) per-slice solve, zero training. Nonnegative coefficients -> nonnegative fit by NNLS (answers van der Stoep positivity within a linear model). P-spline penalty = smoothing spline = Sobolev kernel ridge (Kimeldorf-Wahba) -> Bayer identification is classical, no lemma needed. In 1D: natural default, strongest classical baseline, cousin of Hakala's PURBF (so 1D wins over it may be marginal). Learned features earn keep in d>=2 (tensor splines blow up). C10 revised -> ablation ladder: NW -> P-spline head -> learned-feature ridge head -> full per-slice NN; headline claim becomes "spline head matches NN in 1D at lowest latency; learned features win for d>=2".
+
+### Amortiser training data (2026-08-31, Osian's question: where do synthetic leverage functions come from?)
+Three sources, increasing cleverness:
+1. Bulk offline calibration: sample Heston params + surface shapes, run calibrator to convergence per sample, store (surface, params, L*). Parallel overnight; labels approximate. (What arXiv:2608.01217 effectively does.)
+2. INVERT THE GENERATOR (the trick): sample L directly from a smooth positive prior (GP / spline coefficients), pair with sampled V-params, simulate that LSV model forward ONCE, price its vanilla surface by MC -> (surface, V-params, L) with L exact BY CONSTRUCTION. One simulation per sample, no fixed-point solve, exact labels, unlimited data. Caveats: (a) uniqueness = the well-posedness caveat; conditioning the map on V-params keeps it well-defined; (b) induced surface distribution may not match market surfaces -> shape the L-prior or mix with route 1.
+3. Realism anchor: SSVI/SVI params fitted to historical SPX/FX surfaces + bootstrap perturbations as the market-input distribution.
+Likely recipe: route 2 for volume, route 3 for realism.
+Note: core experiments need NO leverage dataset (Exp B: same-Heston gives L*=1 by symmetry; Exp C validated by repricing).
