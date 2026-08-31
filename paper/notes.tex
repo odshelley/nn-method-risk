@@ -391,9 +391,31 @@ a ridge penalty recovers exactly the regularised structure for which
 \citet{bayer2022rkhs} prove Wasserstein Lipschitz stability, with the
 learned features in place of a hand-chosen basis. The objection that plain
 global regression loses stability as the function class grows is thereby
-answered within the method rather than around it. This is likely the
-workhorse configuration; a short lemma identifying the ridge head with RKHS
-regression on a learned kernel should be written.
+answered within the method rather than around
+it; a short lemma identifying the ridge head with RKHS regression on a
+learned kernel should be written.
+
+A fixed-basis instantiation of the same idea replaces the learned features
+with B-splines. Cubic B-splines on knots placed at quantiles of the particle
+cloud have local support, so the weighted normal equations are banded and
+the per-slice solve costs $O(N + p)$ by banded Cholesky, with no training
+anywhere in the pipeline. Two further properties recommend them. First, the
+basis functions are nonnegative and form a partition of unity, so
+constraining the coefficients to be nonnegative yields a nonnegative fit by
+a small nonnegative least squares solve, answering the positivity objection
+of \citet{vanderstoep2014} within a linear model. Second, with a
+second-difference penalty the estimator is a penalised spline
+\citep{eilers1996}, and smoothing splines are exactly kernel ridge
+regression in a Sobolev space \citep{kimeldorf1971}, so the identification
+with the framework of \citet{bayer2022rkhs} is classical rather than a
+lemma to be written. In one dimension the spline head is therefore the
+natural default and the strongest classical baseline, close in spirit to
+the partition-of-unity RBF estimator of \citet{hakala2019}. The learned
+features earn their keep in higher dimension, where tensor-product spline
+bases grow exponentially in the number of assets while a network body
+scales. The resulting estimator spectrum (kernel, spline head,
+learned-feature head, full per-slice network) is the ablation the
+experiments should run.
 
 \subsection{Reducing the particle count}
 
@@ -740,6 +762,18 @@ vol.~14, no.~1, pp.~113--147, 2001.
 M.~Chataigner, S.~Cr\'epey, and M.~Dixon,
 ``Deep local volatility,''
 \textit{Risks}, vol.~8, no.~3, art.~82, 2020.
+
+\bibitem[Eilers and Marx(1996)]{eilers1996}
+P.~H.~C. Eilers and B.~D. Marx,
+``Flexible smoothing with {B}-splines and penalties,''
+\textit{Statistical Science},
+vol.~11, no.~2, pp.~89--121, 1996.
+
+\bibitem[Kimeldorf and Wahba(1971)]{kimeldorf1971}
+G.~Kimeldorf and G.~Wahba,
+``Some results on {T}chebycheffian spline functions,''
+\textit{Journal of Mathematical Analysis and Applications},
+vol.~33, no.~1, pp.~82--95, 1971.
 
 \end{thebibliography}
 
