@@ -5,6 +5,7 @@
 
 \usepackage{amsmath, amssymb, amsthm, mathtools}
 \usepackage{bm}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 \usepackage[capitalise,noabbrev]{cleveref}
@@ -101,7 +102,7 @@ read off the conditional expectation. No kernel, no bandwidth selection, no
 density estimation. This replaces the Nadaraya--Watson step of the
 Guyon--Henry-Labord\`ere particle method.
 
-\section{Explicit scheme (per time slice)}\label{sec:explicit}
+\section{Explicit scheme}\label{sec:explicit}
 
 On a time grid $0 = t_0 < t_1 < \dots < t_K = T$, use one network per slice.
 At $t_k$, train $f_{\theta_k}(x) \approx \E[V_{t_k} \mid X_{t_k} = x]$ on the
@@ -111,6 +112,30 @@ particle cloud at $t_k$ only, set
 \]
 and advance the particles to $t_{k+1}$. The network takes only $x$ as input.
 
+\begin{algorithm}[H]
+\caption{Explicit scheme}\label{alg:explicit}
+\KwIn{Dupire surface $\sigDup$; time grid $0 = t_0 < \dots < t_K = T$;
+      particle count $N$; variance dynamics; spot $X_0$, initial variance $v_0$}
+\KwOut{Leverage $\Lev(t_k, \cdot)$ for $k = 0, \dots, K-1$; terminal particle cloud}
+Initialise $X^{(i)}_0 = X_0$, $V^{(i)}_0 = v_0$, weights $w^{(i)} = 1$,
+  and $f_{\theta_0} \equiv v_0$\;
+\For{$k = 0, 1, \ldots, K-1$}{
+  \If{$k \geq 1$}{
+    warm start $\theta_k \leftarrow \theta_{k-1}$\;
+    train $f_{\theta_k}$ by minimising
+      $\sum_i w^{(i)} \bigl(V^{(i)}_{t_k} - f(X^{(i)}_{t_k})\bigr)^2$
+      \tcp*{skip if refresh not triggered}
+  }
+  $\Lev(t_k, x) \leftarrow \sigDup(t_k, x) / \sqrt{f_{\theta_k}(x)}$\;
+  advance $(X^{(i)}, V^{(i)})$ from $t_k$ to $t_{k+1}$ under $\Qm$ with
+    leverage $\Lev(t_k, \cdot)$\;
+  update $\ln w^{(i)} \leftarrow \ln w^{(i)}
+    - \eta_k \Delta\widetilde{B}^{\perp,(i)} - \tfrac12 \eta_k^2 \Delta t$
+    \tcp*{$w^{(i)} \equiv 1$ if untilted}
+}
+\Return{$\{\Lev(t_k, \cdot)\}_k$, $\{(X^{(i)}_T, V^{(i)}_T, w^{(i)})\}_i$}\;
+\end{algorithm}
+
 Structural observation to state early in any write-up: the explicit scheme
 contains \emph{no fixed point}. Since $\Lev(t_k,\cdot)$ depends only on
 $\Lev(t_j,\cdot)$ for $j < k$, the discretised problem is a causal forward
@@ -119,7 +144,7 @@ the convergence notes (\texttt{notes\_convergence.tex}) is therefore not
 load-bearing for the explicit scheme; it
 bites only for the implicit one.
 
-\section{Implicit scheme (global network, damped iteration)}\label{sec:implicit}
+\section{Implicit scheme}\label{sec:implicit}
 
 A single network handles all times,
 \[
@@ -131,6 +156,26 @@ The leverage is updated by the damped fixed-point iteration
   \Lev^{n+1} = (1 - \alpha)\,\Lev^{n} + \alpha\,\Phimap(\Lev^{n}),
   \qquad \alpha \in (0, 1].
 \end{equation}
+
+\begin{algorithm}[H]
+\caption{Implicit scheme with damped iteration}\label{alg:implicit}
+\KwIn{Dupire surface $\sigDup$; time grid; particle count $N$; damping
+      $\alpha \in (0,1]$; initial leverage $\Lev^0$ (e.g.\ the output of
+      \cref{alg:explicit}); tolerance $\varepsilon_{\mathrm{tol}}$}
+\KwOut{Calibrated leverage $\Lev^*$}
+$n \leftarrow 0$\;
+\Repeat{$\norm{\Lev^{n} - \Lev^{n-1}} \leq \varepsilon_{\mathrm{tol}}$}{
+  simulate full particle paths under leverage $\Lev^{n}$ (all slices,
+    tilted dynamics and weights as in \cref{alg:explicit})\;
+  train the global network $f_\theta(t, x)$ on the pooled data
+    $\{(t_k, X^{(i)}_{t_k}, V^{(i)}_{t_k}, w^{(i)}_{t_k})\}_{i,k}$ by
+    weighted $L^2$ minimisation\;
+  $\Phimap(\Lev^{n})(t, x) \leftarrow \sigDup(t, x) / \sqrt{f_\theta(t, x)}$\;
+  $\Lev^{n+1} \leftarrow (1 - \alpha)\,\Lev^{n} + \alpha\,\Phimap(\Lev^{n})$\;
+  $n \leftarrow n + 1$\;
+}
+\Return{$\Lev^{n}$}\;
+\end{algorithm}
 
 The scheme is implicit for a subtle reason: shared parameters $\theta$ let data
 at times $t_j > t_k$ influence $\Lev(t_k, \cdot)$, so information flows
