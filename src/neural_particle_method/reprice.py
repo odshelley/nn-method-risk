@@ -26,7 +26,9 @@ def reprice_iv(L_records, dynamics, s0, maturities, k_grid,
     rng = np.random.default_rng(seed)
     T = max(maturities)
     dt, sdt = T / n_steps, np.sqrt(T / n_steps)
-    snap = {int(round(m / dt)): m for m in maturities}
+    snap = {}
+    for m in maturities:
+        snap.setdefault(int(round(m / dt)), []).append(m)
     lnx = np.full(n_particles, np.log(s0))
     v = np.full(n_particles, v0)
     ivs = np.full((len(maturities), len(k_grid)), np.nan)
@@ -41,12 +43,12 @@ def reprice_iv(L_records, dynamics, s0, maturities, k_grid,
         lnx = lnx + (-0.5 * L_p ** 2 * vp) * dt + L_p * np.sqrt(vp) * sdt * z1
         v = v + kappa * (theta - vp) * dt + xi * np.sqrt(vp) * sdt * zb
         if step + 1 in snap:
-            m = snap[step + 1]
             x = np.exp(lnx)
-            for j, k in enumerate(k_grid):
-                K = s0 * np.exp(k)
-                price = float(np.mean(np.maximum(x - K, 0.0)))
-                ivs[mat_idx[m], j] = implied_vol(price, s0, K, m)
+            for m in snap[step + 1]:
+                for j, k in enumerate(k_grid):
+                    K = s0 * np.exp(k)
+                    price = float(np.mean(np.maximum(x - K, 0.0)))
+                    ivs[mat_idx[m], j] = implied_vol(price, s0, K, m)
     return ivs
 
 

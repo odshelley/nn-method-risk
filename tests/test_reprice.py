@@ -18,6 +18,16 @@ def test_gbm_limit_recovers_flat_iv():
                      n_particles=20_000, n_steps=12, seed=7)
     assert np.nanmax(np.abs(ivs - 0.2)) < 0.01
 
+def test_reprice_iv_handles_snapshot_collision():
+    # 0.48 and 0.52 both round to step 6 when T=max(maturities)=1.0, n_steps=12 (dt=1/12).
+    # A naive step->single-maturity snap map drops one of them; both must come back finite.
+    ivs = reprice_iv(const_records(1.0), FLAT_DYN, s0=1.0, maturities=[0.48, 0.52, 1.0],
+                     k_grid=np.log(np.array([0.9, 1.0, 1.1])),
+                     n_particles=5_000, n_steps=12, seed=3)
+    assert np.all(np.isfinite(ivs[0]))
+    assert np.all(np.isfinite(ivs[1]))
+    assert np.all(np.isfinite(ivs[2]))
+
 def test_iv_metrics_shapes():
     k = np.log(np.array([0.7, 1.0, 1.5]))
     target = np.full((2, 3), 0.2)
