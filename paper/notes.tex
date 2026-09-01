@@ -333,19 +333,19 @@ In one dimension the particle method is fast and works well, so the honest compa
 
 \section{Risk paper outline}\label{sec:riskoutline}
 
-One paper, roughly 3{,}500 words. Framing sentence, which everything serves: the particle method without the kernel. The theory (spectral analysis of the damped iteration, the perturbed fixed point) goes to a separate mathematics paper.
+One paper, roughly 3{,}500 words. Framing sentence: the particle method without the kernel. The theory goes to a separate mathematics paper.
 
-Structure, with one figure per headline claim.
+Structure, one figure per claim.
 
 \begin{enumerate}
-\item \emph{Problem.} \Cref{eq:lsv,eq:leverage}, the method of \citet{guyon2012particular}, and its three documented weaknesses (bandwidth, wings, large vol-of-vol). One column.
-\item \emph{Method.} The projection identity \cref{eq:l2proj}, the explicit scheme (\cref{alg:explicit}), softplus positivity answering \citet{vanderstoep2014}, warm starting answering \citet{hakala2019}. The implicit scheme gets one paragraph as the overnight variant. Fig.~1, repricing error across the surface for kernel, bins, spline head and network at a fixed particle budget, synthetic Heston.
-\item \emph{Importance sampling.} The volatility-preserving tilt (\cref{eq:constraint}, the weight recursion), noting it applies unchanged to the classical kernel method. Fig.~2, wings with and without the tilt plus effective sample size, the figure the paper is sold on. Derivation of \cref{subsec:density} to the online appendix.
-\item \emph{Results.} Fig.~3, convergence across the (vol-of-vol, mixing) plane, kernel versus network. Table~1, a real surface (FX favoured, matching \citet{cozma2019}) with runtime and a no-touch reprice. Experiments mirror the design of \citet{li2023thesis}, adding the network as fourth estimator; PURBF \citep{hakala2019} if time permits.
-\item \emph{Deployment.} Desk pattern, event-triggered refresh, amortise-then-correct with the correction count stated informally. Fig.~4, the latency-accuracy trade-off. One column, then limitations, including the open theory for the unregularised limit \citep{bayer2022rkhs}.
+\item \emph{Problem.} \Cref{eq:lsv,eq:leverage}, the method of \citet{guyon2012particular}, its three documented weaknesses (bandwidth, wings, large vol-of-vol). One column.
+\item \emph{Method.} The projection identity \cref{eq:l2proj}, the explicit scheme (\cref{alg:explicit}), softplus positivity \citep{vanderstoep2014}, warm starting \citep{hakala2019}. One paragraph on the implicit scheme as the overnight variant. Fig.~1: repricing error across the surface for kernel, bins, PURBF and network at a fixed particle budget, synthetic Heston.
+\item \emph{Importance sampling.} The volatility-preserving tilt (\cref{eq:constraint}) and the weight recursion; applies unchanged to the kernel method. Fig.~2: wings with and without the tilt, with effective sample size; the central figure. Derivation of \cref{subsec:density} to the online appendix.
+\item \emph{Results.} Fig.~3: convergence across the (vol-of-vol, mixing) plane, kernel versus network. Table~1: a real surface (FX, matching \citet{cozma2019}) with runtime and a no-touch reprice. Design follows \citet{li2023thesis}.
+\item \emph{Deployment.} Warm starts make intraday recalibration cheap. Fig.~4: the latency-accuracy trade-off. Limitations, including the open theory for the unregularised limit \citep{bayer2022rkhs}.
 \end{enumerate}
 
-House style forbids theorem environments, so \cref{rem:cost,rem:selfnorm} become prose. \inlinetodo{Confirm FX versus SPX for Table~1.}
+House style forbids theorem environments; \cref{rem:cost,rem:selfnorm} become prose. \inlinetodo{Confirm FX versus SPX for Table~1.}
 
 \begin{thebibliography}{99}
 
