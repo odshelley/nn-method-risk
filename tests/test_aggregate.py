@@ -1,5 +1,5 @@
 import json
-from bench.aggregate import aggregate
+from bench.aggregate import aggregate, COLUMNS
 
 OK = {"schema": 1, "sid": "s01", "algo": "nw", "n_particles": 1000, "seed": 0,
       "git_hash": "abc", "status": "ok", "timings": {"total_s": 1.0, "fit_s": 0.2},
@@ -18,3 +18,13 @@ def test_aggregate(tmp_path):
     assert (tmp_path / "summary.csv").exists()
     md = (tmp_path / "digest.md").read_text()
     assert "1 failed" in md and "s01" in md
+
+
+def test_aggregate_empty_runs_dir(tmp_path):
+    empty = tmp_path / "empty"; empty.mkdir()
+    df = aggregate(empty, tmp_path / "summary_empty.csv", tmp_path / "digest_empty.md")
+    assert len(df) == 0
+    assert list(df.columns) == list(COLUMNS)
+    assert (tmp_path / "summary_empty.csv").exists()
+    md = (tmp_path / "digest_empty.md").read_text()
+    assert "0 runs, 0 failed" in md
