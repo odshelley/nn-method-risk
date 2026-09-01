@@ -347,7 +347,7 @@ Both simplifications leading to \cref{eq:designformula} fail in general. The wei
 
 The target function $\E[V_{t_k} \mid X_{t_k} = \cdot\,]$ moves by $O(\Delta t)$ between adjacent slices, so initialising $\theta_k$ at $\theta_{k-1}$ leaves only a few gradient steps of work per slice.
 
-\subsection{Update scheduling}
+\subsection{Update scheduling}\label{subsec:scheduling}
 
 Early in the simulation the cloud spreads from a point mass and the correlation structure between $X$ and $V$ builds quickly, so the conditional expectation surface changes fast. Later, mean reversion of $V$ drives it toward quasi-stationarity and updates can be less frequent, improving latency. Unlike kernel estimators, which must be recomputed from the cloud at every step, a network generalises across time. One may therefore retrain only every $\kappa$-th slice and reuse the estimator in between, since the calibration identity needs the estimator refreshed only at the rate at which the conditional law moves.
 
@@ -355,20 +355,28 @@ A stale $f$ biases $\Lev$ at the skipped times, and this error feeds forward thr
 
 \subsection{Ridge regression on frozen features}
 
-This lever, like the two above, concerns the explicit scheme's per-slice regression. Train the network body rarely (on the first slices, or offline) and treat it as a feature extractor. Per slice, solve only a linear readout on the learned features by closed-form ridge least squares, at cost $O(Nd + d^3)$ for $d$ features, with no gradient descent inside the simulation loop. This is least-squares Monte Carlo with learned features. Beyond latency, the configuration has a theoretical payoff. A linear-in-features estimator with a ridge penalty recovers the regularised structure for which \citet{bayer2022rkhs} prove Wasserstein Lipschitz stability, with the learned features in place of a hand-chosen basis. This would answer the objection that plain global regression loses stability as the function class grows, though their constants are proved for a fixed kernel rather than learned features. The lemma identifying the ridge head with RKHS regression on a learned kernel is not yet written.
+This lever, like the two above, concerns the explicit scheme's per-slice regression. Train the network body rarely (on the first slices, or offline) and treat it as a feature extractor. Per slice, solve only a linear readout on the learned features by closed-form ridge least squares, at cost $O(Nd^2 + d^3)$ for $d$ features, with no gradient descent inside the simulation loop. This is least-squares Monte Carlo with learned features. The configuration is standard machine learning rather than an invention of ours: training only the final linear layer on a fixed nonlinear feature map is random-features regression when the body is never trained \citep{rahimi2007}, linear probing or frozen-backbone transfer learning when it is trained once and reused \citep{alain2016,yosinski2014}, and regression Monte Carlo on a fixed basis in finance \citep{longstaff2001}. What is ours is only the placement inside the leverage calibration loop. Beyond latency, the configuration has a theoretical payoff. A linear-in-features estimator with a ridge penalty recovers the regularised structure for which \citet{bayer2022rkhs} prove Wasserstein Lipschitz stability, with the learned features in place of a hand-chosen basis. This would answer the objection that plain global regression loses stability as the function class grows, though their constants are proved for a fixed kernel rather than learned features. The lemma identifying the ridge head with RKHS regression on a learned kernel is not yet written.
 
 The residual view sharpens the estimator. Writing $\beta_k = \beta_{k-1} + \Delta$ for the readout coefficients and solving for the correction $\Delta$ is, unpenalised, identical to solving for $\beta_k$ directly, by linearity. The two differ once regularised. Penalising $\lambda\norm{\beta_k}^2$ shrinks toward the zero function, while penalising $\lambda\norm{\beta_k - \beta_{k-1}}^2$ shrinks toward the previous slice's fit, the linear-head analogue of warm starting. The latter is the right prior here, because the target moves by $O(\Delta t)$ between slices, so the true residual is small and strong shrinkage toward $\beta_{k-1}$ costs negligible bias while buying variance reduction precisely in the thin-data tails, and it makes the leverage surface coherent in time rather than independently noisy per slice. The cost is unchanged (same solve, shifted right-hand side). Under a positivity layer the linearity is only approximate and the equivalence with the direct parametrisation breaks slightly.
 
 \begin{algorithm}[H]
 \caption{Ridge head at slice $t_k$ (replaces the training step of \cref{alg:explicit})}\label{alg:ridgehead}
-\KwIn{particle cloud $\{(X^{(i)}_{t_k}, V^{(i)}_{t_k}, w^{(i)})\}_{i=1}^{N}$; frozen feature body $\varphi \colon \R \to \R^{d}$, trained once on the first fitted slice or offline; penalty $\lambda$; previous coefficients $\beta_{k-1}$ (for the first fitted slice, centre at $0$)}
-\KwOut{conditional-expectation estimate $f_k$}
-standardise $z_i \leftarrow (\log X^{(i)}_{t_k} - \mu_k)/s_k$, with $\mu_k, s_k$ the mean and standard deviation of the cloud\;
-assemble features $A \leftarrow [\varphi(z_i)^{\top}, 1]_{i=1}^{N} \in \R^{N \times (d+1)}$ and $W \leftarrow \operatorname{diag}(w^{(i)})$\;
-solve the centred ridge system $\bigl(A^{\top} W A + \lambda N I\bigr)\,\beta_k = A^{\top} W V + \lambda N \beta_{k-1}$\;
-$f_k(x) \leftarrow \max\bigl\{[\varphi((\log x - \mu_k)/s_k)^{\top}, 1]\,\beta_k,\ \varepsilon\bigr\}$ for a small floor $\varepsilon > 0$\;
+\KwIn{cloud $\{(X^{(i)}, V^{(i)}, w^{(i)})\}_{i=1}^{N}$ at $t_k$; frozen body $\varphi\colon \R \to \R^{d}$ together with normalisation constants $(\mu, s)$ fixed when the body was trained; penalty $\lambda > 0$; previous head $\beta_{k-1} \in \R^{d+1}$, with $\beta_{-1} = 0$; positivity floor $\varepsilon > 0$}
+\KwOut{estimate $f_k$ of $\E[V_{t_k} \mid X_{t_k} = \cdot\,]$}
+\tcp{one feature row per particle; the appended $1$ is the intercept}
+\For{$i = 1, \ldots, N$}{
+  $a_i \leftarrow \bigl(\varphi\bigl((\log X^{(i)} - \mu)/s\bigr)^{\top},\ 1\bigr)^{\top} \in \R^{d+1}$\;
+}
+\tcp{importance-weighted Gram matrix and moment vector; one pass, $O(Nd^2)$}
+$G \leftarrow \textstyle\sum_i w^{(i)} a_i a_i^{\top}$;\quad $b \leftarrow \textstyle\sum_i w^{(i)} V^{(i)} a_i$\;
+\tcp{ridge solve, $O(d^3)$; the $\lambda N \beta_{k-1}$ term shrinks toward the previous slice's fit}
+$\beta_k \leftarrow (G + \lambda N I)^{-1}\,(b + \lambda N \beta_{k-1})$\;
+\tcp{floor because the leverage divides by $\sqrt{f_k}$}
+$f_k(x) \leftarrow \max\bigl\{\bigl(\varphi((\log x - \mu)/s)^{\top},\ 1\bigr)\beta_k,\ \varepsilon\bigr\}$\;
 \Return{$f_k$}\;
 \end{algorithm}
+
+The normalisation $(\mu, s)$ is fixed with the body and never recomputed per slice. Under per-slice standardisation the vectors $\beta_{k-1}$ and $\beta_k$ would be coefficients in different coordinate systems, and the shrinkage term would pull toward a distorted copy of the previous fit rather than the fit itself. The floor $\varepsilon$ is the crude positivity guard, while the softplus and log parametrisations of \cref{sec:practical} are the principled ones and apply unchanged, at the cost of making the head solve approximate rather than exact.
 
 
 \subsection{Variance reduction in the particle count}
@@ -385,9 +393,17 @@ For the implicit scheme the damped outer iteration is calibration-time cost, not
 
 A riskier variant collapses the outer iteration into a single training run with a self-consistency loss, simulating under $\Lev_\theta = \sigDup/\sqrt{f_\theta}$ and differentiating through the simulation as in \citet{cuchiero2020}. This forfeits the damped-iteration theory and is parked unless the amortised initialisation disappoints.
 
-\subsection{Deployment}
+\subsection{Overnight body, intraday head}\label{subsec:overnightbody}
 
-The intended desk pattern combines the schemes, with a full implicit solve overnight, possibly amortiser-initialised, and warm-started explicit sweeps or a small number of damped corrections on the bumped surface intraday. Surfaces move little intraday, so warm starts land near the fixed point, and a contraction factor, once established, would bound the number of damped corrections needed to restore the vanilla fit.
+The frozen-features lever and the implicit scheme compose into a day cycle. Overnight, run the implicit scheme of \cref{alg:implicit} to convergence with body and head trained jointly. The converged body has then been trained on the richest data available, the pooled cloud across all slices under the calibrated law, and is frozen at that point. Intraday, recalibrate to the moved surface by re-running the damped iteration with the body frozen, so each outer iteration is one path simulation plus the linear solve of \cref{alg:ridgehead} on the pooled cloud. Warm-started from last night's head, few corrections are needed, and the cost per correction is dominated by the simulation itself, which no particle scheme avoids.
+
+Freezing the body also changes the character of the fixed point. With the leverage determined by the head through $\Lev = \sigDup/\sqrt{(\varphi^{\top}, 1)\beta}$, the damped iteration acts on $\beta \in \R^{d+1}$ rather than on a function. Its linearisation at the fixed point is a $(d{+}1)\times(d{+}1)$ Jacobian, and the spectral condition of the convergence programme becomes measurable rather than assumed, since the dominant eigenvalue is a power iteration on the calibration loop costing a few extra outer iterations. Any spectral hypothesis should be stated, and numerically checked, in this configuration first.
+
+Staleness is the one failure mode, and it enters on the harmless side of the regression. The head solve regresses the current particles against the current surface, so a lagged body never biases the labels. It only fixes the $d$-dimensional span the fit must live in, and the error is the distance from the current target to that span. On an ordinary day the target moves little and last night's span holds it. After a regime move it may not, and the fit then degrades everywhere rather than only in the wings. The detection is the event trigger of \cref{subsec:scheduling}: the regression loss of the frozen-feature fit on a fresh cloud measures the span violation directly, and a threshold crossing schedules a body refresh.
+
+\subsection{Deployment on two timescales}
+
+The desk pattern is then a single continuously running system with two frequencies, not an overnight and intraday dichotomy. A slow loop retrains the body in the background on a lag, on a schedule at minimum and early whenever the event trigger fires, so the lag adapts to how fast the market is moving. A fast loop serves recalibrations on demand as damped corrections with head-only solves against fresh data, always using the most recently completed body, and it never waits for the slow loop. When a refresh lands mid-session the shrinkage target is carried across by a head transplant, $\beta \leftarrow \operatorname*{arg\,min}_{\beta'} \sum_i w^{(i)} \bigl((\varphi_{\mathrm{new}}(z_i)^{\top}, 1)\beta' - f_{\mathrm{old}}(X^{(i)})\bigr)^2$, one more closed-form solve, so the leverage surface evolves through the day as a single chain with no discontinuity at swap times. Lagging the nonconvex half while the convex half adapts is the stabilisation device of target networks in reinforcement learning \citep{mnih2015}. The fast loop treats the body as a constant, every market-facing solve is convex on fresh data, and the finite-dimensional analysis of \cref{subsec:overnightbody} applies unchanged between swaps.
 
 \section{Positioning}\label{sec:positioning}
 
@@ -521,6 +537,14 @@ House style forbids theorem environments, so \cref{rem:cost,rem:selfnorm} become
 \bibitem[Eilers and Marx(1996)]{eilers1996} P.~H.~C. Eilers and B.~D. Marx, ``Flexible smoothing with {B}-splines and penalties,'' \textit{Statistical Science}, vol.~11, no.~2, pp.~89--121, 1996.
 
 \bibitem[Kimeldorf and Wahba(1971)]{kimeldorf1971} G.~Kimeldorf and G.~Wahba, ``Some results on {T}chebycheffian spline functions,'' \textit{Journal of Mathematical Analysis and Applications}, vol.~33, no.~1, pp.~82--95, 1971.
+
+\bibitem[Rahimi and Recht(2007)]{rahimi2007} A.~Rahimi and B.~Recht, ``Random features for large-scale kernel machines,'' in \textit{Advances in Neural Information Processing Systems}, vol.~20, 2007.
+
+\bibitem[Yosinski et~al.(2014)]{yosinski2014} J.~Yosinski, J.~Clune, Y.~Bengio, and H.~Lipson, ``How transferable are features in deep neural networks?'' in \textit{Advances in Neural Information Processing Systems}, vol.~27, 2014.
+
+\bibitem[Alain and Bengio(2016)]{alain2016} G.~Alain and Y.~Bengio, ``Understanding intermediate layers using linear classifier probes,'' \textit{arXiv preprint} arXiv:1610.01644, 2016.
+
+\bibitem[Mnih et~al.(2015)]{mnih2015} V.~Mnih, K.~Kavukcuoglu, D.~Silver, et~al., ``Human-level control through deep reinforcement learning,'' \textit{Nature}, vol.~518, pp.~529--533, 2015.
 
 \end{thebibliography}
 
