@@ -15,8 +15,12 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
     If `mixture` is a MixtureDesign, particles are split across its components (Algorithm 4):
     the X-drift gains a component-dependent tilt on the orthogonal noise only, V is pathwise
     unchanged, and each particle accumulates a balance-heuristic importance weight that is fed
-    to every conditional-expectation estimator.
+    to every conditional-expectation estimator. Under a mixture, the returned `lnx` and any
+    `snapshots` are proposal- (not physical-) distributed: use `info["weights"]` /
+    `info["snapshot_weights"]` to recover physical-measure statistics (e.g. via `mc_smile`).
     """
+    if method == "spline" and mixture is not None:
+        raise ValueError("spline estimator does not support importance weights")
     kappa, theta, xi, rho, v0 = (params[k] for k in ("kappa", "theta", "xi", "rho", "v0"))
     rng = np.random.default_rng(seed)
     dt, sdt = T / n_steps, np.sqrt(T / n_steps)
@@ -25,7 +29,7 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
     v = np.full(n_particles, v0)
     reg = NNRegressor(seed=seed) if method == "nn" else (RidgeHead(seed=seed) if method == "ridge" else None)
 
-    L_records, snapshots = [], {}
+    L_records, snapshots, snapshot_weights = [], {}, {}
     snap_steps = {int(round(t / dt)): t for t in snapshot_times}
 
     fit_s = 0.0
@@ -81,16 +85,25 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
             w = 1.0 / (np.array(mixture.alphas) @ np.exp(np.clip(ell, -60, 60)))
         if k + 1 in snap_steps:
             snapshots[snap_steps[k + 1]] = lnx.copy()
+            if mixture is not None:
+                snapshot_weights[snap_steps[k + 1]] = w.copy()
 
     info = {"L_records": L_records, "snapshots": snapshots, "fit_s": fit_s}
     if mixture is not None:
         info["weights"] = w
+        info["snapshot_weights"] = snapshot_weights
         info["is_diag"] = {"max_w": float(w.max()),
                           "ess_frac": float(w.sum() ** 2 / (len(w) * (w ** 2).sum()))}
     return lnx, info
 
 
-def mc_smile(lnx_T, K_grid, s0=1.0):
-    """MC call prices from terminal particles."""
+def mc_smile(lnx_T, K_grid, s0=1.0, weights=None):
+    """MC call prices from terminal particles. Pass importance `weights` (e.g.
+    `info["weights"]` from a mixture-tilted run) for a self-normalised weighted mean —
+    required because under a mixture the particle cloud is proposal-, not
+    physical-distributed, and a plain average is biased."""
     x = np.exp(lnx_T)
-    return np.array([np.mean(np.maximum(x - K, 0.0)) for K in K_grid])
+    if weights is None:
+        return np.array([np.mean(np.maximum(x - K, 0.0)) for K in K_grid])
+    wn = weights / weights.sum()
+    return np.array([np.sum(wn * np.maximum(x - K, 0.0)) for K in K_grid])

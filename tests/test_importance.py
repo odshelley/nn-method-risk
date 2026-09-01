@@ -1,6 +1,6 @@
 import numpy as np
 from neural_particle_method.importance import MixtureDesign, design_mixture
-from neural_particle_method.explicit import calibrate_explicit
+from neural_particle_method.explicit import calibrate_explicit, mc_smile
 
 DYN = {"kappa": 2.0, "theta": 0.04, "xi": 0.5, "rho": -0.6, "v0": 0.04}
 # Flat Dupire implies L ~= 1 only when E[V|X] ~= v0 uniformly, i.e. at low vol-of-vol.
@@ -41,6 +41,31 @@ def test_flat_recovery_with_mixture():
     assert np.abs(Lg[mid] - 1.0).max() < 0.15
     assert "fit_s" in info and info["is_diag"]["max_w"] <= 2.0 + 1e-9
 
+def test_mixture_weighted_pricing_matches_untilted_reference():
+    # DYN_LOWVOV's L-recovery test can't detect a broken weighting scheme: at low
+    # vol-of-vol the tilt barely moves the leverage estimate whether or not weights are
+    # applied correctly (or even at all). Discriminate on terminal pricing at the
+    # original DYN (xi=0.5) instead: the WEIGHTED average over the tilted cloud must
+    # recover the untilted reference smile, while the UNWEIGHTED average over the same
+    # tilted cloud is grossly biased (the tilt pushes mass into the wings without
+    # correcting for it).
+    d = design_mixture(DYN, T=0.5)
+    kwargs = dict(T=0.5, n_steps=8, n_particles=20_000, method="nw",
+                  fit_subsample=5_000, seed=3)
+    lnx_ref, _ = calibrate_explicit(FlatDupire(), DYN, mixture=None, **kwargs)
+    lnx_mix, info_mix = calibrate_explicit(FlatDupire(), DYN, mixture=d, **kwargs)
+
+    K_grid = [0.8, 1.0, 1.2]
+    ref = mc_smile(lnx_ref, K_grid)
+    weighted = mc_smile(lnx_mix, K_grid, weights=info_mix["weights"])
+    unweighted = mc_smile(lnx_mix, K_grid)
+
+    rel_weighted = np.abs(weighted - ref) / ref
+    rel_unweighted = np.abs(unweighted - ref) / ref
+    assert rel_weighted.max() < 0.1, rel_weighted
+    # 1.2 wing: unweighted mixture-cloud pricing is grossly wrong (empirically ~270%).
+    assert rel_unweighted[-1] > 0.5, rel_unweighted
+
 def test_flat_recovery_untilted_control():
     # Control: the untilted run at the same low vol-of-vol dynamics must also recover
     # L ~= 1, so test_flat_recovery_with_mixture demonstrably isolates the tilt's effect
@@ -51,3 +76,24 @@ def test_flat_recovery_untilted_control():
     t, grid, Lg, _ = info["L_records"][-1]
     mid = np.abs(grid) < 0.3
     assert np.abs(Lg[mid] - 1.0).max() < 0.15
+
+def test_spline_rejects_mixture():
+    d = design_mixture(DYN, T=0.5)
+    try:
+        calibrate_explicit(FlatDupire(), DYN, T=0.5, n_steps=4,
+                            n_particles=2_000, method="spline",
+                            fit_subsample=500, seed=3, mixture=d)
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "importance weights" in str(e)
+
+def test_snapshot_weights_recorded_under_mixture():
+    d = design_mixture(DYN, T=0.5)
+    lnx, info = calibrate_explicit(FlatDupire(), DYN, T=0.5, n_steps=8,
+                                   n_particles=2_000, method="nw",
+                                   fit_subsample=500, seed=3, mixture=d,
+                                   snapshot_times=(0.25,))
+    assert set(info["snapshot_weights"]) == set(info["snapshots"])
+    sw = info["snapshot_weights"][0.25]
+    assert sw.shape == info["snapshots"][0.25].shape
+    assert np.all(sw > 0) and sw.max() <= 1 / d.alphas[1] + 1e-9
