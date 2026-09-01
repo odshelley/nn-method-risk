@@ -242,6 +242,40 @@ In the simulated chain no continuous-time Girsanov argument is needed: draw the 
 A single tilt direction covers one wing. Splitting the cloud into subpopulations with tilts $+\theta$, $-\theta$ and $0$, combined with balance-heuristic mixture weights, covers both wings while avoiding weight blow-up.
 \end{remark}
 
+\subsection{Optimal choice of the shift}\label{subsec:optshift}
+
+The tilt $\theta$ has so far been a free input, and it admits an optimality criterion, though not the classical one. Zero-variance theory optimises the change of measure for a single scalar expectation, with the Doob $h$-transform as the ideal limit \citep[Ch.~4]{glasserman2003}. Here one particle cloud must estimate the whole function $x \mapsto \E[V_t \mid X_t = x]$, so a single tilt serves every $x$ at once and the question becomes one of experimental design, namely where the tilted law of $X_t$ should place its particles.
+
+Write $m(x) \coloneqq \E_{\Pm}[V_t \mid X_t = x]$ and $\sigma_V^2(x) \coloneqq \operatorname{Var}_{\Pm}(V_t \mid X_t = x)$, and let $p$ and $q_\theta$ denote the densities of $X_t$ under $\Pm$ and $\Qm$. With weight $w = d\Pm/d\Qm$ as in \cref{eq:weights}, a delta-method expansion of the self-normalised estimator of \cref{eq:weightedreg}, kernel or local $L^2$ at the same leading order, gives, up to an estimator-dependent constant at fixed resolution,
+\begin{equation}\label{eq:varexp}
+  \operatorname{Var}\bigl[\widehat m(x)\bigr]
+  \asymp \frac{1}{N}\,
+    \frac{\E_{\Pm}\bigl[\, w\,(V_t - m(x))^2 \,\big|\, X_t = x \bigr]}{p(x)},
+\end{equation}
+in which every quantity on the right is a $\Pm$-quantity. The tilt reduces variance at $x$ exactly when the paths ending near $x$ carry small weight under $\Pm$, which happens when $\Qm$ favours them.
+
+When $w$ is $\sigma(X_t)$-measurable, which holds exactly for a deterministic tilt in the Gaussian proxy model, we have $\E_{\Pm}[w \mid X_t = x] = p(x)/q_\theta(x)$, and if the weight decouples from the squared residual, \cref{eq:varexp} collapses to the classical design formula
+\[
+  \operatorname{Var}\bigl[\widehat m(x)\bigr] \asymp \frac{\sigma_V^2(x)}{N\,q_\theta(x)} .
+\]
+The variance at $x$ is governed by how many particles the tilted measure delivers there.
+
+Fix next a weighting profile $\pi \geq 0$ recording where accuracy in the leverage matters. By \cref{eq:leverage} a relative error in the conditional expectation produces the relative leverage error $\delta\Lev/\Lev = -\tfrac12\,\delta m/m$, which feeds into option prices through the local vega, so the natural choice of $\pi$ places vega-weighted mass at the quoted strikes. Minimising the integrated variance $\int \pi(x)\,\sigma_V^2(x)/q(x)\,dx$ over probability densities $q$ is a Cauchy--Schwarz exercise with minimiser
+\begin{equation}\label{eq:optdesign}
+  q^*(t, x) \propto \sqrt{\pi(x)\,\sigma_V^2(x)} .
+\end{equation}
+The optimal design is neither uniform nor the payoff-shaped tilt of the pricing literature. It oversamples where the smile is quoted and where the conditional variance of $V$ is large, which under high vol-of-vol means the wings, in agreement with the tail-weighting diagnosis of \cref{sec:practical}.
+
+\begin{remark}[Steering as a constrained Schr\"odinger bridge]\label{rem:bridge}
+The design \cref{eq:optdesign} prescribes a marginal, while $\theta$ is a drift, so the remaining problem is to find the cheapest tilt whose $X_t$-marginals track $q^*$. With relative-entropy cost this is a Schr\"odinger bridge problem \citep{leonard2014}, subject to two modifications. The control acts only through $B^\perp$, the single direction left available by \cref{eq:constraint}, and the entropy cost carries the $1/(1-\rho^2)$ inflation of \cref{rem:cost}, so the steering becomes expensive as $\abs{\rho} \to 1$. We do not propose solving the bridge. Its role is to identify the object that the practical choices below approximate.
+\end{remark}
+
+In practice we restrict to deterministic shifts $\theta(t)$ and minimise the variance functional within that family in a Gaussian or Heston proxy, computable offline before any simulation. This is the programme of \citet{dosreis2023} for McKean--Vlasov particle systems, so the within-family optimisation comes with ready-made machinery. It combines with the defensive mixture of \cref{rem:mixture}, one moment-matched tilt per wing plus an untilted component, whose mixture weights are themselves covered by the optimality theory of the balance heuristic \citep{veach1995,owen2000}. The effective sample size per bucket of \cref{rem:selfnorm} remains the runtime diagnostic, while \cref{eq:varexp} supplies the offline design criterion.
+
+\begin{remark}[Scope of the optimality claim]\label{rem:optscope}
+The collapse $\E_{\Pm}[w \mid X_t = x] = p(x)/q_\theta(x)$ is exact only for $\sigma(X_t)$-measurable weights, and the path-dependent weight \cref{eq:weights} is not of this form. The correction term is the conditional variability of the weight given the endpoint, the same quantity isolated in \cref{rem:selfnorm}, so the optimality of \cref{eq:optdesign} holds to leading order in the Gaussian proxy, the level at which \citet{dosreis2023} also operate.
+\end{remark}
+
 \section{Acceleration and deployment}\label{sec:warmstart}
 
 \subsection{Warm starting across time slices}
@@ -402,6 +436,14 @@ House style forbids theorem environments, so \cref{rem:cost,rem:selfnorm} become
 \bibitem[Wang et~al.(2026)]{wang2026} X.~Wang, A.~Despr\'es, M.~Dureau, and F.~Buet-Golfouse, ``Amortizing the calibration triple: a projection-consistent neural operator for local-stochastic volatility,'' \textit{arXiv preprint} arXiv:2608.01217, 2026.
 
 \bibitem[dos Reis et~al.(2023)]{dosreis2023} G.~dos~Reis, G.~Smith, and P.~Tankov, ``Importance sampling for McKean--Vlasov SDEs,'' \textit{Applied Mathematics and Computation}, vol.~453, 2023. \textit{arXiv preprint} arXiv:1803.09320.
+
+\bibitem[Glasserman(2003)]{glasserman2003} P.~Glasserman, \textit{Monte Carlo Methods in Financial Engineering}, Springer, 2003.
+
+\bibitem[L\'eonard(2014)]{leonard2014} C.~L\'eonard, ``A survey of the {S}chr\"odinger problem and some of its connections with optimal transport,'' \textit{Discrete and Continuous Dynamical Systems~A}, vol.~34, no.~4, pp.~1533--1574, 2014.
+
+\bibitem[Veach and Guibas(1995)]{veach1995} E.~Veach and L.~J. Guibas, ``Optimally combining sampling techniques for {M}onte {C}arlo rendering,'' in \textit{Proceedings of SIGGRAPH}, pp.~419--428, 1995.
+
+\bibitem[Owen and Zhou(2000)]{owen2000} A.~B. Owen and Y.~Zhou, ``Safe and effective importance sampling,'' \textit{Journal of the American Statistical Association}, vol.~95, no.~449, pp.~135--143, 2000.
 
 \bibitem[Li(2023)]{li2023thesis} M.~Li, ``Simulations of calibrated local stochastic volatility models,'' MSc thesis, Department of Mathematics, Imperial College London, 2023.
 
