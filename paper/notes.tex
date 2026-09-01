@@ -244,36 +244,71 @@ A single tilt direction covers one wing. Splitting the cloud into subpopulations
 
 \subsection{Optimal choice of the shift}\label{subsec:optshift}
 
-The tilt $\theta$ has so far been a free input, and it admits an optimality criterion, though not the classical one. Zero-variance theory optimises the change of measure for a single scalar expectation, with the Doob $h$-transform as the ideal limit \citep[Ch.~4]{glasserman2003}. Here one particle cloud must estimate the whole function $x \mapsto \E[V_t \mid X_t = x]$, so a single tilt serves every $x$ at once and the question becomes one of experimental design, namely where the tilted law of $X_t$ should place its particles.
+The tilt $\theta$ has so far been a free input. This subsection derives the criterion it should be optimised against, working at a single time slice $t$. It helps to first recall what optimal importance sampling means for an ordinary expectation, because our problem departs from that setting in two ways that shape everything below.
 
-Write $m(x) \coloneqq \E_{\Pm}[V_t \mid X_t = x]$ and $\sigma_V^2(x) \coloneqq \operatorname{Var}_{\Pm}(V_t \mid X_t = x)$, and let $p$ and $q_\theta$ denote the densities of $X_t$ under $\Pm$ and $\Qm$. With weight $w = d\Pm/d\Qm$ as in \cref{eq:weights}, a delta-method expansion of the self-normalised estimator of \cref{eq:weightedreg}, kernel or local $L^2$ at the same leading order, gives, up to an estimator-dependent constant at fixed resolution,
+To estimate a single number $\E_{\Pm}[\Phi(X_T)]$ for a payoff $\Phi \geq 0$, the ideal change of measure is known in closed form. Set $h(t,x) \coloneqq \E_{\Pm}[\Phi(X_T) \mid X_t = x]$, the value function of the target itself, so that $h(t, X_t)$ is a martingale. The measure with density $d\Qm^*/d\Pm = \Phi(X_T)/\E_{\Pm}[\Phi(X_T)]$ is the Doob $h$-transform of $\Pm$, its Girsanov kernel is the gradient $\sigma^{\top}\nabla_x \ln h$ evaluated along the path, and the weighted estimator $\Phi(X_T)\,d\Pm/d\Qm^*$ equals the constant $\E_{\Pm}[\Phi(X_T)]$ on every path, so its variance is zero \citep[Ch.~4]{glasserman2003}. The construction is circular, since building the sampler requires knowing the answer, and every practical scheme approximates $h$ in a tractable proxy.
+
+Zero variance is out of reach here for two structural reasons, before circularity even enters. First, the ideal kernel is a gradient in both noise directions, whereas \cref{eq:constraint} confines our tilt to the single direction $B^\perp$, so the exact transform is not in the admissible family; this is the same degeneracy as \cref{rem:cost}, seen from the other side. Second, the estimand is not one number but the function $x \mapsto \E[V_t \mid X_t = x]$, and each of its values is a ratio of two expectations by \cref{eq:weightedreg}. Self-normalised estimators of ratios have a strictly positive variance floor under every sampling measure \citep{owen2000}. The productive question is therefore not which tilt achieves zero variance but which tilt best spends a fixed particle budget across all $x$ simultaneously. That is a question of experimental design. The plan is to compute the variance of the estimator at each $x$, identify how the tilt enters, and minimise a weighted integral over $x$.
+
+Write $m(x) \coloneqq \E_{\Pm}[V_t \mid X_t = x]$ for the target and $\sigma_V^2(x) \coloneqq \operatorname{Var}_{\Pm}(V_t \mid X_t = x)$ for the conditional variance around it, and let $p$ and $q_\theta$ denote the densities of $X_t$ under $\Pm$ and $\Qm$. The particles $(X^{(i)}, V^{(i)})$ at time $t$ are simulated under $\Qm$ and carry the weights $w^{(i)} = (d\Pm/d\Qm)^{(i)}$ of \cref{eq:weights}. Near a point $x$, every estimator in this paper behaves like the self-normalised local average
+\begin{equation}\label{eq:ratioest}
+  \widehat m(x) = \frac{\sum_i w^{(i)}\, K_b(X^{(i)} - x)\, V^{(i)}}{\sum_i w^{(i)}\, K_b(X^{(i)} - x)},
+  \qquad K_b(u) \coloneqq \tfrac{1}{b}\,K(u/b),
+\end{equation}
+where $K$ is a probability kernel and $b$ a bandwidth. For Nadaraya--Watson this is the estimator itself. For the regression estimators the identification is heuristic, with $b$ standing for the local resolution of the function class, but the leading-order variance calculation is the same.
+
+Both numerator and denominator of \cref{eq:ratioest} are sample means over $\Qm$-particles, so the law of large numbers sends them to $\Qm$-expectations, and the weight converts these back into $\Pm$-expectations through the identity $\E_{\Qm}[w\,g(X_t, V_t)] = \E_{\Pm}[g(X_t, V_t)]$, valid for every integrable $g$. As $b \to 0$ the kernel concentrates at $x$, so the denominator tends to $\E_{\Pm}[K_b(X_t - x)] \approx p(x)$ and the numerator to $\E_{\Pm}[K_b(X_t - x)\,V_t] \approx p(x)\,m(x)$. The estimator is consistent for $m(x)$ whatever the tilt, as \cref{eq:weightedreg} already showed. The tilt affects only the fluctuations around the limit.
+
+The fluctuations follow from the delta method for a ratio. Write $\widehat m(x) = A_N/B_N$ with $A_N$ and $B_N$ the two sample means. Expanding to first order around the limits $p(x)m(x)$ and $p(x)$ gives $\widehat m(x) - m(x) \approx \bigl(A_N - m(x)\,B_N\bigr)/p(x)$, and the right-hand side is the sample mean of $w\,K_b(X_t - x)\,(V_t - m(x))/p(x)$, whose expectation vanishes to leading order because $\E_{\Pm}[V_t - m(x) \mid X_t \approx x] \approx 0$. Its variance is therefore a single second moment,
+\begin{equation}\label{eq:deltamethod}
+  \operatorname{Var}\bigl[\widehat m(x)\bigr]
+  \approx \frac{1}{N}\,\frac{\E_{\Qm}\bigl[ w^2\, K_b(X_t - x)^2\,(V_t - m(x))^2 \bigr]}{p(x)^2}
+  = \frac{1}{N}\,\frac{\E_{\Pm}\bigl[ w\, K_b(X_t - x)^2\,(V_t - m(x))^2 \bigr]}{p(x)^2},
+\end{equation}
+where the equality converts one of the two powers of $w$ back to $\Pm$ by the same identity as before, and one power remains because the second moment carries $w^2$. Localising the remaining kernel with $\E_{\Pm}[K_b(X_t - x)^2\, g(X_t, V_t)] \approx p(x)\,\E_{\Pm}[g \mid X_t = x]\,R(K)/b$, where $R(K) \coloneqq \int K^2$, yields
 \begin{equation}\label{eq:varexp}
   \operatorname{Var}\bigl[\widehat m(x)\bigr]
-  \asymp \frac{1}{N}\,
-    \frac{\E_{\Pm}\bigl[\, w\,(V_t - m(x))^2 \,\big|\, X_t = x \bigr]}{p(x)},
+  \approx \frac{R(K)}{N b}\;
+    \frac{\E_{\Pm}\bigl[\, w\,(V_t - m(x))^2 \,\big|\, X_t = x \bigr]}{p(x)} .
 \end{equation}
-in which every quantity on the right is a $\Pm$-quantity. The tilt reduces variance at $x$ exactly when the paths ending near $x$ carry small weight under $\Pm$, which happens when $\Qm$ favours them.
+The prefactor $R(K)/(Nb)$ does not involve $\theta$, so only the second factor matters for choosing the tilt.
 
-When $w$ is $\sigma(X_t)$-measurable, which holds exactly for a deterministic tilt in the Gaussian proxy model, we have $\E_{\Pm}[w \mid X_t = x] = p(x)/q_\theta(x)$, and if the weight decouples from the squared residual, \cref{eq:varexp} collapses to the classical design formula
+\Cref{eq:varexp} rewards a careful reading. Every quantity in it lives under the original measure $\Pm$, even though the simulation runs under $\Qm$, and the tilt appears in exactly one place, inside the conditional expectation through the weight $w$. In the untilted case $w \equiv 1$ and the variance at $x$ is $\sigma_V^2(x)/p(x)$ up to the prefactor, which blows up in the wings where $p$ is tiny; this is the tail problem of \cref{sec:practical} in quantitative form. Tilting reduces the variance at $x$ precisely when the paths ending near $x$ carry weight $w < 1$, meaning $\Qm$ made them more likely than $\Pm$ did. The variance is not destroyed but relocated, since at any $x$ the tilt starves the same computation shows $w > 1$ and an inflated variance.
+
+Two simplifications turn \cref{eq:varexp} into a design formula. First, suppose the weight is a function of the endpoint alone, $w = \omega(X_t)$. Testing the identity $\E_{\Qm}[\omega(X_t)\,g(X_t)] = \E_{\Pm}[g(X_t)]$ against arbitrary $g$ forces $\omega\, q_\theta = p$ pointwise, so $\omega(x) = p(x)/q_\theta(x)$ and in particular $\E_{\Pm}[w \mid X_t = x] = p(x)/q_\theta(x)$. Second, suppose the weight decouples from the squared residual given the endpoint, so the conditional expectation of the product factorises into $\E_{\Pm}[w \mid X_t = x] \cdot \sigma_V^2(x)$. Under both,
+\begin{equation}\label{eq:designformula}
+  \operatorname{Var}\bigl[\widehat m(x)\bigr]
+  \asymp \frac{R(K)}{Nb}\,\frac{\sigma_V^2(x)}{q_\theta(x)} .
+\end{equation}
+The variance at $x$ is inversely proportional to the density of particles the tilted measure delivers there, and the tilt matters only through the marginal $q_\theta$ it induces. Neither simplification is exact for a path-dependent weight; \cref{rem:optscope} records what is lost.
+
+It remains to say which $x$ we care about. Fix a weighting profile $\pi \geq 0$ recording where accuracy in the leverage matters. The choice belongs to the user, but \cref{eq:leverage} suggests it, since a relative error in the conditional expectation produces the relative leverage error $\delta\Lev/\Lev = -\tfrac12\,\delta m/m$, which moves option prices through the local vega, so a natural $\pi$ places vega-weighted mass at the quoted strikes. The design problem is to choose the sampling density minimising the $\pi$-weighted integrated variance,
 \[
-  \operatorname{Var}\bigl[\widehat m(x)\bigr] \asymp \frac{\sigma_V^2(x)}{N\,q_\theta(x)} .
+  \min_{q}\ \int \frac{\pi(x)\,\sigma_V^2(x)}{q(x)}\,dx
+  \quad \text{over densities } q .
 \]
-The variance at $x$ is governed by how many particles the tilted measure delivers there.
-
-Fix next a weighting profile $\pi \geq 0$ recording where accuracy in the leverage matters. By \cref{eq:leverage} a relative error in the conditional expectation produces the relative leverage error $\delta\Lev/\Lev = -\tfrac12\,\delta m/m$, which feeds into option prices through the local vega, so the natural choice of $\pi$ places vega-weighted mass at the quoted strikes. Minimising the integrated variance $\int \pi(x)\,\sigma_V^2(x)/q(x)\,dx$ over probability densities $q$ is a Cauchy--Schwarz exercise with minimiser
+The minimiser follows from Cauchy--Schwarz. For any density $q$,
+\[
+  \Bigl( \int \sqrt{\pi\,\sigma_V^2}\;dx \Bigr)^{\!2}
+  = \Bigl( \int \sqrt{\frac{\pi\,\sigma_V^2}{q}}\,\sqrt{q}\;dx \Bigr)^{\!2}
+  \;\leq\; \int \frac{\pi\,\sigma_V^2}{q}\,dx \,\cdot \int q\,dx
+  \;=\; \int \frac{\pi\,\sigma_V^2}{q}\,dx ,
+\]
+so the objective is bounded below by $\bigl(\int \sqrt{\pi\,\sigma_V^2}\,dx\bigr)^2$ independently of $q$, and equality holds exactly when the two square roots are proportional, that is when
 \begin{equation}\label{eq:optdesign}
   q^*(t, x) \propto \sqrt{\pi(x)\,\sigma_V^2(x)} .
 \end{equation}
-The optimal design is neither uniform nor the payoff-shaped tilt of the pricing literature. It oversamples where the smile is quoted and where the conditional variance of $V$ is large, which under high vol-of-vol means the wings, in agreement with the tail-weighting diagnosis of \cref{sec:practical}.
+
+The optimal design is neither uniform nor the payoff-shaped tilt of the pricing literature, and the square root tempers both ingredients, so quadrupling the importance of a region only doubles the particles sent there. It oversamples where the smile is quoted and where the conditional variance of $V$ is large, which under high vol-of-vol means the wings.
 
 \begin{remark}[Steering as a constrained Schr\"odinger bridge]\label{rem:bridge}
-The design \cref{eq:optdesign} prescribes a marginal, while $\theta$ is a drift, so the remaining problem is to find the cheapest tilt whose $X_t$-marginals track $q^*$. With relative-entropy cost this is a Schr\"odinger bridge problem \citep{leonard2014}, subject to two modifications. The control acts only through $B^\perp$, the single direction left available by \cref{eq:constraint}, and the entropy cost carries the $1/(1-\rho^2)$ inflation of \cref{rem:cost}, so the steering becomes expensive as $\abs{\rho} \to 1$. We do not propose solving the bridge. Its role is to identify the object that the practical choices below approximate.
+The design \cref{eq:optdesign} prescribes where the particles should sit at each time, but the algorithm does not choose $q_\theta$ directly. It chooses the drift $\theta$, and the marginal is whatever the tilted SDE produces. Finding the cheapest drift whose $X_t$-marginals track a prescribed family of densities, with relative entropy as the cost, is the Schr\"odinger bridge problem \citep{leonard2014}, here subject to two modifications. The control acts only through $B^\perp$, the single direction left available by \cref{eq:constraint}, and the entropy cost carries the $1/(1-\rho^2)$ inflation of \cref{rem:cost}, so the steering becomes expensive as $\abs{\rho} \to 1$. We do not propose solving the bridge. Its role is to identify the object that the practical choices below approximate.
 \end{remark}
 
 In practice we restrict to deterministic shifts $\theta(t)$ and minimise the variance functional within that family in a Gaussian or Heston proxy, computable offline before any simulation. This is the programme of \citet{dosreis2023} for McKean--Vlasov particle systems, so the within-family optimisation comes with ready-made machinery. It combines with the defensive mixture of \cref{rem:mixture}, one moment-matched tilt per wing plus an untilted component, whose mixture weights are themselves covered by the optimality theory of the balance heuristic \citep{veach1995,owen2000}. The effective sample size per bucket of \cref{rem:selfnorm} remains the runtime diagnostic, while \cref{eq:varexp} supplies the offline design criterion.
 
 \begin{remark}[Scope of the optimality claim]\label{rem:optscope}
-The collapse $\E_{\Pm}[w \mid X_t = x] = p(x)/q_\theta(x)$ is exact only for $\sigma(X_t)$-measurable weights, and the path-dependent weight \cref{eq:weights} is not of this form. The correction term is the conditional variability of the weight given the endpoint, the same quantity isolated in \cref{rem:selfnorm}, so the optimality of \cref{eq:optdesign} holds to leading order in the Gaussian proxy, the level at which \citet{dosreis2023} also operate.
+Both simplifications leading to \cref{eq:designformula} fail in general. The weight \cref{eq:weights} depends on the whole path of $B^\perp$, not on the endpoint alone, and it need not decouple from the residual. The error in either case is controlled by the conditional variability of the weight given the endpoint, the same quantity isolated in \cref{rem:selfnorm}. The optimality of \cref{eq:optdesign} therefore holds to leading order in the Gaussian proxy, the level at which \citet{dosreis2023} also operate.
 \end{remark}
 
 \section{Acceleration and deployment}\label{sec:warmstart}
