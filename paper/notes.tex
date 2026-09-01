@@ -76,7 +76,7 @@ where $\E^{\Lev}$ denotes expectation under the law of the solution of \cref{eq:
 
 \section{Conditional expectation by $L^2$ minimisation}\label{sec:l2}
 
-The methodological core is the projection identity: over all measurable functions $f$,
+The methodological core is the projection identity. Over all measurable functions $f$,
 \begin{equation}\label{eq:l2proj}
   \E[V_t \mid X_t = \cdot\,]
   = \operatorname*{arg\,min}_{f}\; \E\bigl[(V_t - f(X_t))^2\bigr].
@@ -115,7 +115,7 @@ Initialise $X^{(i)}_0 = X_0$, $V^{(i)}_0 = v_0$, weights $w^{(i)} = 1$,
 \Return{$\{\Lev(t_k, \cdot)\}_k$, $\{(X^{(i)}_T, V^{(i)}_T, w^{(i)})\}_i$}\;
 \end{algorithm}
 
-Structural observation to state early in any write-up: the explicit scheme contains \emph{no fixed point}. Since $\Lev(t_k,\cdot)$ depends only on $\Lev(t_j,\cdot)$ for $j < k$, the discretised problem is a causal forward recursion solved in a single pass by construction. The fixed-point existence question is therefore not load-bearing for the explicit scheme; it bites only for the implicit one.
+One structural observation belongs early in any write-up. The explicit scheme contains \emph{no fixed point}. Since $\Lev(t_k,\cdot)$ depends only on $\Lev(t_j,\cdot)$ for $j < k$, the discretised problem is a causal forward recursion solved in a single pass by construction. The fixed-point existence question is therefore not load-bearing for the explicit scheme. It bites only for the implicit one.
 
 \section{Implicit scheme}\label{sec:implicit}
 
@@ -149,13 +149,13 @@ $n \leftarrow 0$\;
 \Return{$\Lev^{n}$}\;
 \end{algorithm}
 
-The scheme is implicit for a subtle reason: shared parameters $\theta$ let data at times $t_j > t_k$ influence $\Lev(t_k, \cdot)$, so information flows backward through $\theta$. That, rather than the time stepping, is the actual implicitness. A practical advantage is that sharing across $t$ borrows strength into data-poor slices (tails, short maturities).
+The scheme is implicit for a subtle reason. Shared parameters $\theta$ let data at times $t_j > t_k$ influence $\Lev(t_k, \cdot)$, so information flows backward through $\theta$. That, rather than the time stepping, is the actual implicitness. A practical advantage is that sharing across $t$ borrows strength into data-poor slices (tails, short maturities).
 
 \section{Practical considerations}\label{sec:practical}
 
 \begin{enumerate}
 \item \emph{Positivity.} Nothing constrains $f_\theta \geq 0$ and \cref{eq:leverage} divides by $\sqrt{f_\theta}$. Since $V \geq 0$ implies $\E[V \mid X] \geq 0$, parametrise $f_\theta = \operatorname{softplus}(g_\theta)$ or learn $\log \E[V \mid X]$. This costs nothing in expressiveness and encodes a true property.
-\item \emph{Tail weighting.} The $L^2$ loss is weighted by the sampling density of $X_t$, so errors in the tails are barely penalised, precisely where out-of-the-money leverage lives. The classical particle method papers over this with capping. The principal remedy is the Girsanov importance sampling of \cref{sec:girsanov}. The cross-time strength borrowing of the implicit scheme also helps.
+\item \emph{Tail weighting.} The $L^2$ loss is weighted by the sampling density of $X_t$, so errors in the tails are barely penalised, precisely where out-of-the-money leverage lives. The classical particle method papers over this with capping. The remedy here is the Girsanov importance sampling of \cref{sec:girsanov}, helped by the cross-time strength borrowing of the implicit scheme.
 \item \emph{Dupire input.} The surface $\sigDup$ requires an arbitrage-free implied volatility surface. Treat it as given, with \citep{chataigner2020} for the standard machinery.
 \item \emph{Time interpolation (explicit scheme).} The leverage $\Lev$ is defined on grid times. Intermediate times need interpolation, as in the classical particle method.
 \end{enumerate}
@@ -170,7 +170,9 @@ Write the volatility driver as $B = \rho W + \sqrt{1-\rho^2}\, W^\perp$ with $(W
 \begin{equation}\label{eq:constraint}
   \rho\,\theta + \sqrt{1-\rho^2}\,\theta^\perp = 0 .
 \end{equation}
-Under the new measure $\Qm$, the process $B$ receives drift $\rho\theta + \sqrt{1-\rho^2}\theta^\perp = 0$ and therefore remains a Brownian motion, so the dynamics of $V$ are unchanged, and with the same realisation of $B$ the $V$ paths are literally identical. Meanwhile $W$ acquires drift $\theta$, so the stock particles are pushed into the wings. The constraint \cref{eq:constraint} is one linear equation on the two-dimensional kernel, so $\theta^\perp = -\rho\theta/\sqrt{1-\rho^2}$ is forced once $\theta$ is chosen. In the $(W, W^\perp)$ coordinates the admissible tilts are exactly the orthogonal complement of the direction $(\rho, \sqrt{1-\rho^2})$ generating $B$, a one-parameter family indexed by $\theta$, which may be deterministic in $t$ or state dependent. The density process is the explicit stochastic exponential accumulated along the simulation.
+Under the new measure $\Qm$, the process $B$ receives drift $\rho\theta + \sqrt{1-\rho^2}\theta^\perp = 0$ and therefore remains a Brownian motion, so the dynamics of $V$ are unchanged, and with the same realisation of $B$ the $V$ paths are literally identical. Meanwhile $W$ acquires drift $\theta$, so the stock particles are pushed into the wings.
+
+The constraint \cref{eq:constraint} is one linear equation on the two-dimensional kernel, so $\theta^\perp = -\rho\theta/\sqrt{1-\rho^2}$ is forced once $\theta$ is chosen. In the $(W, W^\perp)$ coordinates the admissible tilts are exactly the orthogonal complement of the direction $(\rho, \sqrt{1-\rho^2})$ generating $B$, a one-parameter family indexed by $\theta$, which may be deterministic in $t$ or state dependent. The density process is the explicit stochastic exponential accumulated along the simulation.
 
 \begin{remark}[Variance cost of preserving the volatility]\label{rem:cost}
 The Girsanov exponent is driven by the full kernel norm
@@ -186,7 +188,7 @@ Rotate to the basis adapted to the constraint. Set
 \[
   B^\perp_t \coloneqq \sqrt{1-\rho^2}\,W_t - \rho\,W^\perp_t ,
 \]
-so that $\langle B^\perp\rangle_t = t$ and $\langle B, B^\perp\rangle_t = 0$: the pair $(B, B^\perp)$ consists of independent $\Pm$-Brownian motions, and the stock driver decomposes as $W = \rho B + \sqrt{1-\rho^2}\,B^\perp$. With $\theta^\perp = -\rho\theta/\sqrt{1-\rho^2}$ forced by \cref{eq:constraint},
+so that $\langle B^\perp\rangle_t = t$ and $\langle B, B^\perp\rangle_t = 0$. The pair $(B, B^\perp)$ consists of independent $\Pm$-Brownian motions, and the stock driver decomposes as $W = \rho B + \sqrt{1-\rho^2}\,B^\perp$. With $\theta^\perp = -\rho\theta/\sqrt{1-\rho^2}$ forced by \cref{eq:constraint},
 \[
   \theta\,dW + \theta^\perp\,dW^\perp
   = \frac{\theta}{\sqrt{1-\rho^2}}
@@ -204,10 +206,10 @@ The constrained two-dimensional change of measure is therefore a one-dimensional
 \end{equation}
 a true martingale under the Novikov condition, automatic for bounded $\theta$, deterministic or state dependent. Its quadratic exponent $\int \eta_s^2\,ds = \int \theta_s^2/(1-\rho^2)\,ds$ recovers the cost of \cref{rem:cost} directly from the derivation.
 
-Under $\Qm$, Girsanov gives that $\widetilde{B}^\perp = B^\perp - \int \eta\,ds$ is a Brownian motion while $B$, orthogonal to the kernel, is untouched, so $V$ is pathwise unchanged; the stock driver gains drift $\sqrt{1-\rho^2}\,\eta = \theta$ and
+Under $\Qm$, Girsanov gives that $\widetilde{B}^\perp = B^\perp - \int \eta\,ds$ is a Brownian motion while $B$, orthogonal to the kernel, is untouched, so $V$ is pathwise unchanged. The stock driver gains drift $\sqrt{1-\rho^2}\,\eta = \theta$ and
 \[
   d\log X_t = \Bigl( -\tfrac12 \Lev^2 V_t + \Lev\sqrt{V_t}\,\theta_t \Bigr) dt
-    + \Lev\sqrt{V_t}\,dW^Q_t .
+    + \Lev\sqrt{V_t}\,dW^{\Qm}_t .
 \]
 The importance weights, expressed in the $\Qm$-Brownian motion actually simulated, are
 \begin{equation}\label{eq:weights}
@@ -218,7 +220,7 @@ The importance weights, expressed in the $\Qm$-Brownian motion actually simulate
 so each particle's log-weight updates recursively per Euler step as $\log w \leftarrow \log w - \eta\,\Delta\widetilde{B}^\perp - \tfrac12 \eta^2 \Delta t$ with $\Delta\widetilde{B}^\perp \sim N(0, \Delta t)$ the drawn increment. This coincides with the ratio of Gaussian step densities $\varphi_{N(0,\Delta t)}(\Delta B^\perp) / \varphi_{N(\eta\Delta t,\Delta t)}(\Delta B^\perp)$, so the continuous-time formula and the exact discrete-chain weights agree step by step. The exactness of \cref{rem:discrete} is an identity, not an approximation statement.
 
 \begin{remark}[Weights are independent of the volatility path]\label{rem:indep}
-For deterministic $\eta$, the log-density $\log Z$ is Gaussian and independent of $B$, hence of the entire $V$ path: the weights live purely on the stock's idiosyncratic noise $B^\perp$. This is the cleanest possible shape for the conditional-variance term in \cref{rem:selfnorm}.
+For deterministic $\eta$, the log-density $\log Z$ is Gaussian and independent of $B$, hence of the entire $V$ path, so the weights live purely on the stock's idiosyncratic noise $B^\perp$. This is the best case for the conditional-variance term in \cref{rem:selfnorm}.
 \end{remark}
 
 \subsection{Weighted $L^2$ regression under the tilted measure}
@@ -228,14 +230,14 @@ Let $Z = d\Pm/d\Qm$. For every measurable $f$, the weighted loss $\E_{\Qm}\!\lef
   f(x) = \frac{\E_{\Qm}[Z V_t \mid X_t = x]}{\E_{\Qm}[Z \mid X_t = x]}
        = \E_{\Pm}[V_t \mid X_t = x],
 \end{equation}
-by the abstract Bayes formula. Importance-weighted $L^2$ minimisation therefore recovers the correct conditional expectation with no further correction: the tilt moves where the samples live, the weights fix the estimand. The identical weighting applies to Nadaraya--Watson regression, so importance sampling is orthogonal to the neural-versus-kernel comparison and improves both.
+by the abstract Bayes formula. Importance-weighted $L^2$ minimisation therefore recovers the correct conditional expectation with no further correction. The identical weighting applies to Nadaraya--Watson regression, so importance sampling is orthogonal to the neural-versus-kernel comparison and improves both.
 
 \begin{remark}[Self-normalisation]\label{rem:selfnorm}
-Importance sampling for conditional expectations is more favourable than for unconditional ones. The ratio structure of \cref{eq:weightedreg} self-normalises at each $x$, so the level of $Z$ at $x$ cancels; only the conditional variability of $Z$ given $X_t = x$ contributes noise. That variability comes from the volatility path and vanishes in the deterministic-volatility limit. The effective sample size per spatial bucket is the natural diagnostic for tuning $\theta$.
+Importance sampling for conditional expectations is more favourable than for unconditional ones. The ratio structure of \cref{eq:weightedreg} self-normalises at each $x$, so the level of $Z$ at $x$ cancels, and only the conditional variability of $Z$ given $X_t = x$ contributes noise. That variability comes from the volatility path and vanishes in the deterministic-volatility limit. The effective sample size per spatial bucket is the natural diagnostic for tuning $\theta$.
 \end{remark}
 
 \begin{remark}[Exact discrete-time weights]\label{rem:discrete}
-In the simulated chain no continuous-time Girsanov argument is needed: draw the tilted Gaussian increments under $\Qm$ and accumulate the exact ratio of Gaussian densities step by step. The resulting weights are exact for the discretised chain, with no discretisation error in the measure change itself.
+In the simulated chain no continuous-time Girsanov argument is needed. Draw the tilted Gaussian increments under $\Qm$ and accumulate the exact ratio of Gaussian densities step by step. The resulting weights are exact for the discretised chain, with no discretisation error in the measure change itself.
 \end{remark}
 
 \begin{remark}[Defensive mixtures]\label{rem:mixture}
@@ -244,54 +246,54 @@ A single tilt direction covers one wing. Splitting the cloud into subpopulations
 
 \subsection{Optimal choice of the shift}\label{subsec:optshift}
 
-The tilt $\theta$ has so far been a free input. This subsection derives the criterion it should be optimised against, working at a single time slice $t$. It helps to first recall what optimal importance sampling means for an ordinary expectation, because our problem departs from that setting in two ways that shape everything below.
+The tilt $\theta$ has so far been a free input. Fixing a single time slice $t$, it helps to first recall what optimal importance sampling means for an ordinary expectation, because our problem departs from that setting in two ways that shape everything below.
 
-To estimate a single number $\E_{\Pm}[\Phi(X_T)]$ for a payoff $\Phi \geq 0$, the ideal change of measure is known in closed form. Set $h(t,x) \coloneqq \E_{\Pm}[\Phi(X_T) \mid X_t = x]$, the value function of the target itself, so that $h(t, X_t)$ is a martingale. The measure with density $d\Qm^*/d\Pm = \Phi(X_T)/\E_{\Pm}[\Phi(X_T)]$ is the Doob $h$-transform of $\Pm$, its Girsanov kernel is the gradient $\sigma^{\top}\nabla_x \log h$ evaluated along the path, and the weighted estimator $\Phi(X_T)\,d\Pm/d\Qm^*$ equals the constant $\E_{\Pm}[\Phi(X_T)]$ on every path, so its variance is zero \citep[Ch.~4]{glasserman2003}. The construction is circular, since building the sampler requires knowing the answer, and every practical scheme approximates $h$ in a tractable proxy.
+To estimate a single number $\E_{\Pm}[\Psi(X_T)]$ for a payoff $\Psi \geq 0$, the ideal change of measure is known in closed form. Set $h(t,x) \coloneqq \E_{\Pm}[\Psi(X_T) \mid X_t = x]$, the value function of the target itself, so that $h(t, X_t)$ is a martingale. The measure with density $d\Qm^*/d\Pm = \Psi(X_T)/\E_{\Pm}[\Psi(X_T)]$ is the Doob $h$-transform of $\Pm$, its Girsanov kernel is the gradient $\sigma^{\top}\nabla_x \log h$ evaluated along the path, with $\sigma$ the diffusion coefficient of the state, and the weighted estimator $\Psi(X_T)\,d\Pm/d\Qm^*$ equals the constant $\E_{\Pm}[\Psi(X_T)]$ on every path, so its variance is zero \citep[Ch.~4]{glasserman2003}. The construction is circular, since building the sampler requires knowing the answer, and every practical scheme approximates $h$ in a tractable proxy.
 
-Zero variance is out of reach here for two structural reasons, before circularity even enters. First, the ideal kernel is a gradient in both noise directions, whereas \cref{eq:constraint} confines our tilt to the single direction $B^\perp$, so the exact transform is not in the admissible family; this is the same degeneracy as \cref{rem:cost}, seen from the other side. Second, the estimand is not one number but the function $x \mapsto \E[V_t \mid X_t = x]$, and each of its values is a ratio of two expectations by \cref{eq:weightedreg}. Self-normalised estimators of ratios have a strictly positive variance floor under every sampling measure \citep{owen2000}. The productive question is therefore not which tilt achieves zero variance but which tilt best spends a fixed particle budget across all $x$ simultaneously. That is a question of experimental design. The plan is to compute the variance of the estimator at each $x$, identify how the tilt enters, and minimise a weighted integral over $x$.
+Zero variance is out of reach here for two structural reasons, before circularity even enters. First, the ideal kernel is a gradient in both noise directions, whereas \cref{eq:constraint} confines our tilt to the single direction $B^\perp$, so the exact transform is not in the admissible family. This is the same degeneracy as \cref{rem:cost}, seen from the other side. Second, the estimand is not one number but the function $x \mapsto \E[V_t \mid X_t = x]$, and each of its values is a ratio of two expectations by \cref{eq:weightedreg}. Self-normalised estimators of ratios have a strictly positive variance floor under every sampling measure \citep{owen2000}. The productive question is therefore not which tilt achieves zero variance but which tilt best spends a fixed particle budget across all $x$ simultaneously. That is a question of experimental design. The plan is to compute the variance of the estimator at each $x$, identify how the tilt enters, and minimise a weighted integral over $x$.
 
 Write $m(x) \coloneqq \E_{\Pm}[V_t \mid X_t = x]$ for the target and $\sigma_V^2(x) \coloneqq \operatorname{Var}_{\Pm}(V_t \mid X_t = x)$ for the conditional variance around it, and let $p$ and $q_\theta$ denote the densities of $X_t$ under $\Pm$ and $\Qm$. Recall from \cref{subsec:density} what the tilt does to the dynamics. Under $\Qm$ the variance process is pathwise unchanged, while the stock gains the drift $\theta$,
 \begin{equation}\label{eq:tiltedsde}
-  \frac{dX_t}{X_t} = \Lev(t, X_t)\,\sqrt{V_t}\,\bigl( \theta_t\,dt + dW^Q_t \bigr),
+  \frac{dX_t}{X_t} = \Lev(t, X_t)\,\sqrt{V_t}\,\bigl( \theta_t\,dt + dW^{\Qm}_t \bigr),
 \end{equation}
 so $q_\theta$ is the time-$t$ density generated by \cref{eq:tiltedsde}. A positive $\theta$ pushes particles toward the upper wing, a negative one toward the lower, and this is the only handle the tilt has on where the particles sit. The particles $(X^{(i)}, V^{(i)})$ at time $t$ are simulated under $\Qm$ and carry the weights $w^{(i)} = (d\Pm/d\Qm)^{(i)}$ of \cref{eq:weights}. Near a point $x$, every estimator in this paper behaves like the self-normalised local average
 \begin{equation}\label{eq:ratioest}
-  \widehat m(x) = \frac{\sum_i w^{(i)}\, K_b(X^{(i)} - x)\, V^{(i)}}{\sum_i w^{(i)}\, K_b(X^{(i)} - x)},
-  \qquad K_b(u) \coloneqq \tfrac{1}{b}\,K(u/b),
+  \widehat m(x) = \frac{\sum_i w^{(i)}\, \mathcal{K}_b(X^{(i)} - x)\, V^{(i)}}{\sum_i w^{(i)}\, \mathcal{K}_b(X^{(i)} - x)},
+  \qquad \mathcal{K}_b(u) \coloneqq \tfrac{1}{b}\,\mathcal{K}(u/b),
 \end{equation}
-where $K$ is a probability kernel and $b$ a bandwidth. For Nadaraya--Watson this is the estimator itself. For the regression estimators the identification is heuristic, with $b$ standing for the local resolution of the function class, but the leading-order variance calculation is the same.
+where $\mathcal{K}$ is a probability kernel and $b$ a bandwidth. For Nadaraya--Watson this is the estimator itself. For the regression estimators the identification is heuristic, with $b$ standing for the local resolution of the function class, but the leading-order variance calculation is the same.
 
-Both numerator and denominator of \cref{eq:ratioest} are sample means over $\Qm$-particles, so the law of large numbers sends them to $\Qm$-expectations, and the weight converts these back into $\Pm$-expectations through the identity $\E_{\Qm}[w\,g(X_t, V_t)] = \E_{\Pm}[g(X_t, V_t)]$, valid for every integrable $g$. As $b \to 0$ the kernel concentrates at $x$, so the denominator tends to $\E_{\Pm}[K_b(X_t - x)] \approx p(x)$ and the numerator to $\E_{\Pm}[K_b(X_t - x)\,V_t] \approx p(x)\,m(x)$. The estimator is consistent for $m(x)$ whatever the tilt, as \cref{eq:weightedreg} already showed. The tilt affects only the fluctuations around the limit.
+Both numerator and denominator of \cref{eq:ratioest} are sample means over $\Qm$-particles, so the law of large numbers sends them to $\Qm$-expectations, and the weight converts these back into $\Pm$-expectations through the identity $\E_{\Qm}[w\,g(X_t, V_t)] = \E_{\Pm}[g(X_t, V_t)]$, valid for every integrable $g$. As $b \to 0$ the kernel concentrates at $x$, so the denominator tends to $\E_{\Pm}[\mathcal{K}_b(X_t - x)] \approx p(x)$ and the numerator to $\E_{\Pm}[\mathcal{K}_b(X_t - x)\,V_t] \approx p(x)\,m(x)$. The estimator is consistent for $m(x)$ whatever the tilt, as \cref{eq:weightedreg} already showed. The tilt affects only the fluctuations around the limit.
 
-The fluctuations follow from the delta method for a ratio. Write $\widehat m(x) = A_N/B_N$ with $A_N$ and $B_N$ the two sample means. Expanding to first order around the limits $p(x)m(x)$ and $p(x)$ gives $\widehat m(x) - m(x) \approx \bigl(A_N - m(x)\,B_N\bigr)/p(x)$, and the right-hand side is the sample mean of $w\,K_b(X_t - x)\,(V_t - m(x))/p(x)$, whose expectation vanishes to leading order because $\E_{\Pm}[V_t - m(x) \mid X_t \approx x] \approx 0$. Its variance is therefore a single second moment,
+The fluctuations follow from the delta method for a ratio. Write $\widehat m(x) = A_N/B_N$ with $A_N$ and $B_N$ the two sample means. Expanding to first order around the limits $p(x)m(x)$ and $p(x)$ gives $\widehat m(x) - m(x) \approx \bigl(A_N - m(x)\,B_N\bigr)/p(x)$, and the right-hand side is the sample mean of $w\,\mathcal{K}_b(X_t - x)\,(V_t - m(x))/p(x)$, whose expectation vanishes to leading order because $\E_{\Pm}[V_t - m(x) \mid X_t \approx x] \approx 0$. Its variance is therefore a single second moment,
 \begin{equation}\label{eq:deltamethod}
   \operatorname{Var}\bigl[\widehat m(x)\bigr]
-  \approx \frac{1}{N}\,\frac{\E_{\Qm}\bigl[ w^2\, K_b(X_t - x)^2\,(V_t - m(x))^2 \bigr]}{p(x)^2}
-  = \frac{1}{N}\,\frac{\E_{\Pm}\bigl[ w\, K_b(X_t - x)^2\,(V_t - m(x))^2 \bigr]}{p(x)^2},
+  \approx \frac{1}{N}\,\frac{\E_{\Qm}\bigl[ w^2\, \mathcal{K}_b(X_t - x)^2\,(V_t - m(x))^2 \bigr]}{p(x)^2}
+  = \frac{1}{N}\,\frac{\E_{\Pm}\bigl[ w\, \mathcal{K}_b(X_t - x)^2\,(V_t - m(x))^2 \bigr]}{p(x)^2},
 \end{equation}
-where the equality converts one of the two powers of $w$ back to $\Pm$ by the same identity as before, and one power remains because the second moment carries $w^2$. Localising the remaining kernel with $\E_{\Pm}[K_b(X_t - x)^2\, g(X_t, V_t)] \approx p(x)\,\E_{\Pm}[g \mid X_t = x]\,R(K)/b$, where $R(K) \coloneqq \int K^2$, yields
+where the equality converts one of the two powers of $w$ back to $\Pm$ by the same identity as before, and one power remains because the second moment carries $w^2$. Localising the remaining kernel with $\E_{\Pm}[\mathcal{K}_b(X_t - x)^2\, g(X_t, V_t)] \approx p(x)\,\E_{\Pm}[g \mid X_t = x]\,R(\mathcal{K})/b$, where $R(\mathcal{K}) \coloneqq \int \mathcal{K}^2$, yields
 \begin{equation}\label{eq:varexp}
   \operatorname{Var}\bigl[\widehat m(x)\bigr]
-  \approx \frac{R(K)}{N b}\;
+  \approx \frac{R(\mathcal{K})}{N b}\;
     \frac{\E_{\Pm}\bigl[\, w\,(V_t - m(x))^2 \,\big|\, X_t = x \bigr]}{p(x)} .
 \end{equation}
-The prefactor $R(K)/(Nb)$ does not involve $\theta$, so only the second factor matters for choosing the tilt.
+The prefactor $R(\mathcal{K})/(Nb)$ does not involve $\theta$, so only the second factor matters for choosing the tilt.
 
-\Cref{eq:varexp} rewards a careful reading. Every quantity in it lives under the original measure $\Pm$, even though the simulation runs under $\Qm$, and the tilt appears in exactly one place, inside the conditional expectation through the weight $w$. In the untilted case $w \equiv 1$ and the variance at $x$ is $\sigma_V^2(x)/p(x)$ up to the prefactor, which blows up in the wings where $p$ is tiny; this is the tail problem of \cref{sec:practical} in quantitative form. Tilting reduces the variance at $x$ precisely when the paths ending near $x$ carry weight $w < 1$, meaning $\Qm$ made them more likely than $\Pm$ did. The variance is not destroyed but relocated, since at any $x$ the tilt starves the same computation shows $w > 1$ and an inflated variance.
+Every quantity in \cref{eq:varexp} lives under the original measure $\Pm$, even though the simulation runs under $\Qm$, and the tilt appears in exactly one place, inside the conditional expectation through the weight $w$. In the untilted case $w \equiv 1$ and the variance at $x$ is $\sigma_V^2(x)/p(x)$ up to the prefactor, which blows up in the wings where $p$ is tiny. This is the tail problem of \cref{sec:practical} in quantitative form. Tilting reduces the variance at $x$ precisely when the paths ending near $x$ carry weight $w < 1$, meaning $\Qm$ made them more likely than $\Pm$ did. The variance is not destroyed but relocated, since at every $x$ that the tilt starves, the same computation shows $w > 1$ and an inflated variance.
 
-Two simplifications turn \cref{eq:varexp} into a design formula. First, suppose the weight is a function of the endpoint alone, $w = \omega(X_t)$. Testing the identity $\E_{\Qm}[\omega(X_t)\,g(X_t)] = \E_{\Pm}[g(X_t)]$ against arbitrary $g$ forces $\omega\, q_\theta = p$ pointwise, so $\omega(x) = p(x)/q_\theta(x)$ and in particular $\E_{\Pm}[w \mid X_t = x] = p(x)/q_\theta(x)$. Second, suppose the weight decouples from the squared residual given the endpoint, so the conditional expectation of the product factorises into $\E_{\Pm}[w \mid X_t = x] \cdot \sigma_V^2(x)$. Under both,
+Two simplifications turn \cref{eq:varexp} into a design formula. First, suppose the weight depends on the path only through the endpoint, so that $w$ is a function of $X_t$. Testing the identity $\E_{\Qm}[w\,g(X_t)] = \E_{\Pm}[g(X_t)]$ against arbitrary $g$ forces $w\,q_\theta = p$ pointwise, so $w = p(X_t)/q_\theta(X_t)$ and in particular $\E_{\Pm}[w \mid X_t = x] = p(x)/q_\theta(x)$. Second, suppose the weight decouples from the squared residual given the endpoint, so the conditional expectation of the product factorises into $\E_{\Pm}[w \mid X_t = x] \cdot \sigma_V^2(x)$. Under both,
 \begin{equation}\label{eq:designformula}
   \operatorname{Var}\bigl[\widehat m(x)\bigr]
-  \asymp \frac{R(K)}{Nb}\,\frac{\sigma_V^2(x)}{q_\theta(x)} .
+  \approx \frac{R(\mathcal{K})}{Nb}\,\frac{\sigma_V^2(x)}{q_\theta(x)} .
 \end{equation}
-The variance at $x$ is inversely proportional to the density of particles the tilted measure delivers there, and the tilt matters only through the marginal $q_\theta$ it induces. Neither simplification is exact for a path-dependent weight; \cref{rem:optscope} records what is lost.
+The variance at $x$ is inversely proportional to the density of particles the tilted measure delivers there, and the tilt matters only through the marginal $q_\theta$ it induces. Neither simplification is exact for a path-dependent weight, and \cref{rem:optscope} records what is lost.
 
-It remains to say which $x$ we care about, which a weighting profile $\pi \geq 0$ encodes. Accuracy in the leverage matters essentially everywhere the model visits, since an error in $\Lev$ at any $x$ with appreciable mass distorts the dynamics from that time onward, whether or not a quoted strike sits nearby. The natural default is therefore $\pi = p$, the model's own marginal, truncated where $\sigDup$ itself is extrapolation rather than data. A sharper alternative, appropriate when only the vanilla reprice matters, places vega-weighted mass at the quoted strikes, since \cref{eq:leverage} converts a relative error in the conditional expectation into the relative leverage error $\delta\Lev/\Lev = -\tfrac12\,\delta m/m$, which moves prices through the local vega. The design problem is to choose the sampling density minimising the $\pi$-weighted integrated variance,
+It remains to say which $x$ we care about, which a weighting profile $\pi \geq 0$ encodes. Accuracy in the leverage matters essentially everywhere the model visits, since an error in $\Lev$ at every $x$ with appreciable mass distorts the dynamics from that time onward, whether or not a quoted strike sits nearby. The natural default is therefore $\pi = p$, the model's own marginal, truncated where $\sigDup$ itself is extrapolation rather than data. A sharper alternative, appropriate when only the vanilla reprice matters, places vega-weighted mass at the quoted strikes, since \cref{eq:leverage} converts a relative error in the conditional expectation into the relative leverage error $\delta\Lev/\Lev = -\tfrac12\,\delta m/m$, which moves prices through the local vega. The design problem is to choose the sampling density minimising the $\pi$-weighted integrated variance,
 \[
   \min_{q}\ \int \frac{\pi(x)\,\sigma_V^2(x)}{q(x)}\,dx
   \quad \text{over densities } q .
 \]
-The minimiser follows from Cauchy--Schwarz. For any density $q$,
+The minimiser follows from Cauchy--Schwarz. For every density $q$,
 \[
   \Bigl( \int \sqrt{\pi\,\sigma_V^2}\;dx \Bigr)^{\!2}
   = \Bigl( \int \sqrt{\frac{\pi\,\sigma_V^2}{q}}\,\sqrt{q}\;dx \Bigr)^{\!2}
@@ -300,7 +302,7 @@ The minimiser follows from Cauchy--Schwarz. For any density $q$,
 \]
 so the objective is bounded below by $\bigl(\int \sqrt{\pi\,\sigma_V^2}\,dx\bigr)^2$ independently of $q$, and equality holds exactly when the two square roots are proportional, that is when
 \begin{equation}\label{eq:optdesign}
-  q^*(t, x) \propto \sqrt{\pi(x)\,\sigma_V^2(x)} .
+  q^*(x) \propto \sqrt{\pi(x)\,\sigma_V^2(x)} .
 \end{equation}
 
 The optimal design is neither uniform nor the payoff-shaped tilt of the pricing literature, and the square root tempers both ingredients, so quadrupling the importance of a region only doubles the particles sent there. Under the default $\pi = p$ with $\sigma_V^2$ slowly varying, \cref{eq:optdesign} reads $q^* \propto \sqrt{p\,\sigma_V^2}$, the physical cloud with its wings fattened by the square root, which decays at half the log-rate of $p$. This makes precise the informal aim of the whole section, namely better coverage across the board without chasing the far tails. Under the vega weighting the design concentrates further at the quoted strikes, and in either case it oversamples where the conditional variance of $V$ is large, which under high vol-of-vol again means the wings.
@@ -323,22 +325,22 @@ The target function $\E[V_{t_k} \mid X_{t_k} = \cdot\,]$ moves by $O(\Delta t)$ 
 
 \subsection{Update scheduling}
 
-Early in the simulation the cloud spreads from a point mass and the correlation structure between $X$ and $V$ builds quickly, so the conditional expectation surface changes fast. Later, mean reversion of $V$ drives it toward quasi-stationarity and updates can be less frequent, improving latency. Unlike kernel estimators, which must be recomputed from the cloud at every step, a network generalises across time. One may therefore retrain only every $m$-th slice and reuse the estimator in between, since the calibration identity needs the estimator refreshed only at the rate at which the conditional law moves.
+Early in the simulation the cloud spreads from a point mass and the correlation structure between $X$ and $V$ builds quickly, so the conditional expectation surface changes fast. Later, mean reversion of $V$ drives it toward quasi-stationarity and updates can be less frequent, improving latency. Unlike kernel estimators, which must be recomputed from the cloud at every step, a network generalises across time. One may therefore retrain only every $\kappa$-th slice and reuse the estimator in between, since the calibration identity needs the estimator refreshed only at the rate at which the conditional law moves.
 
-A stale $f$ biases $\Lev$ at the skipped times, and this error feeds forward through the SDE and compounds, which cuts against the exact-calibration selling point. Prefer an event-triggered refresh: monitor the regression loss of the current network on the fresh cloud and retrain when it crosses a threshold. This yields a latency-accuracy trade-off with a defensible rule, and a natural trade-off plot for the experiments.
+A stale $f$ biases $\Lev$ at the skipped times, and this error feeds forward through the SDE and compounds, which cuts against the exact-calibration selling point. Prefer an event-triggered refresh. Monitor the regression loss of the current network on the fresh cloud and retrain when it crosses a threshold. This yields a latency-accuracy trade-off with a defensible rule, and a natural trade-off plot for the experiments.
 
 \subsection{Ridge regression on frozen features}
 
-This lever, like the two above, concerns the explicit scheme's per-slice regression. Train the network body rarely (on the first slices, or offline) and treat it as a feature extractor; per slice, solve only a linear readout on the learned features by closed-form ridge least squares, at cost $O(Np + p^3)$ for $p$ features, with no gradient descent inside the simulation loop. This is least-squares Monte Carlo with learned features. Beyond latency, the configuration has a theoretical payoff: a linear-in-features estimator with a ridge penalty recovers the regularised structure for which \citet{bayer2022rkhs} prove Wasserstein Lipschitz stability, with the learned features in place of a hand-chosen basis. This would answer the objection that plain global regression loses stability as the function class grows, though their constants are proved for a fixed kernel rather than learned features. The lemma identifying the ridge head with RKHS regression on a learned kernel is not yet written.
+This lever, like the two above, concerns the explicit scheme's per-slice regression. Train the network body rarely (on the first slices, or offline) and treat it as a feature extractor. Per slice, solve only a linear readout on the learned features by closed-form ridge least squares, at cost $O(Nd + d^3)$ for $d$ features, with no gradient descent inside the simulation loop. This is least-squares Monte Carlo with learned features. Beyond latency, the configuration has a theoretical payoff. A linear-in-features estimator with a ridge penalty recovers the regularised structure for which \citet{bayer2022rkhs} prove Wasserstein Lipschitz stability, with the learned features in place of a hand-chosen basis. This would answer the objection that plain global regression loses stability as the function class grows, though their constants are proved for a fixed kernel rather than learned features. The lemma identifying the ridge head with RKHS regression on a learned kernel is not yet written.
 
-The residual view sharpens the estimator. Writing $\beta_k = \beta_{k-1} + \Delta$ for the readout coefficients and solving for the correction $\Delta$ is, unpenalised, identical to solving for $\beta_k$ directly, by linearity. The two differ once regularised: penalising $\lambda\norm{\beta_k}^2$ shrinks toward the zero function, while penalising $\lambda\norm{\beta_k - \beta_{k-1}}^2$ shrinks toward the previous slice's fit, the linear-head analogue of warm starting. The latter is the right prior here: the target moves by $O(\Delta t)$ between slices, so the true residual is small and strong shrinkage toward $\beta_{k-1}$ costs negligible bias while buying variance reduction precisely in the thin-data tails, and it makes the leverage surface coherent in time rather than independently noisy per slice. The cost is unchanged (same solve, shifted right-hand side); under a positivity layer the linearity is only approximate and the equivalence with the direct parametrisation breaks slightly.
+The residual view sharpens the estimator. Writing $\beta_k = \beta_{k-1} + \Delta$ for the readout coefficients and solving for the correction $\Delta$ is, unpenalised, identical to solving for $\beta_k$ directly, by linearity. The two differ once regularised. Penalising $\lambda\norm{\beta_k}^2$ shrinks toward the zero function, while penalising $\lambda\norm{\beta_k - \beta_{k-1}}^2$ shrinks toward the previous slice's fit, the linear-head analogue of warm starting. The latter is the right prior here, because the target moves by $O(\Delta t)$ between slices, so the true residual is small and strong shrinkage toward $\beta_{k-1}$ costs negligible bias while buying variance reduction precisely in the thin-data tails, and it makes the leverage surface coherent in time rather than independently noisy per slice. The cost is unchanged (same solve, shifted right-hand side). Under a positivity layer the linearity is only approximate and the equivalence with the direct parametrisation breaks slightly.
 
 \begin{algorithm}[H]
 \caption{Ridge head at slice $t_k$ (replaces the training step of \cref{alg:explicit})}\label{alg:ridgehead}
-\KwIn{particle cloud $\{(X^{(i)}_{t_k}, V^{(i)}_{t_k}, w^{(i)})\}_{i=1}^{N}$; frozen feature body $\varphi \colon \R \to \R^p$, trained once on the first fitted slice or offline; penalty $\lambda$; previous coefficients $\beta_{k-1}$ (for the first fitted slice, centre at $0$)}
+\KwIn{particle cloud $\{(X^{(i)}_{t_k}, V^{(i)}_{t_k}, w^{(i)})\}_{i=1}^{N}$; frozen feature body $\varphi \colon \R \to \R^{d}$, trained once on the first fitted slice or offline; penalty $\lambda$; previous coefficients $\beta_{k-1}$ (for the first fitted slice, centre at $0$)}
 \KwOut{conditional-expectation estimate $f_k$}
 standardise $z_i \leftarrow (\log X^{(i)}_{t_k} - \mu_k)/s_k$, with $\mu_k, s_k$ the mean and standard deviation of the cloud\;
-assemble features $A \leftarrow [\varphi(z_i)^{\top}, 1]_{i=1}^{N} \in \R^{N \times (p+1)}$ and $W \leftarrow \operatorname{diag}(w^{(i)})$\;
+assemble features $A \leftarrow [\varphi(z_i)^{\top}, 1]_{i=1}^{N} \in \R^{N \times (d+1)}$ and $W \leftarrow \operatorname{diag}(w^{(i)})$\;
 solve the centred ridge system $\bigl(A^{\top} W A + \lambda N I\bigr)\,\beta_k = A^{\top} W V + \lambda N \beta_{k-1}$\;
 $f_k(x) \leftarrow \max\bigl\{[\varphi((\log x - \mu_k)/s_k)^{\top}, 1]\,\beta_k,\ \varepsilon\bigr\}$ for a small floor $\varepsilon > 0$\;
 \Return{$f_k$}\;
@@ -347,21 +349,21 @@ $f_k(x) \leftarrow \max\bigl\{[\varphi((\log x - \mu_k)/s_k)^{\top}, 1]\,\beta_k
 
 \subsection{Variance reduction in the particle count}
 
-Orthogonal to everything above: conditioning estimators in the style of \citet{muguruza2019}, or control variates in the style of \citet{cozma2019}, reduce the particle count needed per unit of estimator variance, and thereby shrink every regression in the chain. These stack with the other levers.
+Orthogonal to everything above, conditioning estimators in the style of \citet{muguruza2019} and control variates in the style of \citet{cozma2019} reduce the particle count needed per unit of estimator variance, and thereby shrink every regression in the chain. These stack with the other levers.
 
 \subsection{Initialisation of the implicit scheme}
 
-Run the explicit pass first and use it to initialise the implicit one: distil the per-slice networks into the global network $f_\theta(t,x)$ as supervised pretraining, and take $\Lev^{0} = \Lev_{\mathrm{explicit}}$. This is more than engineering. The Ostrowski argument delivers only local convergence from a sufficiently good initial guess, and the explicit pass constructively supplies one: its output differs from the fixed point only by time-discretisation bias and regression noise. The explicit scheme is thus the initialiser that plausibly places the damped iteration inside its convergence basin.
+Run the explicit pass first and use it to initialise the implicit one. Distil the per-slice networks into the global network $f_\theta(t,x)$ as supervised pretraining, and take $\Lev^{0} = \Lev_{\mathrm{explicit}}$. This is more than engineering. The Ostrowski argument delivers only local convergence from a sufficiently good initial guess, and the explicit pass constructively supplies one, since its output differs from the fixed point only by time-discretisation bias and regression noise.
 
 \subsection{Amortisation of the fixed point}
 
-For the implicit scheme the damped outer iteration is calibration-time cost, not pricing-time cost, and an overnight calibration renders its latency nearly irrelevant. For intraday recalibration, amortise. Train offline a map from market inputs (the Dupire surface and the variance parameters) to the fixed point itself, over a distribution of surfaces. Online, evaluate the map and run one or two damped corrections from that initialisation to restore the by-construction vanilla fit. This differs from the neural operator of \citet{wang2026}, who amortise the whole calibration and accept the operator's error as final. Here the operator supplies only the initialisation, and the particle method keeps its exactness. If the damped iteration is shown to contract locally at rate $r$, then from warm-start error $\delta_0$ of order $\log(\mathrm{tol}/\delta_0)/\log r$ corrections suffice, which is what would let the theory carry the latency claim as well as the accuracy claim.
+For the implicit scheme the damped outer iteration is calibration-time cost, not pricing-time cost, and an overnight calibration renders its latency nearly irrelevant. For intraday recalibration, amortise. Train offline a map from market inputs (the Dupire surface and the variance parameters) to the fixed point itself, over a distribution of surfaces. Online, evaluate the map and run one or two damped corrections from that initialisation to restore the by-construction vanilla fit. This differs from the neural operator of \citet{wang2026}, who amortise the whole calibration and accept the operator's error as final. Here the operator supplies only the initialisation, and the particle method keeps its exactness. If the damped iteration is shown to contract locally at rate $r$, then from a warm-start error $\delta_0$ a number of corrections of order $\log(\mathrm{tol}/\delta_0)/\log r$ suffices, which is what would let the theory carry the latency claim as well as the accuracy claim.
 
 A riskier variant collapses the outer iteration into a single training run with a self-consistency loss, simulating under $\Lev_\theta = \sigDup/\sqrt{f_\theta}$ and differentiating through the simulation as in \citet{cuchiero2020}. This forfeits the damped-iteration theory and is parked unless the amortised initialisation disappoints.
 
 \subsection{Deployment}
 
-The intended desk pattern combines the schemes: a full implicit solve overnight, possibly amortiser-initialised, and warm-started explicit sweeps or a small number of damped corrections on the bumped surface intraday. Surfaces move little intraday, so warm starts land near the fixed point, and a contraction factor, once established, would bound the number of damped corrections needed to restore the vanilla fit.
+The intended desk pattern combines the schemes, with a full implicit solve overnight, possibly amortiser-initialised, and warm-started explicit sweeps or a small number of damped corrections on the bumped surface intraday. Surfaces move little intraday, so warm starts land near the fixed point, and a contraction factor, once established, would bound the number of damped corrections needed to restore the vanilla fit.
 
 \section{Positioning}\label{sec:positioning}
 
@@ -375,8 +377,8 @@ All flavours simulate an interacting particle system and differ only in the esti
 \item \emph{Kernel regression} \citep{guyon2011smile,guyon2012particular,guyon2013nonlinear}. The original method is Nadaraya--Watson with a Gaussian kernel, bandwidth of order $S_0 N^{-1/5}$, leverage evaluated on a coarse grid with interpolation, and kernel sums truncated for efficiency. It runs in one forward pass with no outer iteration. Its known weaknesses are bandwidth selection, the kernel bias-variance trade-off, and degradation in the wings.
 \item \emph{Bin Monte Carlo} \citep{vanderstoep2014}. Partition the spot range into bins (equal width or equal frequency) and average $V$ within each bin. For our purposes the notable point is that their Remark~3.2 considered $L^2$ projection onto polynomial bases, exactly least-squares regression with a linear function class, and rejected it because an unconstrained regressor of a conditional variance can go negative precisely where the truth approaches zero, which then divides into the leverage.
 \item \emph{RKHS ridge regression} \citep{bayer2022rkhs}. Penalised projection onto a reproducing kernel Hilbert space. This is the only flavour with serious theory. They prove Wasserstein Lipschitz stability of the regularised conditional expectation map with constants of order $\lambda^{-2}$, well-posedness of the regularised McKean--Vlasov system at each fixed $\lambda > 0$, propagation of chaos, and convergence as $\lambda \to 0$ without a rate. The unregularised limit is explicitly open.
-\item \emph{Conditional Monte Carlo} \citep{muguruza2019}. This is not regression at all. Under piecewise-constant leverage the conditional law of the log spot is exactly Gaussian, so the Dirac masses are replaced by the model's own conditional density. No bandwidth, guaranteed variance reduction by Rao--Blackwellisation. The caveat in print is that the algorithm fails to converge for large vol-of-vol, with the threshold unidentified.
-\item \emph{Machine-learning kernel flavours} \citep{hakala2019}. Benchmarks Nadaraya--Watson, local linear regression, RBF and partition-of-unity RBF for exactly our regression problem; PURBF with regularisation and pruning wins. Considered multilayer perceptrons and deferred them, see \cref{subsec:closest}.
+\item \emph{Conditional Monte Carlo} \citep{muguruza2019}. This is not regression at all. Under piecewise-constant leverage the conditional law of the log spot is exactly Gaussian, so the Dirac masses are replaced by the model's own conditional density. There is no bandwidth, and Rao--Blackwellisation guarantees the variance reduction. The caveat in print is that the algorithm fails to converge for large vol-of-vol, with the threshold unidentified.
+\item \emph{Machine-learning kernel flavours} \citep{hakala2019}. Benchmarks Nadaraya--Watson, local linear regression, RBF and partition-of-unity RBF for exactly our regression problem. PURBF with regularisation and pruning wins. Considered multilayer perceptrons and deferred them, see \cref{subsec:closest}.
 \item \emph{Variance-reduced flavours} \citep{cozma2019}. Additive control variates from a coupled cheaper submodel plus a finite-element forward solve, reported $625$-fold speed-up. This is subtraction of a correlated baseline, not reweighting. There is no measure change anywhere in this family.
 \end{enumerate}
 
@@ -384,18 +386,18 @@ Numerical analysis of the particle scheme itself (discretisation error, converge
 
 \subsection{PDE methods}
 
-Solve the two-dimensional forward Kolmogorov equation for the joint density of $(X, V)$ on a grid and read the conditional expectation off the gridded density \citep{ren2007}; the inner fixed-point iteration per time step is credited to \citet{tataru2010}, and the modern finite-volume ADI treatment is \citep{wyns2017adjoint,wyns2017fv}. The route is deterministic and accurate in two dimensions. It hits the curse of dimensionality beyond three factors, and the thin-density wings and the $v = 0$ boundary under Feller violation need care.
+Solve the two-dimensional forward Kolmogorov equation for the joint density of $(X, V)$ on a grid and read the conditional expectation off the gridded density \citep{ren2007}. The inner fixed-point iteration per time step is credited to \citet{tataru2010}, and the modern finite-volume ADI treatment is \citep{wyns2017adjoint,wyns2017fv}. The route is deterministic and accurate in two dimensions. It hits the curse of dimensionality beyond three factors, and the thin-density wings and the $v = 0$ boundary under Feller violation need care.
 
-Two details matter for us. First, the inner leverage iteration is run \emph{undamped} with a fixed small iteration count, $Q = 2$ in \citet[Sec.~7]{wyns2017adjoint}, with tail regularisation that pulls the quotient toward the mean reversion level where the density is thin. Second, the iteration's contraction property has never been proved anywhere in this literature: it is asserted by \citet{reghai2006}, quoted as ``stated but not proved'' by \citet[App.~E.3]{cozma2019}, and documented to fail at large log-moneyness by \citet{saporito2019}, who replace the iteration by Tikhonov regularisation. The only theory-adjacent entries are Anderson acceleration of the iteration with no analysis \citep{nastasi2020} and a rigorous linear-rate theorem for the related but different Bass local volatility fixed point \citep{acciaio2024bass}. A spectral analysis of the damped leverage iteration therefore has no published counterpart.
+Two details matter for us. First, the inner leverage iteration is run \emph{undamped} with a fixed small iteration count, $Q = 2$ in \citet[Sec.~7]{wyns2017adjoint}, with tail regularisation that pulls the quotient toward the mean reversion level where the density is thin. Second, the iteration's contraction property has never been proved anywhere in this literature. It is asserted by \citet{reghai2006}, quoted as ``stated but not proved'' by \citet[App.~E.3]{cozma2019}, and documented to fail at large log-moneyness by \citet{saporito2019}, who replace the iteration by Tikhonov regularisation. The only theory-adjacent entries are Anderson acceleration of the iteration with no analysis \citep{nastasi2020} and a rigorous linear-rate theorem for the related but different Bass local volatility fixed point \citep{acciaio2024bass}. A spectral analysis of the damped leverage iteration therefore has no published counterpart.
 
 \subsection{Prior use of the $L^2$ projection}\label{subsec:closest}
 
-The $L^2$ projection identity \cref{eq:l2proj} is known in this literature; what has never been done is to realise it with a trained neural network inside the particle loop. The near-misses, in increasing order of proximity:
+The $L^2$ projection identity \cref{eq:l2proj} is known in this literature. What has never been done is to realise it with a trained neural network inside the particle loop. The near-misses, in increasing order of proximity:
 
 \begin{enumerate}
 \item \emph{Linear basis, rejected on positivity} \citep[Remark~3.2]{vanderstoep2014}. Least squares onto polynomials, rejected because the fit can go negative under Feller violation. The positivity-preserving parametrisation $f_\theta = \operatorname{softplus}(g_\theta)$ answers this objection directly and should be presented as doing so, with citation.
 \item \emph{Projection identity stated, then penalised} \citep{li2023thesis}. States $\E[v_t \mid S_t = \cdot\,] = \operatorname*{arg\,min}_{f \in L^2} \E(v_t - f(S_t))^2$ explicitly, at pages~24 and~39, and immediately replaces it by RKHS ridge regression. The thesis also provides the ready-made experimental design: a three-way comparison of Nadaraya--Watson, RKHS ridge and bin Monte Carlo across particle counts, with RKHS degrading worst at small $N$ and under strong spot-vol correlation. We mirror that comparison and add the network as the fourth estimator.
-\item \emph{Global regression attempted and abandoned} \citep[p.~5]{bayer2022rkhs}. Their stated starting point was global regression on $L$ basis functions, abandoned because the Lipschitz constants of the resulting conditional expectation map with respect to the particle distribution explode as $L \to \infty$ unless the basis is carefully chosen. This is the referee objection to plain neural $L^2$ regression already in print: our theory must either control the analogous constant for the network class or scope it as explicitly open.
+\item \emph{Global regression attempted and abandoned} \citep[p.~5]{bayer2022rkhs}. Their stated starting point was global regression on $L$ basis functions, abandoned because the Lipschitz constants of the resulting conditional expectation map with respect to the particle distribution explode as $L \to \infty$ unless the basis is carefully chosen. This is the referee objection to plain neural $L^2$ regression already in print. Our theory must either control the analogous constant for the network class or scope it as explicitly open.
 \item \emph{Neural networks named and deferred} \citep{hakala2019}. Frames the problem identically as supervised learning of $R(S) = \E(V_t \mid S_t = S)$ from observed pairs, rules out MLPs because ``the training is much more involved'', and postpones a pretrained MLP ``for potential future use''. The idea exists in print since 2019 and was never executed. The warm-starting of \cref{sec:warmstart} is the direct answer to the training-cost objection, and the benchmark to beat is his PURBF, not just Nadaraya--Watson.
 \end{enumerate}
 
@@ -403,7 +405,7 @@ Adjacent literatures use neural $L^2$ conditional expectation regression as stan
 
 \subsection{Other neural approaches}
 
-\citet{cuchiero2020} parametrise the leverage directly and calibrate to option prices with generative-adversarial training; they call the conditional expectation ``a very challenging and still open problem'' and concede no speed competition with the particle method. We solve exactly the problem they bypass, and vanilla calibration holds by construction modulo regression error. This is the paper a reviewer is most likely to confuse with ours. Distinguish it early. Physics-informed networks on the Fokker--Planck equation \citep{hoshisashi2025} and neural operators amortising the whole quotes-to-calibration map \citep{wang2026} are different axes entirely: the former is the PDE route with a neural solver, the latter learns across surfaces rather than within one calibration.
+\citet{cuchiero2020} parametrise the leverage directly and calibrate to option prices with generative-adversarial training. They call the conditional expectation ``a very challenging and still open problem'' and concede no speed competition with the particle method. We solve exactly the problem they bypass, and vanilla calibration holds by construction modulo regression error. This is the paper a reviewer is most likely to confuse with ours. Distinguish it early. Physics-informed networks on the Fokker--Planck equation \citep{hoshisashi2025} and neural operators amortising the whole quotes-to-calibration map \citep{wang2026} are different axes entirely. The former is the PDE route with a neural solver and the latter learns across surfaces rather than within one calibration.
 
 \subsection{Comparison targets}
 
@@ -419,7 +421,7 @@ Structure, one figure per claim.
 \begin{enumerate}
 \item \emph{Problem.} \Cref{eq:lsv,eq:leverage}, the method of \citet{guyon2012particular}, its three documented weaknesses (bandwidth, wings, large vol-of-vol). One column.
 \item \emph{Method.} The projection identity \cref{eq:l2proj}, the explicit scheme (\cref{alg:explicit}), softplus positivity \citep{vanderstoep2014}, warm starting \citep{hakala2019}. One paragraph on the implicit scheme as the overnight variant. Fig.~1: repricing error across the surface for kernel, bins, PURBF and network at a fixed particle budget, synthetic Heston.
-\item \emph{Importance sampling.} The volatility-preserving tilt (\cref{eq:constraint}) and the weight recursion; applies unchanged to the kernel method. Fig.~2: wings with and without the tilt, with effective sample size; the central figure. Derivation of \cref{subsec:density} to the online appendix.
+\item \emph{Importance sampling.} The volatility-preserving tilt (\cref{eq:constraint}) and the weight recursion, which applies unchanged to the kernel method. Fig.~2: wings with and without the tilt, with effective sample size, the central figure. Derivation of \cref{subsec:density} to the online appendix.
 \item \emph{Results.} Fig.~3: convergence across the (vol-of-vol, mixing) plane, kernel versus network. Table~1: a real surface (FX, matching \citet{cozma2019}) with runtime and a no-touch reprice. Design follows \citet{li2023thesis}.
 \item \emph{Deployment.} Warm starts make intraday recalibration cheap. Fig.~4: the latency-accuracy trade-off. Limitations, including the open theory for the unregularised limit \citep{bayer2022rkhs}.
 \end{enumerate}
