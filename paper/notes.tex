@@ -108,7 +108,7 @@ Initialise $X^{(i)}_0 = X_0$, $V^{(i)}_0 = v_0$, weights $w^{(i)} = 1$,
   $\Lev(t_k, x) \leftarrow \sigDup(t_k, x) / \sqrt{f_{\theta_k}(x)}$\;
   advance $(X^{(i)}, V^{(i)})$ from $t_k$ to $t_{k+1}$ under $\Qm$ with
     leverage $\Lev(t_k, \cdot)$\;
-  update $\ln w^{(i)} \leftarrow \ln w^{(i)}
+  update $\log w^{(i)} \leftarrow \log w^{(i)}
     - \eta_k \Delta\widetilde{B}^{\perp,(i)} - \tfrac12 \eta_k^2 \Delta t$
     \tcp*{$w^{(i)} \equiv 1$ if untilted}
 }
@@ -206,7 +206,7 @@ a true martingale under the Novikov condition, automatic for bounded $\theta$, d
 
 Under $\Qm$, Girsanov gives that $\widetilde{B}^\perp = B^\perp - \int \eta\,ds$ is a Brownian motion while $B$, orthogonal to the kernel, is untouched, so $V$ is pathwise unchanged; the stock driver gains drift $\sqrt{1-\rho^2}\,\eta = \theta$ and
 \[
-  d\ln X_t = \Bigl( -\tfrac12 \Lev^2 V_t + \Lev\sqrt{V_t}\,\theta_t \Bigr) dt
+  d\log X_t = \Bigl( -\tfrac12 \Lev^2 V_t + \Lev\sqrt{V_t}\,\theta_t \Bigr) dt
     + \Lev\sqrt{V_t}\,dW^Q_t .
 \]
 The importance weights, expressed in the $\Qm$-Brownian motion actually simulated, are
@@ -215,10 +215,10 @@ The importance weights, expressed in the $\Qm$-Brownian motion actually simulate
   = \exp\Bigl( -\int_0^t \eta_s\,d\widetilde{B}^\perp_s
     - \tfrac12 \int_0^t \eta_s^2\,ds \Bigr),
 \end{equation}
-so each particle's log-weight updates recursively per Euler step as $\ln w \leftarrow \ln w - \eta\,\Delta\widetilde{B}^\perp - \tfrac12 \eta^2 \Delta t$ with $\Delta\widetilde{B}^\perp \sim N(0, \Delta t)$ the drawn increment. This coincides with the ratio of Gaussian step densities $\varphi_{N(0,\Delta t)}(\Delta B^\perp) / \varphi_{N(\eta\Delta t,\Delta t)}(\Delta B^\perp)$, so the continuous-time formula and the exact discrete-chain weights agree step by step. The exactness of \cref{rem:discrete} is an identity, not an approximation statement.
+so each particle's log-weight updates recursively per Euler step as $\log w \leftarrow \log w - \eta\,\Delta\widetilde{B}^\perp - \tfrac12 \eta^2 \Delta t$ with $\Delta\widetilde{B}^\perp \sim N(0, \Delta t)$ the drawn increment. This coincides with the ratio of Gaussian step densities $\varphi_{N(0,\Delta t)}(\Delta B^\perp) / \varphi_{N(\eta\Delta t,\Delta t)}(\Delta B^\perp)$, so the continuous-time formula and the exact discrete-chain weights agree step by step. The exactness of \cref{rem:discrete} is an identity, not an approximation statement.
 
 \begin{remark}[Weights are independent of the volatility path]\label{rem:indep}
-For deterministic $\eta$, the log-density $\ln Z$ is Gaussian and independent of $B$, hence of the entire $V$ path: the weights live purely on the stock's idiosyncratic noise $B^\perp$. This is the cleanest possible shape for the conditional-variance term in \cref{rem:selfnorm}.
+For deterministic $\eta$, the log-density $\log Z$ is Gaussian and independent of $B$, hence of the entire $V$ path: the weights live purely on the stock's idiosyncratic noise $B^\perp$. This is the cleanest possible shape for the conditional-variance term in \cref{rem:selfnorm}.
 \end{remark}
 
 \subsection{Weighted $L^2$ regression under the tilted measure}
@@ -246,11 +246,15 @@ A single tilt direction covers one wing. Splitting the cloud into subpopulations
 
 The tilt $\theta$ has so far been a free input. This subsection derives the criterion it should be optimised against, working at a single time slice $t$. It helps to first recall what optimal importance sampling means for an ordinary expectation, because our problem departs from that setting in two ways that shape everything below.
 
-To estimate a single number $\E_{\Pm}[\Phi(X_T)]$ for a payoff $\Phi \geq 0$, the ideal change of measure is known in closed form. Set $h(t,x) \coloneqq \E_{\Pm}[\Phi(X_T) \mid X_t = x]$, the value function of the target itself, so that $h(t, X_t)$ is a martingale. The measure with density $d\Qm^*/d\Pm = \Phi(X_T)/\E_{\Pm}[\Phi(X_T)]$ is the Doob $h$-transform of $\Pm$, its Girsanov kernel is the gradient $\sigma^{\top}\nabla_x \ln h$ evaluated along the path, and the weighted estimator $\Phi(X_T)\,d\Pm/d\Qm^*$ equals the constant $\E_{\Pm}[\Phi(X_T)]$ on every path, so its variance is zero \citep[Ch.~4]{glasserman2003}. The construction is circular, since building the sampler requires knowing the answer, and every practical scheme approximates $h$ in a tractable proxy.
+To estimate a single number $\E_{\Pm}[\Phi(X_T)]$ for a payoff $\Phi \geq 0$, the ideal change of measure is known in closed form. Set $h(t,x) \coloneqq \E_{\Pm}[\Phi(X_T) \mid X_t = x]$, the value function of the target itself, so that $h(t, X_t)$ is a martingale. The measure with density $d\Qm^*/d\Pm = \Phi(X_T)/\E_{\Pm}[\Phi(X_T)]$ is the Doob $h$-transform of $\Pm$, its Girsanov kernel is the gradient $\sigma^{\top}\nabla_x \log h$ evaluated along the path, and the weighted estimator $\Phi(X_T)\,d\Pm/d\Qm^*$ equals the constant $\E_{\Pm}[\Phi(X_T)]$ on every path, so its variance is zero \citep[Ch.~4]{glasserman2003}. The construction is circular, since building the sampler requires knowing the answer, and every practical scheme approximates $h$ in a tractable proxy.
 
 Zero variance is out of reach here for two structural reasons, before circularity even enters. First, the ideal kernel is a gradient in both noise directions, whereas \cref{eq:constraint} confines our tilt to the single direction $B^\perp$, so the exact transform is not in the admissible family; this is the same degeneracy as \cref{rem:cost}, seen from the other side. Second, the estimand is not one number but the function $x \mapsto \E[V_t \mid X_t = x]$, and each of its values is a ratio of two expectations by \cref{eq:weightedreg}. Self-normalised estimators of ratios have a strictly positive variance floor under every sampling measure \citep{owen2000}. The productive question is therefore not which tilt achieves zero variance but which tilt best spends a fixed particle budget across all $x$ simultaneously. That is a question of experimental design. The plan is to compute the variance of the estimator at each $x$, identify how the tilt enters, and minimise a weighted integral over $x$.
 
-Write $m(x) \coloneqq \E_{\Pm}[V_t \mid X_t = x]$ for the target and $\sigma_V^2(x) \coloneqq \operatorname{Var}_{\Pm}(V_t \mid X_t = x)$ for the conditional variance around it, and let $p$ and $q_\theta$ denote the densities of $X_t$ under $\Pm$ and $\Qm$. The particles $(X^{(i)}, V^{(i)})$ at time $t$ are simulated under $\Qm$ and carry the weights $w^{(i)} = (d\Pm/d\Qm)^{(i)}$ of \cref{eq:weights}. Near a point $x$, every estimator in this paper behaves like the self-normalised local average
+Write $m(x) \coloneqq \E_{\Pm}[V_t \mid X_t = x]$ for the target and $\sigma_V^2(x) \coloneqq \operatorname{Var}_{\Pm}(V_t \mid X_t = x)$ for the conditional variance around it, and let $p$ and $q_\theta$ denote the densities of $X_t$ under $\Pm$ and $\Qm$. Recall from \cref{subsec:density} what the tilt does to the dynamics. Under $\Qm$ the variance process is pathwise unchanged, while the stock gains the drift $\theta$,
+\begin{equation}\label{eq:tiltedsde}
+  \frac{dX_t}{X_t} = \Lev(t, X_t)\,\sqrt{V_t}\,\bigl( \theta_t\,dt + dW^Q_t \bigr),
+\end{equation}
+so $q_\theta$ is the time-$t$ density generated by \cref{eq:tiltedsde}. A positive $\theta$ pushes particles toward the upper wing, a negative one toward the lower, and this is the only handle the tilt has on where the particles sit. The particles $(X^{(i)}, V^{(i)})$ at time $t$ are simulated under $\Qm$ and carry the weights $w^{(i)} = (d\Pm/d\Qm)^{(i)}$ of \cref{eq:weights}. Near a point $x$, every estimator in this paper behaves like the self-normalised local average
 \begin{equation}\label{eq:ratioest}
   \widehat m(x) = \frac{\sum_i w^{(i)}\, K_b(X^{(i)} - x)\, V^{(i)}}{\sum_i w^{(i)}\, K_b(X^{(i)} - x)},
   \qquad K_b(u) \coloneqq \tfrac{1}{b}\,K(u/b),
@@ -333,10 +337,10 @@ The residual view sharpens the estimator. Writing $\beta_k = \beta_{k-1} + \Delt
 \caption{Ridge head at slice $t_k$ (replaces the training step of \cref{alg:explicit})}\label{alg:ridgehead}
 \KwIn{particle cloud $\{(X^{(i)}_{t_k}, V^{(i)}_{t_k}, w^{(i)})\}_{i=1}^{N}$; frozen feature body $\varphi \colon \R \to \R^p$, trained once on the first fitted slice or offline; penalty $\lambda$; previous coefficients $\beta_{k-1}$ (for the first fitted slice, centre at $0$)}
 \KwOut{conditional-expectation estimate $f_k$}
-standardise $z_i \leftarrow (\ln X^{(i)}_{t_k} - \mu_k)/s_k$, with $\mu_k, s_k$ the mean and standard deviation of the cloud\;
+standardise $z_i \leftarrow (\log X^{(i)}_{t_k} - \mu_k)/s_k$, with $\mu_k, s_k$ the mean and standard deviation of the cloud\;
 assemble features $A \leftarrow [\varphi(z_i)^{\top}, 1]_{i=1}^{N} \in \R^{N \times (p+1)}$ and $W \leftarrow \operatorname{diag}(w^{(i)})$\;
 solve the centred ridge system $\bigl(A^{\top} W A + \lambda N I\bigr)\,\beta_k = A^{\top} W V + \lambda N \beta_{k-1}$\;
-$f_k(x) \leftarrow \max\bigl\{[\varphi((\ln x - \mu_k)/s_k)^{\top}, 1]\,\beta_k,\ \varepsilon\bigr\}$ for a small floor $\varepsilon > 0$\;
+$f_k(x) \leftarrow \max\bigl\{[\varphi((\log x - \mu_k)/s_k)^{\top}, 1]\,\beta_k,\ \varepsilon\bigr\}$ for a small floor $\varepsilon > 0$\;
 \Return{$f_k$}\;
 \end{algorithm}
 
