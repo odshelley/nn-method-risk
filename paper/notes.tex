@@ -164,7 +164,7 @@ The scheme is implicit for a subtle reason: shared parameters $\theta$ let data 
 
 As the particles spread, few of them populate the wings, and the regression estimate of $\E[V_t \mid X_t = x]$ degrades exactly where out-of-the-money leverage is needed. The kernel method suffers there too. The remedy is a Girsanov change of measure with an explicit density process, used as importance sampling, structurally as in the decoupling approach of \citet{dosreis2023}.
 
-\subsection{A two-dimensional change that moves only the stock}
+\subsection{A volatility-preserving change of measure}
 
 Write the volatility driver as $B = \rho W + \sqrt{1-\rho^2}\, W^\perp$ with $(W, W^\perp)$ independent Brownian motions, and assume $\abs{\rho} < 1$. Perform a two-dimensional Girsanov change with kernel $(\theta, \theta^\perp)$ subject to the constraint
 \begin{equation}\label{eq:constraint}
@@ -180,7 +180,7 @@ The Girsanov exponent is driven by the full kernel norm
 so achieving stock drift $\theta$ while leaving $V$ untouched costs quadratic variation $\int \theta_t^2/(1-\rho^2)\,dt$ rather than $\int \theta_t^2\,dt$. The volatility-preserving tilt becomes expensive as $\abs{\rho} \to 1$ and impossible at $\abs{\rho} = 1$, the same degeneracy as the existence condition, now with a rate. For equity-index correlations around $\rho = -0.7$ the factor is roughly $2$, material but benign; it should enter the effective-sample-size tuning of $\theta$ in \cref{rem:selfnorm}.
 \end{remark}
 
-\subsection{The density process, explicitly}\label{subsec:density}
+\subsection{The density process}\label{subsec:density}
 
 Rotate to the basis adapted to the constraint. Set
 \[
@@ -221,7 +221,7 @@ so each particle's log-weight updates recursively per Euler step as $\ln w \left
 For deterministic $\eta$, $\ln Z$ is Gaussian and independent of $B$, hence of the entire $V$ path: the weights live purely on the stock's idiosyncratic noise $B^\perp$. This is the cleanest possible shape for the conditional-variance term in \cref{rem:selfnorm}.
 \end{remark}
 
-\subsection{Weighted $L^2$ regression recovers the $\Pm$-conditional expectation}
+\subsection{Weighted $L^2$ regression under the tilted measure}
 
 Let $Z = d\Pm/d\Qm$. For any measurable $f$, the weighted loss $\E_{\Qm}\!\left[ Z\,(V_t - f(X_t))^2 \right]$ is minimised pointwise by
 \begin{equation}\label{eq:weightedreg}
@@ -244,15 +244,15 @@ A single tilt direction covers one wing. Splitting the cloud into subpopulations
 
 \section{Acceleration and deployment}\label{sec:warmstart}
 
-\subsection{Across time slices in the explicit scheme}
+\subsection{Warm starting across time slices}
 
 The target function $\E[V_{t_k} \mid X_{t_k} = \cdot\,]$ moves by $O(\Delta t)$ between adjacent slices, so initialising $\theta_k$ at $\theta_{k-1}$ leaves only a few gradient steps of work per slice. This is a large constant-factor reduction in training cost.
 
-\subsection{Reduced update frequency at later times}
+\subsection{Update scheduling}
 
 Early in the simulation the cloud spreads from a point mass and the correlation structure between $X$ and $V$ builds quickly, so the conditional expectation surface changes fast; later, mean reversion of $V$ drives it toward quasi-stationarity and updates can be less frequent, improving latency. Unlike kernel estimators, which must be recomputed from the cloud at every step, a network generalises across time, so one may retrain only every $m$-th slice and reuse the estimator in between; the calibration identity needs the estimator refreshed only at the rate at which the conditional law moves. A caution: a stale $f$ biases $\Lev$ at the skipped times, and this error feeds forward through the SDE and compounds, which cuts against the exact-calibration selling point. Prefer an event-triggered refresh: monitor the regression loss of the current network on the fresh cloud and retrain when it crosses a threshold. This yields a latency-accuracy trade-off with a defensible rule, and a natural trade-off plot for the experiments.
 
-\subsection{Frozen features and a ridge head}
+\subsection{Ridge regression on frozen features}
 
 This lever, like the two above, concerns the explicit scheme's per-slice regression. Train the network body rarely (on the first slices, or offline) and treat it as a feature extractor; per slice, solve only a linear readout on the learned features by closed-form ridge least squares, at cost $O(Np + p^3)$ for $p$ features, with no gradient descent inside the simulation loop. This is least-squares Monte Carlo with learned features. Beyond latency, the configuration has a theoretical payoff: a linear-in-features estimator with a ridge penalty recovers exactly the regularised structure for which \citet{bayer2022rkhs} prove Wasserstein Lipschitz stability, with the learned features in place of a hand-chosen basis. The objection that plain global regression loses stability as the function class grows is thereby answered within the method rather than around it; a short lemma identifying the ridge head with RKHS regression on a learned kernel should be written.
 
@@ -270,15 +270,15 @@ $f_k(x) \leftarrow \max\bigl\{[\varphi((\ln x - \mu_k)/s_k)^{\top}, 1]\,\beta_k,
 \end{algorithm}
 
 
-\subsection{Reducing the particle count}
+\subsection{Variance reduction in the particle count}
 
 Orthogonal to everything above: conditioning estimators in the style of \citet{muguruza2019}, or control variates in the style of \citet{cozma2019}, reduce the particle count needed per unit of estimator variance, and thereby shrink every regression in the chain. Stackable with the other levers.
 
-\subsection{Explicit output as initialiser for the implicit scheme}
+\subsection{Initialisation of the implicit scheme}
 
 Run the explicit pass first and use it to initialise the implicit one: distil the per-slice networks into the global network $f_\theta(t,x)$ as supervised pretraining, and take $\Lev^{0} = \Lev_{\mathrm{explicit}}$. This is more than engineering. The Ostrowski argument delivers only local convergence from a sufficiently good initial guess, and the explicit pass constructively supplies one: its output differs from the fixed point only by time-discretisation bias and regression noise. The explicit scheme is thus the initialiser that plausibly places the damped iteration inside its convergence basin. The engineering trick and the hypothesis of the local convergence theorem are the same statement.
 
-\subsection{Amortising the fixed point}
+\subsection{Amortisation of the fixed point}
 
 For the implicit scheme the damped outer iteration is calibration-time cost, not pricing-time cost; an overnight calibration renders its latency nearly irrelevant. For intraday recalibration, amortise: train offline a map from market inputs (the Dupire surface and the variance parameters) to the fixed point itself, over a distribution of surfaces; online, evaluate the map and run one or two damped corrections from that initialisation to restore the by-construction vanilla fit. This differs from the neural operator of \citet{wang2026}, who amortise the whole calibration and accept the operator's error as final: here the operator supplies only the initialisation, and the particle method keeps its exactness. The convergence analysis quantifies the claim: with local contraction factor $r$ and warm-start error $\delta_0$, of order $\log(\mathrm{tol}/\delta_0)/\log r$ corrections suffice, so the theory powers the latency claim as well as the accuracy claim. A riskier variant collapses the outer iteration into a single training run with a self-consistency loss, simulating under $\Lev_\theta = \sigDup/\sqrt{f_\theta}$ and differentiating through the simulation as in \citet{cuchiero2020}; this forfeits the damped-iteration theory and is parked unless the amortised initialisation disappoints.
 
@@ -290,7 +290,7 @@ The intended desk pattern combines the schemes: a full implicit solve overnight,
 
 Every method for LSV calibration computes, in some form, the conditional expectation $\E[V_t \mid X_t = x]$ under the law of the model being calibrated. The families differ in how they represent that law and that conditional expectation. Two families dominate: particle methods and PDE methods.
 
-\subsection{Particle methods and their flavours}
+\subsection{Particle methods}
 
 All flavours simulate an interacting particle system and differ only in the estimator applied to the cloud.
 
@@ -309,7 +309,7 @@ Numerical analysis of the particle scheme itself (discretisation error, converge
 
 Solve the two-dimensional forward Kolmogorov equation for the joint density of $(X, V)$ on a grid and read the conditional expectation off the gridded density \citep{ren2007}; the inner fixed-point iteration per time step is credited to \citet{tataru2010}, and the modern finite-volume ADI treatment is \citep{wyns2017adjoint,wyns2017fv}. Deterministic and accurate in two dimensions; hits the curse of dimensionality beyond three factors; the thin-density wings and the $v = 0$ boundary under Feller violation need care. Two details matter for us. First, the inner leverage iteration is run \emph{undamped} with a fixed small iteration count ($Q = 2$), with tail regularisation that pulls the quotient toward the mean reversion level where the density is thin. Second, the iteration's contraction property has never been proved anywhere in this literature: it is asserted by \citet{reghai2006}, quoted as ``stated but not proved'' by \citet{cozma2019}, and documented to fail at large log-moneyness by \citet{saporito2019}, who replace the iteration by Tikhonov regularisation. The only theory-adjacent entries are Anderson acceleration of the iteration with no analysis \citep{nastasi2020} and a rigorous linear-rate theorem for the related but different Bass local volatility fixed point \citep{acciaio2024bass}. A spectral analysis of the damped leverage iteration therefore has no published counterpart.
 
-\subsection{The closest approaches to the $L^2$ route}\label{subsec:closest}
+\subsection{Prior use of the $L^2$ projection}\label{subsec:closest}
 
 The $L^2$ projection identity \cref{eq:l2proj} is known in this literature; what has never been done is to realise it with a trained neural network inside the particle loop. The near-misses, in increasing order of proximity:
 
@@ -322,11 +322,11 @@ The $L^2$ projection identity \cref{eq:l2proj} is known in this literature; what
 
 Adjacent literatures use neural $L^2$ conditional expectation regression as standard technology (deep backward BSDE schemes \citep{hure2020}, deep Longstaff--Schwartz \citep{longstaff2001}) but nobody has ported it to the leverage loop. The structural precedent for our importance sampling is \citet{dosreis2023}, whose decoupling algorithm for McKean--Vlasov SDEs freezes the law component and tilts the decoupled SDE, exactly our volatility-preserving drift, with no calibration application anywhere in it.
 
-\subsection{Other neural approaches, for contrast}
+\subsection{Other neural approaches}
 
 \citet{cuchiero2020} parametrise the leverage directly and calibrate to option prices with generative-adversarial training; they call the conditional expectation ``a very challenging and still open problem'' and concede no speed competition with the particle method. We solve exactly the problem they bypass, and vanilla calibration holds by construction modulo regression error. This is the paper a reviewer is most likely to confuse with ours; distinguish it early. Physics-informed networks on the Fokker--Planck equation \citep{hoshisashi2025} and neural operators amortising the whole quotes-to-calibration map \citep{wang2026} are different axes entirely: the former is the PDE route with a neural solver, the latter learns across surfaces rather than within one calibration.
 
-\subsection{Where the bar sits}
+\subsection{Comparison targets}
 
 In one dimension the particle method is fast and works well, so the honest comparison targets are PURBF and bin Monte Carlo at realistic particle budgets, with tail accuracy under importance sampling as the differentiator. Kernel methods genuinely fail, and networks do not, in multi-asset LSV; if there is a dimensional story, that is the strongest version of the paper.
 
