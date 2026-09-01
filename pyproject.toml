@@ -14,6 +14,8 @@ dependencies = [
     "torch>=2.3",
     "matplotlib>=3.8",
     "tqdm>=4.66",
+    "quantlib>=1.43",
+    "pandas>=3.0.5",
 ]
 
 [project.optional-dependencies]
@@ -23,8 +25,11 @@ dev = [
     "ipykernel>=6.29",
 ]
 
+[project.scripts]
+bench = "bench.cli:main"
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/neural_particle_method"]
+packages = ["src/neural_particle_method", "bench"]
 
 [tool.ruff]
 line-length = 100
