@@ -313,6 +313,30 @@ The design \cref{eq:optdesign} prescribes where the particles should sit at each
 
 In practice we restrict to deterministic shifts $\theta(t)$ and minimise the variance functional within that family in a Gaussian or Heston proxy, computable offline before any simulation. This is the programme of \citet{dosreis2023} for McKean--Vlasov particle systems, so the within-family optimisation comes with ready-made machinery. It combines with the defensive mixture of \cref{rem:mixture}, one moment-matched tilt per wing plus an untilted component, whose mixture weights are themselves covered by the optimality theory of the balance heuristic \citep{veach1995,owen2000}. The effective sample size per bucket of \cref{rem:selfnorm} remains the runtime diagnostic, while \cref{eq:varexp} supplies the offline design criterion.
 
+The optimal design enters the algorithm only through the offline choice of the mixture. Deterministic tilts cannot reproduce $q^*$ exactly, since a single drift mostly translates the marginal, but a three-component mixture, one tilt per wing plus an untilted defensive component, matches the two features of $q^*$ that carry the variance reduction, namely the mass it assigns to each wing and how far out that mass sits. \Cref{alg:mixture} records the procedure, with $\eta_k = \theta_k/\sqrt{1-\rho^2}$ as in \cref{subsec:density} and $\eta_0 = 0$ for the untilted component. Everything upstream of the simulation is cheap proxy computation. The online overhead is one extra drift term and three running scalars per particle, and the defensive component bounds every weight by $1/\alpha_0$, so a mistuned design costs variance but can neither blow up the weights nor bias the calibration, by \cref{eq:weightedreg}.
+
+\begin{algorithm}[H]
+\caption{Defensive-mixture importance sampling targeting $q^*$ (replaces the tilt handling of \cref{alg:explicit})}\label{alg:mixture}
+\KwIn{quote grid with vegas; proxy model for $(X, V)$; particle count $N$; ESS floor per bucket}
+\KwOut{particle cloud with balance-heuristic weights for the weighted regressions of \cref{alg:explicit}}
+\tcp{offline design, once per calibration}
+form $\pi$ from the quote grid, or take $\pi = p$ from the proxy, and compute $\sigma_V^2$ from proxy moments\;
+target $q^*(x) \propto \sqrt{\pi(x)\,\sigma_V^2(x)}$ per maturity bucket\;
+set $\alpha_\pm$ to the $q^*$-mass of each wing and $\alpha_0$ to the remainder\;
+choose $\theta_\pm$ by moment matching, so the proxy mean of $\log X_T$ under each tilt reaches the outer edge of its wing's $q^*$-mass; a schedule $\theta(t) \propto 1/\sqrt{t}$ tracks a fixed delta across maturities\;
+shrink $\abs{\theta_\pm}$ until the proxy effective sample size per bucket clears its floor, mindful of the kernel cost $\theta^2/(1-\rho^2)$ of \cref{rem:cost}\;
+\tcp{online, inside the particle loop}
+assign particle $i$ to component $j(i) \in \{-, 0, +\}$ with proportions $\alpha$; initialise $\ell^{(i)}_k = 0$ for $k \in \{-, 0, +\}$\;
+\For{each Euler step of \cref{alg:explicit}}{
+  advance $V^{(i)}$ unchanged; advance $X^{(i)}$ with the extra drift $\Lev\sqrt{V^{(i)}}\,\theta_{j(i)}\,\Delta t$\;
+  recover the untilted increment $\Delta B^{\perp,(i)} = \Delta\widetilde{B}^{\perp,(i)} + \eta_{j(i)}\,\Delta t$\;
+  update $\ell^{(i)}_k \leftarrow \ell^{(i)}_k + \eta_k\,\Delta B^{\perp,(i)} - \tfrac12 \eta_k^2\,\Delta t$ for each component $k$\;
+  set the regression weight $w^{(i)} \leftarrow 1/\sum_k \alpha_k \exp(\ell^{(i)}_k)$
+    \tcp*{balance heuristic, $w^{(i)} \leq 1/\alpha_0$}
+}
+\Return{cloud and weights}\;
+\end{algorithm}
+
 \begin{remark}[Scope of the optimality claim]\label{rem:optscope}
 Both simplifications leading to \cref{eq:designformula} fail in general. The weight \cref{eq:weights} depends on the whole path of $B^\perp$, not on the endpoint alone, and it need not decouple from the residual. The error in either case is controlled by the conditional variability of the weight given the endpoint, the same quantity isolated in \cref{rem:selfnorm}. The optimality of \cref{eq:optdesign} therefore holds to leading order in the Gaussian proxy, the level at which \citet{dosreis2023} also operate.
 \end{remark}
