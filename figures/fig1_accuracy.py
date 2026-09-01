@@ -17,5 +17,5 @@ def make(summary_csv, runs_dir, outdir):
     ax.tick_params(axis="x", rotation=20)
     out = Path(outdir) / "fig1_accuracy.pdf"
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout(); fig.savefig(out); plt.close(fig)
+    fig.tight_layout(); fig.savefig(out, metadata={"CreationDate": None}); plt.close(fig)
     return str(out)

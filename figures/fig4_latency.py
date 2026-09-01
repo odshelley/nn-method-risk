@@ -19,5 +19,5 @@ def make(summary_csv, runs_dir, outdir):
     ax.set_xscale("log"); ax.legend(fontsize=8)
     out = Path(outdir) / "fig4_latency.pdf"
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout(); fig.savefig(out); plt.close(fig)
+    fig.tight_layout(); fig.savefig(out, metadata={"CreationDate": None}); plt.close(fig)
     return str(out)

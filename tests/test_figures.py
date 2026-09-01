@@ -35,3 +35,16 @@ def _runs(tmp_path):
 def test_each_figure_writes_pdf(tmp_path, mod):
     out = mod.make(str(_summary(tmp_path)), str(_runs(tmp_path)), str(tmp_path / "out"))
     assert Path(out).exists() and out.endswith(".pdf")
+
+
+def test_fig1_is_byte_identical_across_runs(tmp_path):
+    summary = _summary(tmp_path)
+    runs = _runs(tmp_path)
+    out_a = f1.make(str(summary), str(runs), str(tmp_path / "out_a"))
+    out_b = f1.make(str(summary), str(runs), str(tmp_path / "out_b"))
+    bytes_a, bytes_b = Path(out_a).read_bytes(), Path(out_b).read_bytes()
+    assert bytes_a == bytes_b
+    # The byte-equality check above can pass by luck if both calls land in the
+    # same wall-clock second (PDF /CreationDate has 1s resolution). Assert the
+    # actual root cause is fixed: no embedded timestamp at all.
+    assert b"/CreationDate" not in bytes_a

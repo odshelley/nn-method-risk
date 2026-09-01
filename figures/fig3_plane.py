@@ -23,5 +23,5 @@ def make(summary_csv, runs_dir, outdir):
     fig.colorbar(im, ax=axes, label="pooled IV RMSE (bp)")
     out = Path(outdir) / "fig3_plane.pdf"
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, bbox_inches="tight"); plt.close(fig)
+    fig.savefig(out, bbox_inches="tight", metadata={"CreationDate": None}); plt.close(fig)
     return str(out)
