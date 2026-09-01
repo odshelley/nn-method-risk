@@ -286,7 +286,7 @@ For the implicit scheme the damped outer iteration is calibration-time cost, not
 
 The intended desk pattern combines the schemes: a full implicit solve overnight, possibly amortiser-initialised, and warm-started explicit sweeps or a small number of damped corrections on the bumped surface intraday. Surfaces move little intraday, so warm starts land near the fixed point, and the contraction theory turns recalibration latency into a quantified prediction rather than a hope.
 
-\section{Positioning: the calibration landscape}\label{sec:positioning}
+\section{Positioning}\label{sec:positioning}
 
 Every method for LSV calibration computes, in some form, the conditional expectation $\E[V_t \mid X_t = x]$ under the law of the model being calibrated. The families differ in how they represent that law and that conditional expectation. Two families dominate: particle methods and PDE methods.
 
