@@ -29,7 +29,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/neural_particle_method", "bench"]
+packages = ["src/neural_particle_method", "bench", "figures"]
 
 [tool.ruff]
 line-length = 100
