@@ -1,4 +1,4 @@
-import subprocess, sys
+import subprocess
 
 def test_bench_list_runs():
     r = subprocess.run(["uv", "run", "bench", "list"], capture_output=True, text=True)
