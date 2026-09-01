@@ -82,7 +82,7 @@ def calibrate_implicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=50
         new_records, sup = [], 0.0
         with torch.no_grad():
             for (t, g, Lg, _) in L_records:
-                tzg = torch.tensor(np.stack([np.full(len(g), (t + dt) / max(T, 1e-9)),
+                tzg = torch.tensor(np.stack([np.full(len(g), t / max(T, 1e-9)),
                                              g / Z_SCALE], axis=1), dtype=torch.float32)
                 f = np.clip(net(tzg).numpy()[:, 0], 1e-4, None)
                 sig = dupire.sigma(max(t, dupire.T_grid[0]), np.exp(g), s0)
