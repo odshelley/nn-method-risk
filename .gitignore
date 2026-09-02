@@ -22,3 +22,5 @@ paper/*.blg
 
 # Paper PDFs (92MB, re-downloadable via papers/READING_LIST.md links)
 papers/pdf/
+
+results/runs/

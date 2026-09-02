@@ -68,10 +68,11 @@ class RidgeHead:
         self.lam, self.residual = lam, residual
         self.w_prev = None
         self.trained = False
+        self.mu, self.sd = None, None
 
     def train_body(self, lnx, v, steps=400):
-        mu, sd = lnx.mean(), max(lnx.std(), 1e-6)
-        z = torch.tensor(((lnx - mu) / sd)[:, None], dtype=torch.float32)
+        self.mu, self.sd = lnx.mean(), max(lnx.std(), 1e-6)
+        z = torch.tensor(((lnx - self.mu) / self.sd)[:, None], dtype=torch.float32)
         tv = torch.tensor(v[:, None], dtype=torch.float32)
         opt = torch.optim.Adam(self.net.parameters(), lr=1e-2)
         for _ in range(steps):
@@ -87,12 +88,16 @@ class RidgeHead:
             phi = self.net.body(z).numpy()
         return np.concatenate([phi, np.ones((len(lnx), 1))], axis=1)
 
-    def fit_predict(self, lnx, v, lnx_grid):
-        mu, sd = lnx.mean(), max(lnx.std(), 1e-6)
+    def fit_predict(self, lnx, v, lnx_grid, weights=None):
+        # (mu, sd) are fixed once by train_body so w_prev's coefficients stay
+        # in the same standardised coordinates across slices; do not
+        # recompute them here.
+        mu, sd = self.mu, self.sd
         A = self._features(lnx, mu, sd)
         lam = self.lam * len(lnx)
-        lhs = A.T @ A + lam * np.eye(A.shape[1])
-        rhs = A.T @ v
+        wv = np.ones(len(lnx)) if weights is None else weights
+        lhs = A.T @ (wv[:, None] * A) + lam * np.eye(A.shape[1])
+        rhs = A.T @ (wv * v)
         if self.residual and self.w_prev is not None:
             rhs = rhs + lam * self.w_prev
         w = np.linalg.solve(lhs, rhs)
