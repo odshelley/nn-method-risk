@@ -10,7 +10,9 @@
 | implicit_nn | 200k | 154.0 | 550.7 | 196.5 | 154.9 |
 | implicit_ridge | 50k | 330.1 | 827.7 | 367.8 | 0.8 |
 | implicit_ridge | 200k | 334.3 | 835.9 | 371.4 | 1.3 |
+| spline | 50k | 335.0 | 841.8 | 372.7 | 0.4 |
 | nw | 50k | 335.3 | 861.8 | 375.8 | 0.9 |
+| spline | 200k | 338.6 | 840.7 | 376.1 | 1.0 |
 | ridge | 50k | 339.6 | 862.9 | 379.4 | 6.2 |
 | nw | 200k | 339.8 | 861.2 | 380.4 | 1.5 |
 | ridge | 200k | 346.3 | 875.8 | 387.1 | 6.9 |
@@ -45,4 +47,4 @@ implicit_ridge's time is the intraday ridge sweep only; its implicit solve (~142
 
 Mean overnight (implicit solve + distillation): 142 s. Mean intraday (causal ridge sweep): 1.34 s.
 
-Notes: 50k vs 200k differ by <2 percent everywhere (bias-dominated regime); importance sampling matches explicit_nn within noise on this quote grid (see analysis in session log); spline algorithm added after this sweep, results pending.
+Notes: 50k vs 200k differ by <2 percent everywhere (bias-dominated regime); importance sampling matches explicit_nn within noise on this quote grid (see analysis in session log); spline (P-spline head) runs at ridge-class latency and is statistically indistinguishable from NW (paired +1.2 bp, t=0.5), slightly ahead of the frozen-feature ridge (paired +7.7 bp, t=2.6).

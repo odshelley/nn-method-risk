@@ -1,5 +1,5 @@
 # Benchmark digest
-756 runs, 0 failed, 0 unreadable
+876 runs, 0 failed, 0 unreadable
 
 - f_xi0.3_rho-0.3: best = nw (52.1 bp)
 - f_xi0.3_rho-0.7: best = nw (50.9 bp)
@@ -20,10 +20,10 @@
 - s11: best = implicit_nn (316.1 bp)
 - s12: best = implicit_nn (235.0 bp)
 - s13: best = implicit_nn (92.0 bp)
-- s14: best = nw (64.0 bp)
+- s14: best = spline (62.4 bp)
 - s15: best = implicit_ridge (155.0 bp)
 - s16: best = implicit_nn (196.9 bp)
 - s17: best = implicit_ridge (60.7 bp)
-- s18: best = nw (61.6 bp)
-- s19: best = implicit_ridge (54.7 bp)
-- s20: best = nw (51.0 bp)
+- s18: best = spline (61.0 bp)
+- s19: best = spline (53.8 bp)
+- s20: best = spline (48.6 bp)

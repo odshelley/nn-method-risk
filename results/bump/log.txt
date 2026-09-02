@@ -1,0 +1,11 @@
+s01 s0: anchor_unbumped_implicit=169 anchor_unbumped_distilled=171 stale_L=201 stale_f_fresh_sigma=135 causal_sweep=35 beta_corr_1=144 beta_corr_2=37 full_resolve=109
+s01 s1: anchor_unbumped_implicit=204 anchor_unbumped_distilled=202 stale_L=122 stale_f_fresh_sigma=47 causal_sweep=37 beta_corr_1=45 beta_corr_2=107 full_resolve=139
+s02 s0: anchor_unbumped_implicit=146 anchor_unbumped_distilled=162 stale_L=139 stale_f_fresh_sigma=204 causal_sweep=216 beta_corr_1=152 beta_corr_2=153 full_resolve=190
+s02 s1: anchor_unbumped_implicit=200 anchor_unbumped_distilled=225 stale_L=146 stale_f_fresh_sigma=167 causal_sweep=230 beta_corr_1=178 beta_corr_2=197 full_resolve=184
+s03 s0: anchor_unbumped_implicit=229 anchor_unbumped_distilled=199 stale_L=304 stale_f_fresh_sigma=148 causal_sweep=844 beta_corr_1=202 beta_corr_2=159 full_resolve=277
+s03 s1: anchor_unbumped_implicit=374 anchor_unbumped_distilled=351 stale_L=248 stale_f_fresh_sigma=209 causal_sweep=856 beta_corr_1=194 beta_corr_2=226 full_resolve=278
+s04 s0: anchor_unbumped_implicit=312 anchor_unbumped_distilled=324 stale_L=457 stale_f_fresh_sigma=70 causal_sweep=258 beta_corr_1=296 beta_corr_2=145 full_resolve=145
+s04 s1: anchor_unbumped_implicit=485 anchor_unbumped_distilled=483 stale_L=114 stale_f_fresh_sigma=114 causal_sweep=442 beta_corr_1=111 beta_corr_2=162 full_resolve=233
+s05 s0: anchor_unbumped_implicit=136 anchor_unbumped_distilled=199 stale_L=101 stale_f_fresh_sigma=160 causal_sweep=178 beta_corr_1=190 beta_corr_2=192 full_resolve=171
+s05 s1: anchor_unbumped_implicit=174 anchor_unbumped_distilled=209 stale_L=97 stale_f_fresh_sigma=167 causal_sweep=175 beta_corr_1=180 beta_corr_2=180 full_resolve=139
+done

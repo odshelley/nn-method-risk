@@ -1,0 +1,29 @@
+{
+ "sid": "s01",
+ "seed": 0,
+ "rmse_bp": {
+  "anchor_unbumped_implicit": 169.073519748,
+  "anchor_unbumped_distilled": 171.141400416,
+  "stale_L": 201.33772563,
+  "stale_f_fresh_sigma": 134.777009998,
+  "causal_sweep": 34.712276245,
+  "beta_corr_1": 144.498197211,
+  "beta_corr_2": 36.726883381,
+  "full_resolve": 109.192721204
+ },
+ "build_s": {
+  "overnight": 52.49,
+  "stale_L": 0.0,
+  "stale_f_fresh_sigma": 0.0,
+  "causal_sweep": 0.98,
+  "beta_corr_1": 0.65,
+  "beta_corr_2": 1.27,
+  "full_resolve": 54.23
+ },
+ "bumped": {
+  "sigma0": 0.2708968335710887,
+  "eta": 0.49737316664397235,
+  "gamma": 0.33753791537638594,
+  "rho": -0.17658245159415628
+ }
+}
