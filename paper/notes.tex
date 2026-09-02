@@ -459,6 +459,31 @@ In one dimension the particle method is fast and works well, so the honest compa
 
 The benchmark generates twenty synthetic markets, each an arbitrage-free SSVI surface drawn at random and paired with Heston dynamics, and hands every calibrator the same inputs a desk would hold, the analytic Dupire surface and the variance parameters. Calibration runs over a two-year horizon on fifty time slices. Accuracy is measured by an independent repricing simulation with fresh seeds, inverted to implied volatility at thirteen strikes (moneyness $0.6$ to $1.6$) and four maturities ($0.25$, $0.5$, $1$, $2$ years), and reported in volatility basis points against the exact SSVI targets. Each configuration runs at $N \in \{50\,000,\ 200\,000\}$ particles with three seeds, 876 runs in total.
 
+\subsection{Synthetic markets}\label{subsec:synthmarkets}
+
+Each market is a pair, an implied volatility surface and a set of variance dynamics, drawn once per scenario from a fixed seed so that the whole benchmark is reproducible run for run. The surface is an SSVI surface in the power-law parameterisation of \citet{gatheral2014}. Writing $k$ for log-moneyness and $\rho_s$ for the SSVI correlation parameter, kept distinct from the spot-volatility correlation $\rho$ of the dynamics, the total implied variance is
+\begin{equation}\label{eq:ssvi}
+  w(k, \theta_T) = \frac{\theta_T}{2}\Bigl( 1 + \rho_s\,\varphi(\theta_T)\,k + \sqrt{(\varphi(\theta_T)k + \rho_s)^2 + 1 - \rho_s^2} \Bigr),
+  \qquad \varphi(\theta) = \eta\,\theta^{-\gamma},
+  \qquad \theta_T = \sigma_0^2 T .
+\end{equation}
+The four parameters are drawn independently and uniformly, $\sigma_0 \in [0.12, 0.35]$, $\eta \in [0.5, 2.0]$, $\gamma \in [0.3, 0.5]$, $\rho_s \in [-0.85, -0.10]$, and redrawn until the sufficient no-arbitrage conditions of \citet{gatheral2014} hold, namely $\gamma \leq \tfrac12$ and $\eta(1 + \abs{\rho_s}) \leq 2$.
+
+The calibrators never see the implied surface. They receive the Dupire local volatility computed analytically from \cref{eq:ssvi}, with the $k$-derivatives in closed form and the $T$-derivative through the chain rule in $\theta_T$, assembled by the total-variance form of Dupire's formula,
+\begin{equation}\label{eq:dupiretv}
+  \sigma_{\mathrm{loc}}^2(T, k)
+  = \frac{\partial_T w}{1 - \frac{k}{w}\,\partial_k w + \frac14\bigl(-\frac14 - \frac1w + \frac{k^2}{w^2}\bigr)(\partial_k w)^2 + \frac12\,\partial_k^2 w} .
+\end{equation}
+Using the analytic surface removes interpolation and finite-difference noise from the comparison, so differences between algorithms are attributable to the algorithms alone. The implementation is cross-validated against an independent finite-difference local-volatility construction.
+
+The variance dynamics are square-root, $dV_t = \kappa(\bar v - V_t)\,dt + \xi\sqrt{V_t}\,dB_t$, with $\kappa$ drawn from $\{1, 2, 3\}$, $\xi$ from $\{0.3, 0.6, 1.0\}$, $\rho$ from $\{-0.7, -0.3\}$, and $\bar v = v_0 = \sigma_0^2$. The dynamics are drawn independently of the surface, a deliberate misspecification: no leverage close to constant reprices the surface, so every scenario forces a genuine calibration. Feller's condition $2\kappa\bar v \geq \xi^2$ fails in many scenarios, exercising the full-truncation Euler scheme at the $V = 0$ boundary. Calibration simulates fifty uniform slices over the two-year horizon.
+
+Accuracy is scored against the exact SSVI values, with no quote noise. The quote grid holds thirteen strikes, log-spaced in moneyness from $0.6$ to $1.6$, at maturities $0.25$, $0.5$, $1$ and $2$ years; the wings statistic restricts to $\abs{k} > 0.25$. Repricing is a fresh simulation, independent of the calibration paths by construction (seed offset $10^4$), with $500\,000$ paths on $200$ uniform steps so that every quoted maturity lands exactly on the grid; call prices invert to implied volatility by Brent's method and errors are reported in volatility basis points, pooled, per maturity, and wings-only.
+
+Two extensions reuse the machinery. The stress cross of \cref{tab:cold}'s companion figure fixes one representative surface and runs the full $\xi \times \rho$ grid, isolating the effect of the dynamics. The warm experiment of \cref{subsec:warmresults} bumps a calibrated market's surface parameters by $(\sigma_0, \eta, \rho_s) \mapsto (\sigma_0 + 0.01,\ 0.95\,\eta,\ \rho_s + 0.03)$, directions chosen to stay inside the no-arbitrage region, while holding the dynamics fixed.
+
+\subsection{Cold calibration}\label{subsec:coldresults}
+
 \begin{table}[h]
 \centering
 \begin{tabular}{lrrr}
@@ -535,6 +560,8 @@ House style forbids theorem environments, so \cref{rem:cost,rem:selfnorm} become
 \bibitem[Gy\"ongy(1986)]{gyongy1986} I.~Gy\"ongy, ``Mimicking the one-dimensional marginal distributions of processes having an It\^o differential,'' \textit{Probability Theory and Related Fields}, vol.~71, no.~4, pp.~501--516, 1986.
 
 \bibitem[Dupire(1994)]{dupire1994} B.~Dupire, ``Pricing with a smile,'' \textit{Risk}, vol.~7, no.~1, pp.~18--20, 1994.
+
+\bibitem[Gatheral and Jacquier(2014)]{gatheral2014} J.~Gatheral and A.~Jacquier, ``Arbitrage-free SVI volatility surfaces,'' \textit{Quantitative Finance}, vol.~14, no.~1, pp.~59--71, 2014.
 
 \bibitem[Guyon and Henry-Labord\`ere(2011)]{guyon2011smile} J.~Guyon and P.~Henry-Labord\`ere, ``The smile calibration problem solved,'' SSRN working paper 1885032, 2011.
 
