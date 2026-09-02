@@ -531,15 +531,49 @@ Causal ridge sweep & 327 & 1.0 \\
 
 The table needs unpacking, because its best row costs nothing. Write the overnight estimate of the conditional expectation as $f$ and recall $\Lev = \sigDup/\sqrt{f}$. When the surface bumps, $\sigDup$ changes directly and is known analytically, so the numerator updates for free. The denominator $f = \E[V_t \mid X_t]$ changes only indirectly: the dynamics of $V$ are untouched, and the joint law of $(X, V)$ feels the bump solely through the feedback of the new leverage into the simulation, one order higher in the bump size. To first order the overnight $f$ is still correct. The strategy in the first row exploits exactly this, keeping the stored $f$ and refreshing only the numerator, $\Lev' = \sigma'_{\mathrm{Dup}}/\sqrt{f}$, with no simulation and no new estimation noise.
 
-The mechanism admits a two-line expansion. Write $F(\Lev) \coloneqq \E^{\Lev}[V_t \mid X_t = \cdot\,]$ for the conditional-expectation map of \cref{eq:phimap}, so the overnight state is the fixed point $\Lev = \sigma/\sqrt{F(\Lev)}$ with stored $f = F(\Lev)$, and the refresh is one application of the bumped map at the old point, $\widetilde{\Lev} = \sigma'/\sqrt{f}$. Because $\sigma/\sqrt{f} = \Lev$ holds exactly, the refresh moves by
+The mechanism deserves a derivation rather than a slogan. Fix the variance dynamics and write $F$ for the map sending a leverage function to the conditional expectation it induces, $F(\Lev) \coloneqq \E^{\Lev}[V_t \mid X_t = \cdot\,]$, the object underlying \cref{eq:phimap}. The overnight calibration on the surface $\sigma$ is a fixed point of $\Phimap_\sigma(\Lev) = \sigma/\sqrt{F(\Lev)}$, and we write $f \coloneqq F(\Lev)$ for the stored conditional expectation, so that
 \[
-  \widetilde{\Lev} - \Lev = \Lev\,\frac{\delta\sigma}{\sigma},
+  \Lev = \frac{\sigma}{\sqrt{f}} .
 \]
-with no error in $\delta\sigma$. The true recalibration $\Lev' = \Lev + \delta\Lev$ solves the bumped fixed-point equation, and linearising it around $\Lev$ with $A \coloneqq (\Lev/2f)\,DF(\Lev)$ gives $(\mathrm{Id} + A)\,\delta\Lev = \Lev\,\delta\sigma/\sigma$. Subtracting the two displays,
-\begin{equation}\label{eq:staleerr}
-  \widetilde{\Lev} - \Lev' = A(\mathrm{Id} + A)^{-1}\bigl(\Lev\,\delta\sigma/\sigma\bigr) + O(\norm{\delta\sigma}^2).
+The intraday surface is $\sigma' = \sigma + \delta\sigma$, and everything below is an expansion in $\varepsilon \coloneqq \norm{\delta\sigma}$.
+
+The free refresh replaces the numerator and keeps the stored denominator, $\widetilde{\Lev} \coloneqq \sigma'/\sqrt{f}$. Its move needs no expansion at all, since
+\[
+  \widetilde{\Lev} = \frac{\sigma + \delta\sigma}{\sqrt{f}} = \Lev + \frac{\delta\sigma}{\sqrt{f}} = \Lev\Bigl(1 + \frac{\delta\sigma}{\sigma}\Bigr),
+\]
+so the refresh moves by exactly $\Lev\,\delta\sigma/\sigma$, linearly in the bump and with no remainder.
+
+The true recalibration is the fixed point of the bumped map, $\Lev' = \sigma'/\sqrt{F(\Lev')}$. Write $\Lev' = \Lev + \delta\Lev$ and assume $F$ is Fr\'echet differentiable at $\Lev$ with derivative $DF$, the same hypothesis the convergence analysis of the damped iteration \cref{eq:damped} rests on. Then $F(\Lev + \delta\Lev) = f + DF\,\delta\Lev + o(\norm{\delta\Lev})$, and expanding the inverse square root to first order,
+\[
+  \frac{1}{\sqrt{F(\Lev + \delta\Lev)}}
+  = \frac{1}{\sqrt{f}}\Bigl(1 + \frac{DF\,\delta\Lev}{f}\Bigr)^{-1/2}
+  = \frac{1}{\sqrt{f}} - \frac{DF\,\delta\Lev}{2 f^{3/2}} + o(\norm{\delta\Lev}) .
+\]
+Multiplying by $\sigma' = \sigma + \delta\sigma$, dropping the cross term $\delta\sigma \cdot DF\,\delta\Lev = O(\varepsilon^2)$, and using $\sigma/\sqrt{f} = \Lev$ twice, the fixed-point equation becomes
+\[
+  \Lev + \delta\Lev
+  = \frac{\sigma + \delta\sigma}{\sqrt{f}} - \frac{\sigma}{\sqrt{f}}\,\frac{DF\,\delta\Lev}{2f} + O(\varepsilon^2)
+  = \Lev + \Lev\,\frac{\delta\sigma}{\sigma} - \frac{\Lev}{2f}\,DF\,\delta\Lev + O(\varepsilon^2) .
+\]
+Cancelling $\Lev$ and collecting the $\delta\Lev$ terms on the left with the feedback operator
+\[
+  A \coloneqq \frac{\Lev}{2f}\,DF(\Lev),
+\]
+the first-order condition and its solution read
+\begin{equation}\label{eq:truemove}
+  (\mathrm{Id} + A)\,\delta\Lev = \Lev\,\frac{\delta\sigma}{\sigma} + O(\varepsilon^2),
+  \qquad
+  \delta\Lev = (\mathrm{Id} + A)^{-1}\Bigl(\Lev\,\frac{\delta\sigma}{\sigma}\Bigr) + O(\varepsilon^2),
 \end{equation}
-The free refresh therefore captures the whole first-order move except the part routed through the feedback operator $A$, the response of the conditional expectation to a leverage change, which is the McKean nonlinearity itself.
+provided $\mathrm{Id} + A$ is invertible, which holds whenever $-1$ lies outside the spectrum of $A$ and in particular under the spectral condition of the damped-iteration analysis.
+
+The staleness error is the difference of the two moves. From $(\mathrm{Id}+A) - \mathrm{Id} = A$, multiplying on the right by $(\mathrm{Id}+A)^{-1}$ gives the resolvent identity $\mathrm{Id} - (\mathrm{Id}+A)^{-1} = A(\mathrm{Id}+A)^{-1}$, and therefore
+\begin{equation}\label{eq:staleerr}
+  \widetilde{\Lev} - \Lev'
+  = \bigl(\mathrm{Id} - (\mathrm{Id}+A)^{-1}\bigr)\Bigl(\Lev\,\frac{\delta\sigma}{\sigma}\Bigr) + O(\varepsilon^2)
+  = A(\mathrm{Id}+A)^{-1}\Bigl(\Lev\,\frac{\delta\sigma}{\sigma}\Bigr) + O(\varepsilon^2) .
+\end{equation}
+Both moves are of size $\varepsilon$, and their difference carries the extra factor $A(\mathrm{Id}+A)^{-1}$. The refresh therefore recovers the fraction $(\mathrm{Id}+A)^{-1}$ of the true move and forgoes only the part routed through $A$, the response of the conditional expectation to a leverage change, which is the McKean nonlinearity itself. For $\rho(A) \ll 1$ the forgone part is roughly the fraction $\rho(A)$ of a move that is itself of size $\varepsilon$, which is what the experiment observes.
 
 \begin{remark}[One constant governs staleness and convergence]\label{rem:stalespectral}
 The operator $A$ is, up to sign, the linearisation of the calibration map at its fixed point, $D\Phimap = -A$, so the relative staleness error in \cref{eq:staleerr} and the local contraction rate of the damped iteration \cref{eq:damped} are controlled by the same spectral radius. A market in which the implicit solve converges quickly is automatically one in which the stored $f$ survives surface bumps, and in the frozen-body configuration of \cref{sec:warmstart} this constant is measurable by power iteration on the $(d+1)\times(d+1)$ head Jacobian. Boundedness of $DF$ is what the Wasserstein Lipschitz stability of \citet{bayer2022rkhs} supplies for the regularised estimator. Two consequences frame the experiments. The crossover at which damped corrections overtake the free refresh sits near $\norm{\delta\sigma} \approx (\text{estimation floor})/\rho(A)$, and a bump in the dynamics parameters enters through $DF$ directly rather than through the numerator, which is why the free refresh's premise fails there.
