@@ -546,27 +546,27 @@ The free refresh replaces the numerator and keeps the stored denominator, $\wide
 \]
 so the refresh moves by $\Lev\,\delta\sigma/\sigma$. The absence of a remainder here concerns this identity alone and says nothing yet about calibration quality.
 
-The true recalibration is the fixed point of the bumped map, $\Lev' = \sigma'/\sqrt{F(\Lev')}$. Write $\Lev' = \Lev + \delta\Lev$ and assume $F$ is Fr\'echet differentiable at $\Lev$ with Lipschitz derivative $DF$, a slight strengthening of the hypothesis the convergence analysis of the damped iteration \cref{eq:damped} rests on, which upgrades every remainder below from $o(\norm{\delta\sigma})$ to $O(\norm{\delta\sigma}^2)$. Then $F(\Lev + \delta\Lev) = f + DF\,\delta\Lev + o(\norm{\delta\Lev})$, and expanding the inverse square root to first order,
+The true recalibration is the fixed point of the bumped map, $\Lev' = \sigma'/\sqrt{F(\Lev')}$, driven by the same market move $\delta\sigma$, since calibrating to the intraday market means calibrating to $\sigma'$. Write $\Lev' = \Lev + \Delta\Lev$, where $\Delta\Lev$ is not an input but the unknown response of the calibrated leverage, determined by the equation below and only afterwards seen to be of order $\norm{\delta\sigma}$. Assume $F$ is Fr\'echet differentiable at $\Lev$ with Lipschitz derivative $DF$, a slight strengthening of the hypothesis the convergence analysis of the damped iteration \cref{eq:damped} rests on, which upgrades every remainder below from $o(\norm{\delta\sigma})$ to $O(\norm{\delta\sigma}^2)$. Then $F(\Lev + \Delta\Lev) = f + DF\,\Delta\Lev + o(\norm{\Delta\Lev})$, and expanding the inverse square root to first order,
 \[
-  \frac{1}{\sqrt{F(\Lev + \delta\Lev)}}
-  = \frac{1}{\sqrt{f}}\Bigl(1 + \frac{DF\,\delta\Lev}{f}\Bigr)^{-1/2}
-  = \frac{1}{\sqrt{f}} - \frac{DF\,\delta\Lev}{2 f^{3/2}} + o(\norm{\delta\Lev}) .
+  \frac{1}{\sqrt{F(\Lev + \Delta\Lev)}}
+  = \frac{1}{\sqrt{f}}\Bigl(1 + \frac{DF\,\Delta\Lev}{f}\Bigr)^{-1/2}
+  = \frac{1}{\sqrt{f}} - \frac{DF\,\Delta\Lev}{2 f^{3/2}} + o(\norm{\Delta\Lev}) .
 \]
-Multiplying by $\sigma' = \sigma + \delta\sigma$, dropping the cross term $\delta\sigma \cdot DF\,\delta\Lev = O(\norm{\delta\sigma}^2)$, and using $\sigma/\sqrt{f} = \Lev$ twice, the fixed-point equation becomes
+Multiplying by $\sigma' = \sigma + \delta\sigma$, dropping the cross term $\delta\sigma \cdot DF\,\Delta\Lev = O(\norm{\delta\sigma}^2)$, and using $\sigma/\sqrt{f} = \Lev$ twice, the fixed-point equation becomes
 \[
-  \Lev + \delta\Lev
-  = \frac{\sigma + \delta\sigma}{\sqrt{f}} - \frac{\sigma}{\sqrt{f}}\,\frac{DF\,\delta\Lev}{2f} + O(\norm{\delta\sigma}^2)
-  = \Lev + \Lev\,\frac{\delta\sigma}{\sigma} - \frac{\Lev}{2f}\,DF\,\delta\Lev + O(\norm{\delta\sigma}^2) .
+  \Lev + \Delta\Lev
+  = \frac{\sigma + \delta\sigma}{\sqrt{f}} - \frac{\sigma}{\sqrt{f}}\,\frac{DF\,\Delta\Lev}{2f} + O(\norm{\delta\sigma}^2)
+  = \Lev + \Lev\,\frac{\delta\sigma}{\sigma} - \frac{\Lev}{2f}\,DF\,\Delta\Lev + O(\norm{\delta\sigma}^2) .
 \]
-Cancelling $\Lev$ and collecting the $\delta\Lev$ terms on the left with the feedback operator
+Cancelling $\Lev$ and collecting the $\Delta\Lev$ terms on the left with the feedback operator
 \[
   A \coloneqq \frac{\Lev}{2f}\,DF(\Lev),
 \]
 the first-order condition and its solution read
 \begin{equation}\label{eq:truemove}
-  (\Id + A)\,\delta\Lev = \Lev\,\frac{\delta\sigma}{\sigma} + O(\norm{\delta\sigma}^2),
+  (\Id + A)\,\Delta\Lev = \Lev\,\frac{\delta\sigma}{\sigma} + O(\norm{\delta\sigma}^2),
   \qquad
-  \delta\Lev = (\Id + A)^{-1}\Bigl(\Lev\,\frac{\delta\sigma}{\sigma}\Bigr) + O(\norm{\delta\sigma}^2),
+  \Delta\Lev = (\Id + A)^{-1}\Bigl(\Lev\,\frac{\delta\sigma}{\sigma}\Bigr) + O(\norm{\delta\sigma}^2),
 \end{equation}
 provided $\Id + A$ is invertible, which holds whenever $-1$ lies outside the spectrum of $A$ and in particular under the spectral condition of the damped-iteration analysis.
 
