@@ -15,6 +15,7 @@
 \setlength{\parskip}{6pt}
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{xcolor}
+\usepackage{booktabs}
 
 \theoremstyle{plain}
 \newtheorem{theorem}{Theorem}[section]
@@ -453,6 +454,65 @@ Adjacent literatures use neural $L^2$ conditional expectation regression as stan
 
 In one dimension the particle method is fast and works well, so the honest comparison targets are PURBF and bin Monte Carlo at realistic particle budgets, with tail accuracy under importance sampling as the differentiator. The one place kernel methods are expected to fail outright is multi-asset LSV. If the experiments show the network holding up there, that is the strongest version of the paper.
 
+
+\section{Numerical results}\label{sec:results}
+
+The benchmark generates twenty synthetic markets, each an arbitrage-free SSVI surface drawn at random and paired with Heston dynamics, and hands every calibrator the same inputs a desk would hold, the analytic Dupire surface and the variance parameters. Calibration runs over a two-year horizon on fifty time slices. Accuracy is measured by an independent repricing simulation with fresh seeds, inverted to implied volatility at thirteen strikes (moneyness $0.6$ to $1.6$) and four maturities ($0.25$, $0.5$, $1$, $2$ years), and reported in volatility basis points against the exact SSVI targets. Each configuration runs at $N \in \{50\,000,\ 200\,000\}$ particles with three seeds, 876 runs in total.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Algorithm & Pooled RMSE (bp) & Wings RMSE (bp) & Intraday time (s) \\
+\midrule
+Implicit network & 154 & 197 & 155 \\
+Implicit body, ridge head & 334 & 371 & 1.3 \\
+P-spline head & 339 & 376 & 1.0 \\
+Nadaraya--Watson & 340 & 380 & 1.5 \\
+Ridge head (explicit body) & 346 & 387 & 6.9 \\
+Explicit network, tilted & 381 & 427 & 102 \\
+Explicit network & 381 & 428 & 90 \\
+\bottomrule
+\end{tabular}
+\caption{Cold calibration at $N = 200\,000$, mean over twenty scenarios and three seeds. The implicit-body ridge head's time is its intraday sweep alone; its overnight solve is separate.}
+\label{tab:cold}
+\end{table}
+
+Three facts organise \cref{tab:cold}. First, the implicit scheme wins decisively, by a factor $2.2$ pooled, and its advantage grows with maturity ($43$\,bp at two years against $321$\,bp for the kernel). The mechanism is the damped fixed-point iteration: each iteration re-simulates and revisits early errors, so leverage and induced law converge jointly. Second, the per-slice estimators form a statistical tie near $340$\,bp, with the P-spline head cheapest, indistinguishable from Nadaraya--Watson in a paired test ($+1.2$\,bp, $t = 0.5$). The choice of per-slice estimator matters far less than the pass structure that feeds it. Third, doubling the particle budget from $50\,000$ to $200\,000$ moves no algorithm by more than two percent, so the residual error is bias, not sampling noise. The bias concentrates at short maturity and in the wings, where the per-slice leverage grid, tied to cloud quantiles, never reaches the quoted strikes (the outermost quote sits near $5\sigma$ at $T = 0.25$), and where the uniform time grid holds leverage constant across the fastest-moving part of the Dupire surface. Both causes suggest recipe fixes, an extended leverage grid and a graded time grid, rather than estimator changes.
+
+The importance-sampling comparison is a null result with a clean diagnosis. The weighted and unweighted estimates agree within $3$\,bp at every strike, confirming the unbiasedness of \cref{eq:weightedreg} in practice, and the effective sample fraction averages $0.80$, so the capped tilt of \cref{alg:mixture} stayed mild by design. There was simply no variance for the tilt to remove: with $50\,000$ or more particles and quotes inside $1.7\sigma$ at the long end, the term $\sigma_V^2/(Nq)$ of \cref{eq:varexp} is negligible against the propagated bias, which no reweighting touches. The tilt's proper regime, small particle budgets and short-dated far wings under the $\theta(t) \propto 1/\sqrt{t}$ schedule, remains to be tested.
+
+\subsection{Warm intraday recalibration}\label{subsec:warmresults}
+
+The cold table answers the wrong question for intraday use. A desk does not calibrate from nothing; it holds last night's solve and faces a slightly moved surface. The warm experiment models this directly. Calibrate overnight on a surface $S$ (implicit solve, then distil the network body into per-slice ridge coefficients $\beta$), bump the surface to $S'$ (level up one volatility point, curvature and skew nudged within no-arbitrage bounds), and reprice every intraday strategy against $S'$. The dynamics parameters are held fixed; only the surface moves.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Intraday strategy & Pooled RMSE (bp) & Intraday cost (s) \\
+\midrule
+Stale $f$, fresh Dupire & 142 & 0.0 \\
+Two damped $\beta$-corrections & 156 & 1.3 \\
+One damped $\beta$-correction & 169 & 0.6 \\
+Full re-solve on $S'$ & 186 & 53 \\
+Stale leverage, no action & 193 & 0.0 \\
+Causal ridge sweep & 327 & 1.0 \\
+\bottomrule
+\end{tabular}
+\caption{Recalibration against the bumped surface, mean over ten (scenario, seed) pairs at $N = 200\,000$. Overnight cost is $53$\,s in this configuration.}
+\label{tab:warm}
+\end{table}
+
+The table needs unpacking, because its best row costs nothing. Write the overnight estimate of the conditional expectation as $f$ and recall $\Lev = \sigDup/\sqrt{f}$. When the surface bumps, $\sigDup$ changes directly and is known analytically, so the numerator updates for free. The denominator $f = \E[V_t \mid X_t]$ changes only indirectly: the dynamics of $V$ are untouched, and the joint law of $(X, V)$ feels the bump solely through the feedback of the new leverage into the simulation, one order higher in the bump size. To first order the overnight $f$ is still correct. The strategy in the first row exploits exactly this, keeping the stored $f$ and refreshing only the numerator, $\Lev' = \sigma'_{\mathrm{Dup}}/\sqrt{f}$, with no simulation and no new estimation noise.
+
+\begin{remark}[Why the free refresh beats the full re-solve]\label{rem:jacobi}
+The stale-$f$ refresh at $142$\,bp beats the full re-solve at $186$\,bp by $44$\,bp in a paired comparison ($t = 2.4$). This is not a paradox. The re-solve targets the right surface but must re-estimate $f$ from scratch and therefore re-incurs the full calibration error floor of \cref{tab:cold}, while the refresh keeps an $f$ whose error under the bump is second order and adds nothing on top. The stored conditional expectation is more stable under a surface move than re-estimation is accurate. This is the staleness claim of \cref{sec:warmstart} in quantitative form, and it is the concrete sense in which the overnight solve pays for itself intraday.
+\end{remark}
+
+The $\beta$-corrections of the overnight-body programme land within noise of the free refresh here ($156$ against $142$\,bp), because at this bump size there is little first-order error left for the feedback to correct. Their expected regime is larger moves, and in particular moves in the dynamics parameters, which strike $f$ directly and invalidate the free refresh's premise; that regime is untested. The causal ridge sweep, a single forward pass re-fitting each slice from the frozen body, is the clear failure at $327$\,bp, worse than doing nothing. A causal pass re-accumulates the early-slice bias whatever the quality of the features, which is the same lesson \cref{tab:cold} teaches through the explicit column, seen a second way.
+
+The deployment recipe that emerges: solve implicitly overnight; intraday, refresh the Dupire numerator for free on every surface move; escalate to one or two damped $\beta$-corrections on large moves, at about a second each; reserve full re-solves for dynamics recalibration. The scope of these conclusions is one bump size and direction over ten runs, and the ranking of refresh against corrections should be read as provisional until a bump-magnitude sweep maps where each regime ends.
 
 \section{Risk paper outline}\label{sec:riskoutline}
 
