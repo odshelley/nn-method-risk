@@ -531,6 +531,20 @@ Causal ridge sweep & 327 & 1.0 \\
 
 The table needs unpacking, because its best row costs nothing. Write the overnight estimate of the conditional expectation as $f$ and recall $\Lev = \sigDup/\sqrt{f}$. When the surface bumps, $\sigDup$ changes directly and is known analytically, so the numerator updates for free. The denominator $f = \E[V_t \mid X_t]$ changes only indirectly: the dynamics of $V$ are untouched, and the joint law of $(X, V)$ feels the bump solely through the feedback of the new leverage into the simulation, one order higher in the bump size. To first order the overnight $f$ is still correct. The strategy in the first row exploits exactly this, keeping the stored $f$ and refreshing only the numerator, $\Lev' = \sigma'_{\mathrm{Dup}}/\sqrt{f}$, with no simulation and no new estimation noise.
 
+The mechanism admits a two-line expansion. Write $F(\Lev) \coloneqq \E^{\Lev}[V_t \mid X_t = \cdot\,]$ for the conditional-expectation map of \cref{eq:phimap}, so the overnight state is the fixed point $\Lev = \sigma/\sqrt{F(\Lev)}$ with stored $f = F(\Lev)$, and the refresh is one application of the bumped map at the old point, $\widetilde{\Lev} = \sigma'/\sqrt{f}$. Because $\sigma/\sqrt{f} = \Lev$ holds exactly, the refresh moves by
+\[
+  \widetilde{\Lev} - \Lev = \Lev\,\frac{\delta\sigma}{\sigma},
+\]
+with no error in $\delta\sigma$. The true recalibration $\Lev' = \Lev + \delta\Lev$ solves the bumped fixed-point equation, and linearising it around $\Lev$ with $A \coloneqq (\Lev/2f)\,DF(\Lev)$ gives $(\mathrm{Id} + A)\,\delta\Lev = \Lev\,\delta\sigma/\sigma$. Subtracting the two displays,
+\begin{equation}\label{eq:staleerr}
+  \widetilde{\Lev} - \Lev' = A(\mathrm{Id} + A)^{-1}\bigl(\Lev\,\delta\sigma/\sigma\bigr) + O(\norm{\delta\sigma}^2).
+\end{equation}
+The free refresh therefore captures the whole first-order move except the part routed through the feedback operator $A$, the response of the conditional expectation to a leverage change, which is the McKean nonlinearity itself.
+
+\begin{remark}[One constant governs staleness and convergence]\label{rem:stalespectral}
+The operator $A$ is, up to sign, the linearisation of the calibration map at its fixed point, $D\Phimap = -A$, so the relative staleness error in \cref{eq:staleerr} and the local contraction rate of the damped iteration \cref{eq:damped} are controlled by the same spectral radius. A market in which the implicit solve converges quickly is automatically one in which the stored $f$ survives surface bumps, and in the frozen-body configuration of \cref{sec:warmstart} this constant is measurable by power iteration on the $(d+1)\times(d+1)$ head Jacobian. Boundedness of $DF$ is what the Wasserstein Lipschitz stability of \citet{bayer2022rkhs} supplies for the regularised estimator. Two consequences frame the experiments. The crossover at which damped corrections overtake the free refresh sits near $\norm{\delta\sigma} \approx (\text{estimation floor})/\rho(A)$, and a bump in the dynamics parameters enters through $DF$ directly rather than through the numerator, which is why the free refresh's premise fails there.
+\end{remark}
+
 \begin{remark}[Why the free refresh beats the full re-solve]\label{rem:jacobi}
 The stale-$f$ refresh at $142$\,bp beats the full re-solve at $186$\,bp by $44$\,bp in a paired comparison ($t = 2.4$). This is not a paradox. The re-solve targets the right surface but must re-estimate $f$ from scratch and therefore re-incurs the full calibration error floor of \cref{tab:cold}, while the refresh keeps an $f$ whose error under the bump is second order and adds nothing on top. The stored conditional expectation is more stable under a surface move than re-estimation is accurate. This is the staleness claim of \cref{sec:warmstart} in quantitative form, and it is the concrete sense in which the overnight solve pays for itself intraday.
 \end{remark}
