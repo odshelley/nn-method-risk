@@ -4,12 +4,12 @@
 
 ## Table 1 — pooled accuracy and latency by algorithm (mean over scenarios and seeds)
 
-| Algorithm | N | Pooled RMSE (bp) | Pooled max (bp) | Wings RMSE (bp) | Calib. time (s) |
+| Algorithm | N | Pooled RMSE (bp) | Pooled max (bp) | Wings RMSE (bp) | Intraday calib. time (s) |
 |---|---|---|---|---|---|
 | implicit_nn | 50k | 154.0 | 559.7 | 196.2 | 149.5 |
 | implicit_nn | 200k | 154.0 | 550.7 | 196.5 | 154.9 |
-| implicit_ridge | 50k | 330.1 | 827.7 | 367.8 | 139.6 |
-| implicit_ridge | 200k | 334.3 | 835.9 | 371.4 | 143.0 |
+| implicit_ridge | 50k | 330.1 | 827.7 | 367.8 | 0.8 |
+| implicit_ridge | 200k | 334.3 | 835.9 | 371.4 | 1.3 |
 | nw | 50k | 335.3 | 861.8 | 375.8 | 0.9 |
 | ridge | 50k | 339.6 | 862.9 | 379.4 | 6.2 |
 | nw | 200k | 339.8 | 861.2 | 380.4 | 1.5 |
@@ -18,6 +18,8 @@
 | explicit_nn_is | 50k | 380.6 | 937.8 | 427.0 | 105.4 |
 | explicit_nn_is | 200k | 381.1 | 942.6 | 427.1 | 102.0 |
 | explicit_nn | 200k | 381.3 | 943.5 | 428.2 | 89.8 |
+
+implicit_ridge's time is the intraday ridge sweep only; its implicit solve (~142 s mean) is offline cost, reported in Table 4. All other algorithms calibrate fully in-line.
 
 ## Table 2 — RMSE by maturity (bp, N=200k)
 

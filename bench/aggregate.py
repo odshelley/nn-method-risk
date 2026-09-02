@@ -6,7 +6,7 @@ import pandas as pd
 
 METRIC_COLS = ("pooled_rmse_bp", "pooled_max_bp", "wings_rmse_bp", "wings_max_bp", "n_failed")
 COLUMNS = ("sid", "algo", "n_particles", "seed", "status") + METRIC_COLS + \
-          ("total_s", "fit_s", "git_hash")
+          ("total_s", "fit_s", "intraday_s", "git_hash")
 
 
 def aggregate(runs_dir="results/runs", out_csv="results/summary.csv",
@@ -25,6 +25,7 @@ def aggregate(runs_dir="results/runs", out_csv="results/summary.csv",
         for c in METRIC_COLS:
             row[c] = m.get(c)
         row["total_s"], row["fit_s"] = t.get("total_s"), t.get("fit_s")
+        row["intraday_s"] = (d.get("diagnostics") or {}).get("intraday_s")
         row["git_hash"] = d.get("git_hash")
         rows.append(row)
     df = pd.DataFrame(rows, columns=COLUMNS)
