@@ -38,6 +38,9 @@ def _nn(sc, n, seed, cfg): return _explicit(sc, n, seed, cfg, "nn")
 def _ridge(sc, n, seed, cfg): return _explicit(sc, n, seed, cfg, "ridge")
 
 
+def _spline(sc, n, seed, cfg): return _explicit(sc, n, seed, cfg, "spline")
+
+
 def _nn_is(sc, n, seed, cfg):
     mix = design_mixture(sc.dynamics, sc.T)
     return _explicit(sc, n, seed, cfg, "nn", mixture=mix)
@@ -79,7 +82,7 @@ def _implicit_ridge(sc, n, seed, cfg):
 
 
 ALGOS = {"nw": _nw, "explicit_nn": _nn, "ridge": _ridge,
-         "explicit_nn_is": _nn_is, "implicit_nn": _implicit,
+         "explicit_nn_is": _nn_is, "implicit_nn": _implicit, "spline": _spline,
          "implicit_ridge": _implicit_ridge}
 
 
