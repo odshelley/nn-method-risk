@@ -48,3 +48,18 @@ implicit_ridge's time is the intraday ridge sweep only; its implicit solve (~142
 Mean overnight (implicit solve + distillation): 142 s. Mean intraday (causal ridge sweep): 1.34 s.
 
 Notes: 50k vs 200k differ by <2 percent everywhere (bias-dominated regime); importance sampling matches explicit_nn within noise on this quote grid (see analysis in session log); spline (P-spline head) runs at ridge-class latency and is statistically indistinguishable from NW (paired +1.2 bp, t=0.5), slightly ahead of the frozen-feature ridge (paired +7.7 bp, t=2.6).
+
+## Table 5 — warm intraday recalibration on a bumped surface (10 pairs: 5 scenarios x 2 seeds, N=200k)
+
+Protocol: overnight implicit solve + head distillation on surface S; surface bumped to S' (sigma0 +0.01, eta x0.95, rho +0.03); strategies reprice against S'. Cold-calibration Table 1 has no overnight state, so these rows are not comparable to it row-by-row.
+
+| Intraday strategy | Pooled RMSE (bp) | Intraday cost (s) |
+|---|---|---|
+| stale f, fresh Dupire (free Jacobi step) | 142.1 | 0.00 |
+| 1 damped beta-correction | 169.3 | 0.64 |
+| 2 damped beta-corrections | 155.9 | 1.26 |
+| stale L (no action) | 192.9 | 0.00 |
+| full re-solve (warm explicit + implicit) | 186.4 | 52.99 |
+| causal ridge sweep | 327.0 | 0.97 |
+
+Overnight cost (implicit solve + distillation): 53 s mean. The free Jacobi step beats the full re-solve by 44 bp paired (t = 2.4) because the conditional expectation is second-order stable under surface bumps while re-solving re-incurs the full calibration noise. Beta-corrections match it within noise here; they are expected to matter on larger moves or dynamics changes (untested).
