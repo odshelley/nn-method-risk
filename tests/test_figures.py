@@ -24,11 +24,11 @@ def _runs(tmp_path):
         for algo in ("nw", "explicit_nn", "explicit_nn_is"):
             d = tmp_path / "runs" / sid / algo
             d.mkdir(parents=True, exist_ok=True)
-            doc = {"schema": 1, "sid": sid, "algo": algo, "n_particles": 50_000, "seed": 0,
+            doc = {"schema": 1, "sid": sid, "algo": algo, "n_particles": 200_000, "seed": 0,
                    "status": "ok", "iv_err_bp": [[float(i - 6) for i in range(13)]] * 4,
                    "diagnostics": {"is_diag": {"max_w": 1.8, "ess_frac": 0.6}} if "is" in algo else {},
                    "scenario": {"maturities": [0.25, 0.5, 1.0, 2.0]}}
-            (d / "n50000_s0.json").write_text(json.dumps(doc))
+            (d / "n200000_s0.json").write_text(json.dumps(doc))
     return tmp_path / "runs"
 
 @pytest.mark.parametrize("mod", [f1, f2, f3, f4])

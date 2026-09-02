@@ -1,13 +1,14 @@
 """Run one (scenario, algo, N, seed) and write a self-describing result JSON."""
 import dataclasses
 import json
+import os
 import subprocess
 import traceback
 from pathlib import Path
 
 import numpy as np
 
-from neural_particle_method.reprice import reprice_iv, iv_metrics
+from neural_particle_method.reprice import reprice_iv, iv_metrics, snap_times
 from neural_particle_method.ssvi import implied_vol_ssvi
 
 from .algos import run_algo
@@ -40,7 +41,7 @@ def _jsonable(x):
 
 
 def run_one(sid, algo, n_particles, seed, results_dir="results/runs", cfg=None,
-            reprice_particles=500_000, reprice_steps=100):
+            reprice_particles=500_000, reprice_steps=200):
     sc = full_registry()[sid]
     out = run_path(sid, algo, n_particles, seed, results_dir)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -55,12 +56,15 @@ def run_one(sid, algo, n_particles, seed, results_dir="results/runs", cfg=None,
         iv_model = reprice_iv(res.L_records, sc.dynamics, sc.s0, mats, k,
                               n_particles=reprice_particles, n_steps=reprice_steps,
                               seed=seed + 10_000)
-        iv_target = np.stack([implied_vol_ssvi(sc.ssvi, k, m) for m in mats])
+        ts = snap_times(mats, reprice_steps)
+        iv_target = np.stack([implied_vol_ssvi(sc.ssvi, k, t) for t in ts])
         doc.update(status="ok", timings=_jsonable(res.timings),
                    diagnostics=_jsonable(res.diagnostics),
                    metrics=_jsonable(iv_metrics(iv_model, iv_target, k, mats)),
                    iv_err_bp=_jsonable(((iv_model - iv_target) * 1e4).tolist()))
     except Exception:
         doc.update(status="failed", error=traceback.format_exc())
-    out.write_text(json.dumps(doc, indent=1))
+    tmp = out.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(doc, indent=1))
+    os.replace(tmp, out)
     return out

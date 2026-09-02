@@ -30,6 +30,18 @@ def test_aggregate_empty_runs_dir(tmp_path):
     assert "0 runs, 0 failed" in md
 
 
+def test_aggregate_skips_unreadable_json(tmp_path):
+    d = tmp_path / "s01" / "nw"; d.mkdir(parents=True)
+    (d / "n1000_s0.json").write_text(json.dumps(OK))
+    (d / "n1000_s1.json.tmp").write_text("")  # not *.json, shouldn't even be picked up
+    (d / "n2000_s0.json").write_text("{truncated garbage, not valid json")
+    df = aggregate(tmp_path, tmp_path / "summary.csv", tmp_path / "digest.md")
+    assert len(df) == 1
+    assert (tmp_path / "summary.csv").exists()
+    md = (tmp_path / "digest.md").read_text()
+    assert "1 unreadable" in md
+
+
 def test_aggregate_out_md_dir_is_created(tmp_path, monkeypatch):
     # out_csv and out_md land under two different, not-yet-existing directories;
     # aggregate() must mkdir both parents rather than relying on the cwd having results/.

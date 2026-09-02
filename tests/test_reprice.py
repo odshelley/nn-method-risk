@@ -1,5 +1,5 @@
 import numpy as np
-from neural_particle_method.reprice import L_lookup, reprice_iv, iv_metrics
+from neural_particle_method.reprice import L_lookup, reprice_iv, iv_metrics, snap_times
 
 FLAT_DYN = {"kappa": 0.0, "theta": 0.04, "xi": 0.0, "rho": 0.0, "v0": 0.04}
 
@@ -27,6 +27,28 @@ def test_reprice_iv_handles_snapshot_collision():
     assert np.all(np.isfinite(ivs[0]))
     assert np.all(np.isfinite(ivs[1]))
     assert np.all(np.isfinite(ivs[2]))
+
+def test_snap_times_matches_reprice_iv_grid():
+    # T=0.5, n_steps=25 -> dt=0.02; 0.25/0.02=12.5 is deliberately off-grid.
+    ts = snap_times([0.25, 0.5], n_steps=25, T=0.5)
+    assert np.isclose(ts[0], 12 * 0.02)   # round(12.5) -> 12 (banker's rounding), not 0.25
+    assert np.isclose(ts[1], 25 * 0.02)   # exactly on-grid already
+
+def test_reprice_iv_inverts_at_snapped_time_not_requested_maturity():
+    # Flat GBM (xi=0, kappa=0, v0=0.04 -> vol sqrt(v0)=0.2): since vol is constant,
+    # the true IV is 0.2 at ANY evaluation time, so this isolates the inversion-time
+    # bug cleanly. maturities=[0.25, 0.5] with n_steps=25 over T=max(maturities)=0.5
+    # gives dt=0.02; 0.25/0.02=12.5 is deliberately off-grid (snaps to step 12,
+    # t=0.24) while 0.5 lands exactly on step 25. Inverting the off-grid row's
+    # price at the requested m=0.25 instead of the snapped t=0.24 mixes a price
+    # simulated to 0.24 with a 0.25-maturity BS formula, producing a large biased
+    # IV error; inverting at the snapped time removes it.
+    ivs = reprice_iv(const_records(1.0, T=0.5, n=4), FLAT_DYN, s0=1.0,
+                     maturities=[0.25, 0.5], k_grid=np.log(np.array([0.95, 1.0, 1.05])),
+                     n_particles=500_000, n_steps=25, seed=11)
+    row_mean_err_bp = np.abs(ivs - 0.2).mean(axis=1) * 1e4
+    assert row_mean_err_bp[0] < 15.0, f"misaligned row (m=0.25): {row_mean_err_bp[0]:.1f} bp"
+    assert row_mean_err_bp[1] < 15.0, f"aligned row (m=0.5): {row_mean_err_bp[1]:.1f} bp"
 
 def test_iv_metrics_shapes():
     k = np.log(np.array([0.7, 1.0, 1.5]))

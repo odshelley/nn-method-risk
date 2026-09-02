@@ -18,14 +18,27 @@ def L_lookup(L_records):
     return L
 
 
+def snap_times(maturities, n_steps, T=None):
+    """Grid-snapped time for each requested maturity, mirroring reprice_iv's dt exactly."""
+    T = max(maturities) if T is None else T
+    dt = T / n_steps
+    return [int(round(m / dt)) * dt for m in maturities]
+
+
 def reprice_iv(L_records, dynamics, s0, maturities, k_grid,
-               n_particles=500_000, n_steps=100, seed=10_000):
-    """Simulate fresh paths under L, price calls at each maturity, invert to IV."""
+               n_particles=500_000, n_steps=200, seed=10_000):
+    """Simulate fresh paths under L, price calls at each maturity, invert to IV.
+
+    Each requested maturity snaps to the nearest simulation step; the price is
+    inverted at that SNAPPED time, not the requested maturity, since that is the
+    time the simulated cloud actually reached.
+    """
     kappa, theta, xi, rho, v0 = (dynamics[k] for k in ("kappa", "theta", "xi", "rho", "v0"))
     L = L_lookup(L_records)
     rng = np.random.default_rng(seed)
     T = max(maturities)
     dt, sdt = T / n_steps, np.sqrt(T / n_steps)
+    t_snap = dict(zip(maturities, snap_times(maturities, n_steps, T)))
     snap = {}
     for m in maturities:
         snap.setdefault(int(round(m / dt)), []).append(m)
@@ -48,7 +61,7 @@ def reprice_iv(L_records, dynamics, s0, maturities, k_grid,
                 for j, k in enumerate(k_grid):
                     K = s0 * np.exp(k)
                     price = float(np.mean(np.maximum(x - K, 0.0)))
-                    ivs[mat_idx[m], j] = implied_vol(price, s0, K, m)
+                    ivs[mat_idx[m], j] = implied_vol(price, s0, K, t_snap[m])
     return ivs
 
 

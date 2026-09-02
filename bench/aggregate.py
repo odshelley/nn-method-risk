@@ -12,8 +12,14 @@ COLUMNS = ("sid", "algo", "n_particles", "seed", "status") + METRIC_COLS + \
 def aggregate(runs_dir="results/runs", out_csv="results/summary.csv",
               out_md="results/digest.md"):
     rows = []
+    n_unreadable = 0
     for p in sorted(Path(runs_dir).rglob("*.json")):
-        d = json.loads(p.read_text())
+        try:
+            d = json.loads(p.read_text())
+        except (ValueError, OSError) as e:
+            n_unreadable += 1
+            print(f"warning: skipping unreadable run file {p}: {e}")
+            continue
         row = {k: d.get(k) for k in ("sid", "algo", "n_particles", "seed", "status")}
         m, t = d.get("metrics") or {}, d.get("timings") or {}
         for c in METRIC_COLS:
@@ -25,7 +31,8 @@ def aggregate(runs_dir="results/runs", out_csv="results/summary.csv",
     Path(out_csv).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_csv, index=False)
     n_fail = int((df.status == "failed").sum())
-    lines = [f"# Benchmark digest", f"{len(df)} runs, {n_fail} failed", ""]
+    lines = [f"# Benchmark digest",
+             f"{len(df)} runs, {n_fail} failed, {n_unreadable} unreadable", ""]
     ok = df[df.status == "ok"]
     if len(ok):
         best = ok.groupby(["sid", "algo"]).pooled_rmse_bp.mean().reset_index() \

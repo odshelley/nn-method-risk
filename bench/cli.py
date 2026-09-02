@@ -40,7 +40,7 @@ def main(argv=None):
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--n-steps", type=int, default=None)
     p.add_argument("--reprice-n", type=int, default=500_000)
-    p.add_argument("--reprice-steps", type=int, default=100)
+    p.add_argument("--reprice-steps", type=int, default=200)
     p.add_argument("--results-dir", default="results/runs")
     p = sub.add_parser("sweep")
     p.add_argument("--preset", default="paper", choices=["paper"])
@@ -90,11 +90,7 @@ def main(argv=None):
         print(f"{len(df)} runs -> {args.out}")
         return 0
     if args.cmd == "figures":
-        try:
-            import figures.fig1_accuracy, figures.fig2_wings, figures.fig3_plane, figures.fig4_latency
-        except ImportError:
-            print("no figure modules")
-            return 0
+        import figures.fig1_accuracy, figures.fig2_wings, figures.fig3_plane, figures.fig4_latency
         Path(args.outdir).mkdir(parents=True, exist_ok=True)
         for mod in (figures.fig1_accuracy, figures.fig2_wings,
                     figures.fig3_plane, figures.fig4_latency):
