@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 
 from neural_particle_method.explicit import calibrate_explicit
-from neural_particle_method.implicit import calibrate_implicit
+from neural_particle_method.implicit import GlobalRidgeHead, calibrate_implicit
 from neural_particle_method.importance import design_mixture
 from neural_particle_method.ssvi import SSVILocalVol
 
@@ -56,8 +56,31 @@ def _implicit(sc, n, seed, cfg):
                        {"deltas": info["deltas"]})
 
 
+def _implicit_ridge(sc, n, seed, cfg):
+    lv = SSVILocalVol(sc.ssvi, sc.s0, T_max=sc.T)
+    warm = _explicit(sc, n, seed, cfg, "nn")
+    t0 = time.perf_counter()
+    recs, info = calibrate_implicit(
+        lv, sc.dynamics, s0=sc.s0, T=sc.T, n_steps=_cfg(cfg, "n_steps", 50),
+        n_particles=n, alpha=_cfg(cfg, "alpha", 0.5), n_iters=_cfg(cfg, "n_iters", 6),
+        seed=seed, fit_steps=_cfg(cfg, "fit_steps", 300), L0_records=warm.L_records)
+    overnight = time.perf_counter() - t0 + warm.timings["total_s"]
+    head = GlobalRidgeHead(info["net"], sc.T)
+    t1 = time.perf_counter()
+    _, einfo = calibrate_explicit(
+        lv, sc.dynamics, s0=sc.s0, T=sc.T, n_steps=_cfg(cfg, "n_steps", 50),
+        n_particles=n, fit_subsample=_cfg(cfg, "fit_subsample", 30_000),
+        seed=seed + 1, regressor=head)
+    intraday = time.perf_counter() - t1
+    return CalibResult(einfo["L_records"],
+                       {"total_s": overnight + intraday, "fit_s": einfo["fit_s"]},
+                       {"deltas": info["deltas"], "overnight_s": overnight,
+                        "intraday_s": intraday})
+
+
 ALGOS = {"nw": _nw, "explicit_nn": _nn, "ridge": _ridge,
-         "explicit_nn_is": _nn_is, "implicit_nn": _implicit}
+         "explicit_nn_is": _nn_is, "implicit_nn": _implicit,
+         "implicit_ridge": _implicit_ridge}
 
 
 def run_algo(name, scenario, n_particles, seed, cfg=None):

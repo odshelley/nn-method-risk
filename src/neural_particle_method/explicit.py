@@ -8,7 +8,7 @@ from .condexp import NNRegressor, RidgeHead, nw_estimate, spline_estimate
 
 def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=200_000,
                        method="nn", fit_subsample=30_000, seed=0, L_max=4.0,
-                       first_steps=400, later_steps=120, snapshot_times=(), mixture=None):
+                       first_steps=400, later_steps=120, snapshot_times=(), mixture=None, regressor=None):
     """Single forward pass. Returns terminal lnX, diagnostics with L on per-slice grids,
     and lnX snapshots at requested times.
 
@@ -27,7 +27,7 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
 
     lnx = np.full(n_particles, np.log(s0))
     v = np.full(n_particles, v0)
-    reg = NNRegressor(seed=seed) if method == "nn" else (RidgeHead(seed=seed) if method == "ridge" else None)
+    reg = None if regressor is not None else (NNRegressor(seed=seed) if method == "nn" else (RidgeHead(seed=seed) if method == "ridge" else None))
 
     L_records, snapshots, snapshot_weights = [], {}, {}
     snap_steps = {int(round(t / dt)): t for t in snapshot_times}
@@ -52,7 +52,9 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
             idx = rng.choice(n_particles, size=min(fit_subsample, n_particles), replace=False)
             wi = None if w is None else w[idx]
             t0 = time.perf_counter()
-            if method == "nn":
+            if regressor is not None:
+                f_grid = regressor.fit_predict(t, lnx[idx], v[idx], grid, weights=wi)
+            elif method == "nn":
                 reg.fit(lnx[idx], v[idx], steps=first_steps if k == 1 else later_steps, weights=wi)
                 f_grid = reg.predict(grid)
             elif method == "ridge":
