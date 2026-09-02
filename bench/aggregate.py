@@ -32,5 +32,6 @@ def aggregate(runs_dir="results/runs", out_csv="results/summary.csv",
                  .sort_values("pooled_rmse_bp").groupby("sid").first()
         for sid, r in best.iterrows():
             lines.append(f"- {sid}: best = {r.algo} ({r.pooled_rmse_bp:.1f} bp)")
+    Path(out_md).parent.mkdir(parents=True, exist_ok=True)
     Path(out_md).write_text("\n".join(lines) + "\n")
     return df

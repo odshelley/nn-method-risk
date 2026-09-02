@@ -28,3 +28,19 @@ def test_aggregate_empty_runs_dir(tmp_path):
     assert (tmp_path / "summary_empty.csv").exists()
     md = (tmp_path / "digest_empty.md").read_text()
     assert "0 runs, 0 failed" in md
+
+
+def test_aggregate_out_md_dir_is_created(tmp_path, monkeypatch):
+    # out_csv and out_md land under two different, not-yet-existing directories;
+    # aggregate() must mkdir both parents rather than relying on the cwd having results/.
+    monkeypatch.chdir(tmp_path)
+    runs = tmp_path / "runs"
+    d = runs / "s01" / "nw"; d.mkdir(parents=True)
+    (d / "n1000_s0.json").write_text(json.dumps(OK))
+    csv_dir = tmp_path / "csv_out"
+    md_dir = tmp_path / "md_out"
+    assert not csv_dir.exists() and not md_dir.exists()
+    df = aggregate(runs, csv_dir / "summary.csv", md_dir / "digest.md")
+    assert len(df) == 1
+    assert (csv_dir / "summary.csv").exists()
+    assert (md_dir / "digest.md").exists()
