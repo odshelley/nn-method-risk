@@ -1,0 +1,39 @@
+{
+ "rmse_bp": {
+  "s0.5/scale_eff": 0.5,
+  "s0.5/refresh": 109.339986395,
+  "s0.5/ridge_1": 44.943124342,
+  "s0.5/full_resolve": 176.96857093,
+  "s1/scale_eff": 1.0,
+  "s1/refresh": 107.825624808,
+  "s1/ridge_1": 45.193012576,
+  "s1/full_resolve": 174.46056016,
+  "s2/scale_eff": 2.0,
+  "s2/refresh": 105.649554242,
+  "s2/ridge_1": 46.765351961,
+  "s2/full_resolve": 168.677716756,
+  "s4/scale_eff": 4.0,
+  "s4/refresh": 105.551952171,
+  "s4/ridge_1": 53.323621752,
+  "s4/full_resolve": 156.813457037
+ },
+ "build_s": {
+  "overnight": 55.32,
+  "s0.5/refresh": 0.0,
+  "s0.5/ridge_1": 0.68,
+  "s0.5/full_resolve": 52.9,
+  "s1/refresh": 0.0,
+  "s1/ridge_1": 0.66,
+  "s1/full_resolve": 53.48,
+  "s2/refresh": 0.0,
+  "s2/ridge_1": 0.66,
+  "s2/full_resolve": 53.57,
+  "s4/refresh": 0.0,
+  "s4/ridge_1": 0.68,
+  "s4/full_resolve": 53.65
+ },
+ "arm": "xover",
+ "sid": "s01",
+ "seed": 0,
+ "wall_s": 243.7
+}

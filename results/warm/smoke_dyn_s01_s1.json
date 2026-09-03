@@ -1,0 +1,42 @@
+{
+ "rmse_bp": {
+  "anchor_unbumped": 411.751453656,
+  "xi_up/do_nothing": 404.054287652,
+  "xi_up/ridge_1": 231.819095384,
+  "xi_up/ridge_2": 262.548903608,
+  "xi_up/kalman_1": 260.23787319,
+  "xi_up/full_resolve": 261.16299683,
+  "rho_dn/do_nothing": 386.637240955,
+  "rho_dn/ridge_1": 291.361758226,
+  "rho_dn/ridge_2": 274.783064138,
+  "rho_dn/kalman_1": 238.179053603,
+  "rho_dn/full_resolve": 206.16910272,
+  "kappa_dn/do_nothing": 359.930654877,
+  "kappa_dn/ridge_1": 198.749145066,
+  "kappa_dn/ridge_2": 229.147628217,
+  "kappa_dn/kalman_1": 208.35121581,
+  "kappa_dn/full_resolve": 229.007423405
+ },
+ "build_s": {
+  "overnight": 8.25,
+  "xi_up/do_nothing": 0.0,
+  "xi_up/ridge_1": 0.02,
+  "xi_up/ridge_2": 0.04,
+  "xi_up/kalman_1": 0.02,
+  "xi_up/full_resolve": 7.41,
+  "rho_dn/do_nothing": 0.0,
+  "rho_dn/ridge_1": 0.02,
+  "rho_dn/ridge_2": 0.04,
+  "rho_dn/kalman_1": 0.02,
+  "rho_dn/full_resolve": 7.35,
+  "kappa_dn/do_nothing": 0.0,
+  "kappa_dn/ridge_1": 0.02,
+  "kappa_dn/ridge_2": 0.04,
+  "kappa_dn/kalman_1": 0.02,
+  "kappa_dn/full_resolve": 7.37
+ },
+ "arm": "dyn",
+ "sid": "s01",
+ "seed": 1,
+ "wall_s": 34.3
+}

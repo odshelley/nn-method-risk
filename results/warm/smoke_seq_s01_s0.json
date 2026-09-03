@@ -1,0 +1,77 @@
+{
+ "rmse_bp": {
+  "steps": [
+   {
+    "refresh": 198.706508908,
+    "ridge": 310.00869755,
+    "kalman": 362.171319307,
+    "kalman_spline": 345.782866708,
+    "resolve_warm": 193.738794591
+   },
+   {
+    "refresh": 292.272600857,
+    "ridge": 368.07362425,
+    "kalman": 484.881980628,
+    "kalman_spline": 420.602258162,
+    "resolve_warm": 222.348589605
+   },
+   {
+    "refresh": 259.312099189,
+    "ridge": 275.386233903,
+    "kalman": 355.8162724,
+    "kalman_spline": 232.339884688,
+    "resolve_warm": 254.854325614
+   }
+  ],
+  "resolve_cold_final": 305.573835618,
+  "path": [
+   {
+    "sigma0": 0.2588289385950943,
+    "eta": 0.5272466820076916,
+    "gamma": 0.33753791537638594,
+    "rho": -0.19115376436471693
+   },
+   {
+    "sigma0": 0.25904350234266166,
+    "eta": 0.5349667756944294,
+    "gamma": 0.33753791537638594,
+    "rho": -0.2038561586435146
+   },
+   {
+    "sigma0": 0.25844425993616915,
+    "eta": 0.5313621801823687,
+    "gamma": 0.33753791537638594,
+    "rho": -0.1979310297871984
+   }
+  ]
+ },
+ "build_s": {
+  "overnight": 9.55,
+  "step_0": {
+   "refresh": 0.0,
+   "ridge": 0.03,
+   "kalman": 0.02,
+   "kalman_spline": 0.07,
+   "resolve_warm": 4.65
+  },
+  "step_1": {
+   "refresh": 0.0,
+   "ridge": 0.03,
+   "kalman": 0.02,
+   "kalman_spline": 0.04,
+   "resolve_warm": 3.94
+  },
+  "step_2": {
+   "refresh": 0.0,
+   "ridge": 0.02,
+   "kalman": 0.02,
+   "kalman_spline": 0.03,
+   "resolve_warm": 4.1
+  },
+  "resolve_cold_final": 7.52
+ },
+ "arm": "seq",
+ "sid": "s01",
+ "seed": 0,
+ "wall_s": 24.2
+}

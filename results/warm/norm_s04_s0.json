@@ -1,0 +1,15 @@
+{
+ "A_norm_history": [
+  0.6088,
+  0.0496,
+  0.275,
+  0.3486
+ ],
+ "A_norm": 0.3486,
+ "error_fraction_pred": 0.2585,
+ "eps": 0.02,
+ "arm": "norm",
+ "sid": "s04",
+ "seed": 0,
+ "wall_s": 2.9
+}

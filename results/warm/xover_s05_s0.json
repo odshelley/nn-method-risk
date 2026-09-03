@@ -1,0 +1,39 @@
+{
+ "rmse_bp": {
+  "s0.5/scale_eff": 0.5,
+  "s0.5/refresh": 186.374680141,
+  "s0.5/ridge_1": 179.530872536,
+  "s0.5/full_resolve": 139.933468586,
+  "s1/scale_eff": 1.0,
+  "s1/refresh": 172.850887867,
+  "s1/ridge_1": 168.050519127,
+  "s1/full_resolve": 134.823797027,
+  "s2/scale_eff": 2.0,
+  "s2/refresh": 149.24591665,
+  "s2/ridge_1": 148.10988572,
+  "s2/full_resolve": 123.172971118,
+  "s4/scale_eff": 4.0,
+  "s4/refresh": 127.089024755,
+  "s4/ridge_1": 124.401817328,
+  "s4/full_resolve": 101.421215825
+ },
+ "build_s": {
+  "overnight": 53.84,
+  "s0.5/refresh": 0.0,
+  "s0.5/ridge_1": 0.64,
+  "s0.5/full_resolve": 53.07,
+  "s1/refresh": 0.0,
+  "s1/ridge_1": 0.66,
+  "s1/full_resolve": 53.08,
+  "s2/refresh": 0.0,
+  "s2/ridge_1": 0.66,
+  "s2/full_resolve": 52.71,
+  "s4/refresh": 0.0,
+  "s4/ridge_1": 0.66,
+  "s4/full_resolve": 52.4
+ },
+ "arm": "xover",
+ "sid": "s05",
+ "seed": 0,
+ "wall_s": 240.5
+}

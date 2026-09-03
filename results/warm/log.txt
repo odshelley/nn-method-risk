@@ -1,0 +1,26 @@
+dyn s01 s0: done in 264.9s
+dyn s01 s1: done in 262.8s
+dyn s02 s0: done in 263.2s
+dyn s02 s1: done in 260.5s
+dyn s03 s0: done in 259.1s
+dyn s03 s1: done in 259.9s
+dyn s04 s0: done in 257.4s
+dyn s04 s1: done in 257.0s
+dyn s05 s0: done in 261.6s
+dyn s05 s1: done in 260.7s
+seq s01 s0: done in 201.7s
+seq s02 s0: done in 197.7s
+seq s03 s0: done in 197.1s
+seq s04 s0: done in 191.3s
+seq s05 s0: done in 199.1s
+xover s01 s0: done in 243.7s
+xover s02 s0: done in 239.8s
+xover s03 s0: done in 241.0s
+xover s04 s0: done in 239.3s
+xover s05 s0: done in 240.5s
+norm s01 s0: done in 3.1s
+norm s02 s0: done in 3.1s
+norm s03 s0: done in 3.0s
+norm s04 s0: done in 2.9s
+norm s05 s0: done in 3.1s
+all jobs done

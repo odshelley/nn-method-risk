@@ -1,0 +1,25 @@
+{
+ "rmse_bp": {
+  "s1/scale_eff": 1.0,
+  "s1/refresh": 343.693340453,
+  "s1/ridge_1": 453.302523231,
+  "s1/full_resolve": 136.954237949,
+  "s4/scale_eff": 4.0,
+  "s4/refresh": 326.658964754,
+  "s4/ridge_1": 424.623239109,
+  "s4/full_resolve": 116.275253618
+ },
+ "build_s": {
+  "overnight": 9.55,
+  "s1/refresh": 0.0,
+  "s1/ridge_1": 0.02,
+  "s1/full_resolve": 7.62,
+  "s4/refresh": 0.0,
+  "s4/ridge_1": 0.02,
+  "s4/full_resolve": 7.62
+ },
+ "arm": "xover",
+ "sid": "s01",
+ "seed": 0,
+ "wall_s": 16.7
+}
