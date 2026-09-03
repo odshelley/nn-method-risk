@@ -592,9 +592,39 @@ The operator $A$ is, up to sign, the linearisation of the calibration map at its
 The stale-$f$ refresh at $142$\,bp beats the full re-solve at $186$\,bp by $44$\,bp in a paired comparison ($t = 2.4$). This is not a paradox. The re-solve targets the right surface but must re-estimate $f$ from scratch and therefore re-incurs the full calibration error floor of \cref{tab:cold}, while the refresh keeps an $f$ whose error under the bump is second order and adds nothing on top. This is the staleness claim of \cref{sec:warmstart} in quantitative form, and it is the concrete sense in which the overnight solve pays for itself intraday.
 \end{remark}
 
-The $\beta$-corrections of the overnight-body programme land within noise of the free refresh here ($156$ against $142$\,bp), because at this bump size there is little first-order error left for the feedback to correct. Their expected regime is larger moves, and in particular moves in the dynamics parameters, which strike $f$ directly and invalidate the free refresh's premise. That regime is untested. The causal ridge sweep, a single forward pass re-fitting each slice from the frozen body, is the clear failure at $327$\,bp, worse than doing nothing. A causal pass re-accumulates the early-slice bias whatever the quality of the features, which is the same lesson \cref{tab:cold} teaches through the explicit column, seen a second way.
+The $\beta$-corrections of the overnight-body programme land within noise of the free refresh here ($156$ against $142$\,bp), because at this bump size there is little first-order error left for the feedback to correct. Their expected regime is larger moves, and in particular moves in the dynamics parameters, which strike $f$ directly and invalidate the free refresh's premise. Both regimes are tested in \cref{subsec:warmsuite}. The causal ridge sweep, a single forward pass re-fitting each slice from the frozen body, is the clear failure at $327$\,bp, worse than doing nothing. A causal pass re-accumulates the early-slice bias whatever the quality of the features, which is the same lesson \cref{tab:cold} teaches through the explicit column, seen a second way.
 
-The deployment recipe follows. Solve implicitly overnight. Refresh the Dupire numerator for free on every intraday surface move. Escalate to one or two damped $\beta$-corrections on large moves, at about a second each. Reserve full re-solves for changes in the dynamics. The scope of these conclusions is one bump size and direction over ten runs, and the ranking of refresh against corrections should be read as provisional until a bump-magnitude sweep maps where each regime ends.
+The deployment recipe follows. Solve implicitly overnight. Refresh the Dupire numerator for free on every intraday surface move, and add one damped $\beta$-correction when a second of latency is available. Reserve full re-solves for the overnight cycle. The stress tests of \cref{subsec:warmsuite} support each clause, including the last one in a form stronger than expected, since even re-marks of the dynamics parameters are better absorbed by a correction on the frozen body than by re-solving.
+
+\subsection{Stress tests of the warm-start policy}\label{subsec:warmsuite}
+
+Four further experiments on the scenarios of the bump study probe the edges of the free refresh's regime. A bump-magnitude sweep scales the standard surface bump, a dynamics arm re-marks the Heston parameters with the surface held fixed, a sequential arm strings six cumulative bumps into a trading day, and a measurement arm estimates the feedback norm $\norm{A}$ directly. Alongside the damped ridge correction, each arm also runs a recursive least-squares head, carried per slice as a state $(\beta_k, \Lambda_k)$ with $\Lambda_k$ the posterior precision, in which the overnight fit counts as $n_{\mathrm{prior}}$ effective samples of the batch's per-sample information $A^\top A/(nr)$, each intraday batch contributes $n_{\mathrm{eff}} \ll n$ because particles within a batch share simulation error, and a forgetting factor inflates the covariance between updates so the head can track drift.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lccc}
+\toprule
+bump scale & free refresh & one correction & full re-solve \\
+\midrule
+$0.5\times$ & $143$ & $128$ & $212$ \\
+$1\times$   & $137$ & $124$ & $208$ \\
+$2\times$   & $133$ & $122$ & $196$ \\
+$4\times$   & $142$ & $124$ & $182$ \\
+\bottomrule
+\end{tabular}
+\caption{Bump-magnitude sweep, pooled repricing RMSE in bp across five scenarios. The re-solve improves with bump size but never crosses the refresh, so the crossover of \cref{rem:stalespectral} lies beyond four times a normal intraday move.}
+\label{tab:xover}
+\end{table}
+
+The sweep in \cref{tab:xover} finds no crossover. The refresh is flat in the bump size, exactly as \cref{eq:staleerr} predicts when $\norm{A}$ is small, and the re-solve narrows the gap as its fixed floor is diluted by a growing signal but remains at least $40$\,bp behind at four times the standard bump. The sweep also sharpens the reading of the corrections. Paired across the twenty bump instances, one damped correction beats the refresh by $14$\,bp ($t = 2.45$) at $0.6$\,s, a modest but consistent gain that the ten-run study above could not resolve.
+
+The dynamics arm re-marks $\xi$ by a factor $1.3$, $\rho$ by $-0.15$, and $\kappa$ by a factor $0.6$, the regime in which the refresh has no numerator to update and the staleness enters through $DF$ directly. The floor still dominates. Doing nothing scores $139$ to $193$\,bp across the three re-marks, one ridge correction improves this to $126$ to $180$\,bp and is best in every column, and the full re-solve is worst at $231$ to $269$\,bp for $53$\,s, because it re-incurs the whole calibration floor, which the harder bumped dynamics raise further.
+
+The sequential arm draws six cumulative surface bumps as a random walk, with per-step increments of $0.004$ in $\sigma_0$, two percent in $\eta$, and $0.015$ in $\rho_s$. The refresh shows no error accumulation, moving from $185$\,bp at the first step to $197$\,bp at the sixth, and no per-step correction scheme beats it along the path. A single cold re-solve at the end of the day reaches $140$\,bp against the day-stale refresh's $197$, which is the empirical form of the two-timescale deployment, refresh intraday and re-solve overnight.
+
+The recursive least-squares head loses to the damped ridge in every arm under this tuning ($n_{\mathrm{prior}} = 4000$, $n_{\mathrm{eff}} = 2000$, forgetting factor $0.85$). A plausible mechanism is that it shrinks each slice toward its own overnight coefficients independently, and so lacks the across-slice threading that the residual penalty of \cref{sec:warmstart} provides. The negative is confined to this recipe, and a variant with cross-slice coupling in the state remains untried.
+
+The measurement arm estimates $\norm{A}$ by power iteration, evaluating $DF$ as a finite difference of the simulate-and-refit map under common random numbers at a two percent perturbation of the leverage. The estimates range from $0.05$ to $0.51$ across the five scenarios, and they order the scenarios' refresh errors nearly monotonically, Spearman $0.8$, with the smallest estimate paired with $113$\,bp at the largest bump and the largest with $174$\,bp. This is direct empirical support for \cref{rem:stalespectral}, with the caveat that four power iterations do not fully converge, so the values are indicative rather than sharp.
 
 \section{Risk paper outline}\label{sec:riskoutline}
 
