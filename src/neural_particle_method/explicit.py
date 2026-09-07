@@ -4,6 +4,8 @@ import time
 import numpy as np
 
 from .condexp import NNRegressor, RidgeHead, nw_estimate, spline_estimate
+from .simulate.dynamics import HestonParams
+from .simulate.stepper import heston_step
 
 
 def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=200_000,
@@ -21,7 +23,8 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
     """
     if method == "spline" and mixture is not None:
         raise ValueError("spline estimator does not support importance weights")
-    kappa, theta, xi, rho, v0 = (params[k] for k in ("kappa", "theta", "xi", "rho", "v0"))
+    hp = HestonParams.from_dict(params)
+    v0 = hp.v0
     rng = np.random.default_rng(seed)
     dt, sdt = T / n_steps, np.sqrt(T / n_steps)
 
@@ -74,13 +77,8 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
         L_p = np.interp(lnx, grid, L_grid) if len(grid) > 1 else np.full(n_particles, L_grid[0])
         zb = rng.standard_normal(n_particles)
         zp = rng.standard_normal(n_particles)
-        z1 = rho * zb + np.sqrt(1 - rho ** 2) * zp
-        vp = np.maximum(v, 0.0)
-        drift_x = -0.5 * L_p ** 2 * vp
-        if mixture is not None:
-            drift_x = drift_x + L_p * np.sqrt(vp) * theta_p
-        lnx = lnx + drift_x * dt + L_p * np.sqrt(vp) * sdt * z1
-        v = v + kappa * (theta - vp) * dt + xi * np.sqrt(vp) * sdt * zb
+        lnx, v = heston_step(lnx, v, L_p, zb, zp, hp, dt, sdt,
+                             theta_p=theta_p if mixture is not None else None)
         if mixture is not None:
             dbperp = zp * sdt + eta_p * dt
             ell += etas[:, None] * dbperp[None, :] - 0.5 * (etas ** 2)[:, None] * dt

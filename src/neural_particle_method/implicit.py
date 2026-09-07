@@ -6,7 +6,9 @@ import torch
 import torch.nn as nn
 
 from .condexp import V_SCALE, Z_SCALE
-from .reprice import L_lookup
+from .simulate.dynamics import HestonParams
+from .simulate.leverage import DEFAULT_GRID, LeverageField
+from .simulate.stepper import heston_step
 
 
 class GlobalNet(nn.Module):
@@ -24,8 +26,9 @@ class GlobalNet(nn.Module):
 
 def _simulate(L_records, params, s0, T, n_steps, n_particles, rng):
     """Forward Euler under a fixed leverage; returns pooled (t, lnx, v) slices."""
-    kappa, theta, xi, rho, v0 = (params[k] for k in ("kappa", "theta", "xi", "rho", "v0"))
-    L = L_lookup(L_records)
+    hp = HestonParams.from_dict(params)
+    v0 = hp.v0
+    L = LeverageField.from_records(L_records).at
     dt, sdt = T / n_steps, np.sqrt(T / n_steps)
     lnx = np.full(n_particles, np.log(s0))
     v = np.full(n_particles, v0)
@@ -35,10 +38,7 @@ def _simulate(L_records, params, s0, T, n_steps, n_particles, rng):
         L_p = L(t, lnx)
         zb = rng.standard_normal(n_particles)
         zp = rng.standard_normal(n_particles)
-        z1 = rho * zb + np.sqrt(1 - rho ** 2) * zp
-        vp = np.maximum(v, 0.0)
-        lnx = lnx + (-0.5 * L_p ** 2 * vp) * dt + L_p * np.sqrt(vp) * sdt * z1
-        v = v + kappa * (theta - vp) * dt + xi * np.sqrt(vp) * sdt * zb
+        lnx, v = heston_step(lnx, v, L_p, zb, zp, hp, dt, sdt)
         out.append((t + dt, lnx.copy(), np.maximum(v, 0.0).copy()))
     return out
 
@@ -48,7 +48,7 @@ def calibrate_implicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=50
                        pool_subsample=60_000, L0_records=None):
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
-    grid = np.linspace(np.log(0.4), np.log(2.2), 81)
+    grid = DEFAULT_GRID.copy()
     dt = T / n_steps
     v0 = params["v0"]
     if L0_records is None:
@@ -56,10 +56,7 @@ def calibrate_implicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=50
         L0 = np.clip(sig0 / np.sqrt(v0), 0.0, L_max)
         L_records = [(k * dt, grid.copy(), L0.copy(), np.full(len(grid), v0)) for k in range(n_steps)]
     else:
-        L_records = [(t, grid.copy(),
-                      np.interp(grid, g, Lg) if len(g) > 1 else np.full(len(grid), Lg[0]),
-                      np.interp(grid, g, fg) if len(g) > 1 else np.full(len(grid), fg[0]))
-                     for (t, g, Lg, fg) in L0_records]
+        L_records = LeverageField.from_records(L0_records).resample(grid).to_records()
     net = GlobalNet()
     opt = torch.optim.Adam(net.parameters(), lr=1e-2)
     deltas, fit_s = [], 0.0

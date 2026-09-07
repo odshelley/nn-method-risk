@@ -2,20 +2,14 @@
 import numpy as np
 
 from .bs import implied_vol
+from .simulate.dynamics import HestonParams
+from .simulate.stepper import heston_step
 
 
 def L_lookup(L_records):
     """Piecewise-constant-in-t, interp-in-lnx leverage function from calibration records."""
-    ts = np.array([r[0] for r in L_records])
-
-    def L(t, lnx):
-        i = max(int(np.searchsorted(ts, t + 1e-12)) - 1, 0)
-        _, grid, Lg, _ = L_records[i]
-        if len(grid) == 1:
-            return np.full_like(lnx, Lg[0])
-        return np.interp(lnx, grid, Lg)
-
-    return L
+    from .simulate.leverage import LeverageField
+    return LeverageField.from_records(L_records).at
 
 
 def snap_times(maturities, n_steps, T=None):
@@ -33,7 +27,8 @@ def reprice_iv(L_records, dynamics, s0, maturities, k_grid,
     inverted at that SNAPPED time, not the requested maturity, since that is the
     time the simulated cloud actually reached.
     """
-    kappa, theta, xi, rho, v0 = (dynamics[k] for k in ("kappa", "theta", "xi", "rho", "v0"))
+    hp = HestonParams.from_dict(dynamics)
+    v0 = hp.v0
     L = L_lookup(L_records)
     rng = np.random.default_rng(seed)
     T = max(maturities)
@@ -51,10 +46,7 @@ def reprice_iv(L_records, dynamics, s0, maturities, k_grid,
         L_p = L(t, lnx)
         zb = rng.standard_normal(n_particles)
         zp = rng.standard_normal(n_particles)
-        z1 = rho * zb + np.sqrt(1 - rho ** 2) * zp   # W increment
-        vp = np.maximum(v, 0.0)
-        lnx = lnx + (-0.5 * L_p ** 2 * vp) * dt + L_p * np.sqrt(vp) * sdt * z1
-        v = v + kappa * (theta - vp) * dt + xi * np.sqrt(vp) * sdt * zb
+        lnx, v = heston_step(lnx, v, L_p, zb, zp, hp, dt, sdt)
         if step + 1 in snap:
             x = np.exp(lnx)
             for m in snap[step + 1]:
