@@ -67,7 +67,7 @@ src/neural_particle_method/
     warm_suite.py    the four arms (dyn, seq, xover, norm) as functions; job list
   figures/
     fig1_accuracy.py, fig2_wings.py, fig3_plane.py, fig4_latency.py
-  cli.py             `npm` entry point
+  cli.py             `nparticle` entry point (not `npm`, which would shadow Node's npm)
 ```
 
 Removed after migration: top-level `bench/`, `figures/`, `experiments/*.py`, and the
