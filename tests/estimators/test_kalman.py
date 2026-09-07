@@ -2,12 +2,21 @@ import numpy as np
 import torch
 
 from neural_particle_method.estimators.kalman import KalmanHead, bspline_basis
-from neural_particle_method.implicit import GlobalNet
+
+
+class _QuadBody(torch.nn.Module):
+    """Well-conditioned stand-in for a trained body: features (x, x^2) of the scaled log-spot."""
+    def forward(self, tz):
+        x = tz[:, 1:2]
+        return torch.cat([x, x ** 2], dim=1)
+
+
+class _FakeNet:
+    body = _QuadBody()
 
 
 def _head(**kw):
-    torch.manual_seed(0)
-    return KalmanHead(GlobalNet(), T=1.0, **kw)
+    return KalmanHead(_FakeNet(), T=1.0, **kw)
 
 
 def test_zero_prior_reproduces_least_squares():
