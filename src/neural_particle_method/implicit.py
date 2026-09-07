@@ -5,7 +5,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .condexp import V_SCALE, Z_SCALE
+from .estimators.nn import V_SCALE, Z_SCALE
+from .estimators.ridge import GlobalRidge as GlobalRidgeHead  # noqa: F401
 from .simulate.dynamics import HestonParams
 from .simulate.leverage import DEFAULT_GRID, LeverageField
 from .simulate.stepper import heston_step
@@ -90,30 +91,3 @@ def calibrate_implicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=50
         L_records = new_records
         deltas.append(sup)
     return L_records, {"deltas": deltas, "fit_s": fit_s, "net": net}
-
-
-class GlobalRidgeHead:
-    """Frozen implicit-scheme body as a (t, x) feature extractor with a per-slice ridge readout."""
-
-    def __init__(self, net, T, lam=1e-3, residual=True):
-        self.net, self.T, self.lam, self.residual = net, T, lam, residual
-        self.w_prev = None
-
-    def _features(self, t, lnx):
-        with torch.no_grad():
-            tz = torch.tensor(np.stack([np.full(len(lnx), t / max(self.T, 1e-9)),
-                                        lnx / Z_SCALE], axis=1), dtype=torch.float32)
-            phi = self.net.body(tz).numpy()
-        return np.concatenate([phi, np.ones((len(lnx), 1))], axis=1)
-
-    def fit_predict(self, t, lnx, v, lnx_grid, weights=None):
-        A = self._features(t, lnx)
-        wv = np.ones(len(lnx)) if weights is None else weights
-        lam = self.lam * len(lnx)
-        lhs = A.T @ (wv[:, None] * A) + lam * np.eye(A.shape[1])
-        rhs = A.T @ (wv * v)
-        if self.residual and self.w_prev is not None:
-            rhs = rhs + lam * self.w_prev
-        beta = np.linalg.solve(lhs, rhs)
-        self.w_prev = beta
-        return self._features(t, lnx_grid) @ beta

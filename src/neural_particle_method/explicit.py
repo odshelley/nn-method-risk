@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 
-from .condexp import NNRegressor, RidgeHead, nw_estimate, spline_estimate
+from .estimators import make_estimator
 from .simulate.dynamics import HestonParams
 from .simulate.stepper import heston_step
 
@@ -21,8 +21,6 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
     `snapshots` are proposal- (not physical-) distributed: use `info["weights"]` /
     `info["snapshot_weights"]` to recover physical-measure statistics (e.g. via `mc_smile`).
     """
-    if method == "spline" and mixture is not None:
-        raise ValueError("spline estimator does not support importance weights")
     hp = HestonParams.from_dict(params)
     v0 = hp.v0
     rng = np.random.default_rng(seed)
@@ -30,7 +28,12 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
 
     lnx = np.full(n_particles, np.log(s0))
     v = np.full(n_particles, v0)
-    reg = None if regressor is not None else (NNRegressor(seed=seed) if method == "nn" else (RidgeHead(seed=seed) if method == "ridge" else None))
+    if regressor is not None:
+        est = regressor
+    else:
+        est = make_estimator(method, seed=seed, first_steps=first_steps, later_steps=later_steps)
+    if mixture is not None and not est.supports_weights:
+        raise ValueError(f"{type(est).__name__} estimator does not support importance weights")
 
     L_records, snapshots, snapshot_weights = [], {}, {}
     snap_steps = {int(round(t / dt)): t for t in snapshot_times}
@@ -55,19 +58,7 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
             idx = rng.choice(n_particles, size=min(fit_subsample, n_particles), replace=False)
             wi = None if w is None else w[idx]
             t0 = time.perf_counter()
-            if regressor is not None:
-                f_grid = regressor.fit_predict(t, lnx[idx], v[idx], grid, weights=wi)
-            elif method == "nn":
-                reg.fit(lnx[idx], v[idx], steps=first_steps if k == 1 else later_steps, weights=wi)
-                f_grid = reg.predict(grid)
-            elif method == "ridge":
-                if not reg.trained:
-                    reg.train_body(lnx[idx], v[idx], steps=first_steps)
-                f_grid = reg.fit_predict(lnx[idx], v[idx], grid, weights=wi)
-            elif method == "spline":
-                f_grid = spline_estimate(lnx[idx], v[idx], grid)
-            else:
-                f_grid = nw_estimate(lnx[idx], v[idx], grid, weights=wi)
+            f_grid = est.fit_predict(t, lnx[idx], v[idx], grid, weights=wi)
             fit_s += time.perf_counter() - t0
         f_grid = np.clip(f_grid, 1e-4, None)
         sig = dupire.sigma(max(t, dupire.T_grid[0]), np.exp(grid), s0)
