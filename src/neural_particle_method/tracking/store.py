@@ -120,8 +120,8 @@ class Store:
     def run(self, experiment, params, tags=None):
         r = self.client.create_run(self.experiment_id(experiment), tags=tags or {})
         h = RunHandle(self.client, r.info.run_id)
-        h.log_params(params)
         try:
+            h.log_params(params)
             yield h
         except BaseException:
             with tempfile.TemporaryDirectory() as d:
@@ -151,4 +151,6 @@ class Store:
             row.update({f"metrics.{k}": v for k, v in r.data.metrics.items()})
             row.update({f"tags.{k}": v for k, v in r.data.tags.items()})
             rows.append(row)
+        if not rows:
+            return pd.DataFrame(rows, columns=["run_id", "status", "start_time"])
         return pd.DataFrame(rows)

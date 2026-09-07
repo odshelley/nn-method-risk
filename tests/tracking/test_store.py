@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pytest
 
-from neural_particle_method.tracking.store import Store, flatten_metrics, to_jsonable
+from neural_particle_method.tracking.store import RunHandle, Store, flatten_metrics, to_jsonable
 
 
 @pytest.fixture
@@ -53,3 +53,30 @@ def test_metrics_with_step(store):
 def test_to_jsonable_and_flatten():
     assert to_jsonable({"a": np.float64(1.5), "b": [np.int64(2)], "c": float("nan")}) == {"a": 1.5, "b": [2], "c": None}
     assert flatten_metrics("rmse_bp", {"x": {"y": 1.0}, "z": 2, "s": "skip"}) == {"rmse_bp/x/y": 1.0, "rmse_bp/z": 2.0}
+
+
+def test_failure_before_yield_still_marks_failed(store, monkeypatch):
+    key = {"sid": "s01", "algo": "nw", "n_particles": 1000, "seed": 0}
+
+    def boom(self, params):
+        raise RuntimeError("boom before yield")
+
+    monkeypatch.setattr(RunHandle, "log_params", boom)
+    with pytest.raises(RuntimeError, match="boom before yield"), store.run("bench", key):
+        pass
+    df = store.search("bench")
+    assert len(df) == 1 and df.loc[0, "status"] == "FAILED"
+
+
+def test_search_on_empty_experiment_has_base_columns(store):
+    df = store.search("bench")
+    assert len(df) == 0
+    assert list(df.columns) == ["run_id", "status", "start_time"]
+
+
+def test_find_finished_matches_path_like_param_value(store):
+    params = {"legacy_path": "results/runs/s01/nw/n50000_s0.json", "sid": "s01"}
+    with store.run("bench", params) as h:
+        rid = h.run_id
+    found = store.find_finished("bench", {"legacy_path": "results/runs/s01/nw/n50000_s0.json"})
+    assert found == rid
