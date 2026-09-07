@@ -5,7 +5,7 @@ from neural_particle_method.calibrate.config import ExplicitConfig
 from neural_particle_method.calibrate.explicit import calibrate_explicit
 from neural_particle_method.calibrate.importance import MixtureDesign, design_mixture
 from neural_particle_method.estimators import make_estimator
-from neural_particle_method.explicit import mc_smile
+from neural_particle_method.pricing.reprice import mc_smile
 
 DYN = {"kappa": 2.0, "theta": 0.04, "xi": 0.5, "rho": -0.6, "v0": 0.04}
 # Flat Dupire implies L ~= 1 only when E[V|X] ~= v0 uniformly, i.e. at low vol-of-vol.

@@ -8,8 +8,8 @@ import pytest
 from bench.algos import ALGOS, run_algo
 from tests.conftest import TINY_EXPLICIT, TINY_IMPLICIT, TINY_N, TINY_REPRICE_N, TINY_REPRICE_STEPS
 from bench.scenarios import make_registry, quote_k_grid
-from neural_particle_method.reprice import iv_metrics, reprice_iv, snap_times
-from neural_particle_method.ssvi import implied_vol_ssvi
+from neural_particle_method.pricing.metrics import iv_metrics, target_ivs
+from neural_particle_method.pricing.reprice import RepriceConfig, reprice_iv
 
 GOLDEN = Path(__file__).parent / "golden"
 
@@ -22,9 +22,8 @@ def run_tiny(algo):
     mats = list(sc.maturities)
     res = run_algo(algo, sc, TINY_N, 0, TINY_EXPLICIT, TINY_IMPLICIT)
     ivs = reprice_iv(res.field.to_records(), sc.dynamics, sc.s0, mats, k,
-                     n_particles=TINY_REPRICE_N, n_steps=TINY_REPRICE_STEPS, seed=10_000)
-    ts = snap_times(mats, TINY_REPRICE_STEPS)
-    tgt = np.stack([implied_vol_ssvi(sc.ssvi, k, t) for t in ts])
+                     cfg=RepriceConfig(TINY_REPRICE_N, TINY_REPRICE_STEPS), seed=10_000)
+    tgt = target_ivs(sc.ssvi, k, mats, TINY_REPRICE_STEPS)
     records = [(float(t), np.asarray(g), np.asarray(L), np.asarray(f)) for (t, g, L, f) in res.field.to_records()]
     return records, iv_metrics(ivs, tgt, k, mats), (ivs - tgt) * 1e4
 

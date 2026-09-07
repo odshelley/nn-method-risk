@@ -7,8 +7,8 @@ import pytest
 
 from bench.algos import run_algo
 from bench.scenarios import make_registry, quote_k_grid
-from neural_particle_method.reprice import iv_metrics, reprice_iv, snap_times
-from neural_particle_method.ssvi import implied_vol_ssvi
+from neural_particle_method.pricing.metrics import iv_metrics, target_ivs
+from neural_particle_method.pricing.reprice import RepriceConfig, reprice_iv
 
 RUNS = Path(__file__).resolve().parents[1] / "results" / "runs"
 CASES = ["nw", "explicit_nn", "explicit_nn_is", "implicit_ridge"]
@@ -20,9 +20,8 @@ def replay(algo, n_particles=50_000, seed=0, sid="s01"):
     mats = list(sc.maturities)
     res = run_algo(algo, sc, n_particles, seed)
     ivs = reprice_iv(res.field.to_records(), sc.dynamics, sc.s0, mats, k,
-                     n_particles=500_000, n_steps=200, seed=seed + 10_000)
-    ts = snap_times(mats, 200)
-    tgt = np.stack([implied_vol_ssvi(sc.ssvi, k, t) for t in ts])
+                     cfg=RepriceConfig(500_000, 200), seed=seed + 10_000)
+    tgt = target_ivs(sc.ssvi, k, mats, 200)
     return iv_metrics(ivs, tgt, k, mats), (ivs - tgt) * 1e4
 
 

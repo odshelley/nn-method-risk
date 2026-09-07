@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 
 from neural_particle_method.calibrate.config import ExplicitConfig, ImplicitConfig
-from neural_particle_method.reprice import reprice_iv, iv_metrics, snap_times
-from neural_particle_method.ssvi import implied_vol_ssvi
+from neural_particle_method.pricing.metrics import iv_metrics, target_ivs
+from neural_particle_method.pricing.reprice import RepriceConfig, reprice_iv
 
 from .algos import run_algo
 from .scenarios import full_registry, quote_k_grid
@@ -56,10 +56,9 @@ def run_one(sid, algo, n_particles, seed, results_dir="results/runs",
         k = quote_k_grid()
         mats = list(sc.maturities)
         iv_model = reprice_iv(res.field.to_records(), sc.dynamics, sc.s0, mats, k,
-                              n_particles=reprice_particles, n_steps=reprice_steps,
+                              cfg=RepriceConfig(reprice_particles, reprice_steps),
                               seed=seed + 10_000)
-        ts = snap_times(mats, reprice_steps)
-        iv_target = np.stack([implied_vol_ssvi(sc.ssvi, k, t) for t in ts])
+        iv_target = target_ivs(sc.ssvi, k, mats, reprice_steps)
         doc.update(status="ok", timings=_jsonable(res.timings),
                    diagnostics=_jsonable(res.diagnostics),
                    metrics=_jsonable(iv_metrics(iv_model, iv_target, k, mats)),

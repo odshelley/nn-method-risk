@@ -1,9 +1,8 @@
 """Shim (removed in Task 12): old calibrate_explicit signature over the new implementation."""
-import numpy as np
-
 from .calibrate.config import ExplicitConfig
 from .calibrate.explicit import calibrate_explicit as _new
 from .estimators import make_estimator
+from .pricing.reprice import mc_smile  # noqa: F401
 
 
 def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=200_000,
@@ -19,11 +18,3 @@ def calibrate_explicit(dupire, params, s0=1.0, T=1.0, n_steps=50, n_particles=20
     if mixture is not None:
         info.update(weights=r.weights, snapshot_weights=r.snapshot_weights, is_diag=r.is_diag)
     return r.lnx, info
-
-
-def mc_smile(lnx_T, K_grid, s0=1.0, weights=None):
-    x = np.exp(lnx_T)
-    if weights is None:
-        return np.array([np.mean(np.maximum(x - K, 0.0)) for K in K_grid])
-    wn = weights / weights.sum()
-    return np.array([np.sum(wn * np.maximum(x - K, 0.0)) for K in K_grid])
