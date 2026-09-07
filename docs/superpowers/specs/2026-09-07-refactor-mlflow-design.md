@@ -36,7 +36,7 @@ src/neural_particle_method/
     stepper.py       one Euler step of (lnx, v) under a leverage value and two normals
     leverage.py      LeverageField: typed replacement for the (t, grid, L, f) tuple list
   estimators/
-    base.py          Estimator protocol: fit_predict(lnx, v, grid, weights=None) -> f_grid
+    base.py          Estimator protocol: fit_predict(t, lnx, v, grid, weights=None) -> f_grid
     nn.py            SliceNet, warm-started NNRegressor
     nadaraya_watson.py
     spline.py        P-spline estimator
@@ -92,7 +92,7 @@ It never draws random numbers. Correlation is applied inside: `z1 = rho*zb + sqr
 point), `resample(grid)`, `to_records()`, `from_records()`, `to_json()`, `from_json()`.
 `reprice.L_lookup` becomes `LeverageField.at`.
 
-**Estimator** (protocol): `fit_predict(lnx, v, grid, weights=None) -> f_grid`. Stateful
+**Estimator** (protocol): `fit_predict(t, lnx, v, grid, weights=None) -> f_grid`. Per-slice estimators ignore `t`; the global-body ridge uses it. `KalmanHead` is a readout with its own `update(k, t, ...)` interface used only by the warm arms and is not an Estimator. Stateful
 estimators keep warm-start state between calls. Estimators that do not support weights
 raise `ValueError` when given any. The per-slice step budget (`first_steps` on the first
 fitted slice, `later_steps` after) moves into `NNRegressor` so `calibrate_explicit` does
@@ -196,8 +196,8 @@ Each step lands with the full default suite green and the golden suite green.
 9. `experiments/` moved into the package; overnight cache becomes an `overnight` run.
 10. `tracking/importer.py`; run it on the archived results.
 11. `figures/` moved; fig2 reads the artifact.
-12. `cli.py` as `npm`; delete shims, old top-level packages, and root `experiments/*.py`.
-    Update README and `pyproject.toml` (`[project.scripts] npm = ...`, wheel packages,
+12. `cli.py` as `nparticle`; delete shims, old top-level packages, and root `experiments/*.py`.
+    Update README and `pyproject.toml` (`[project.scripts] nparticle = ...`, wheel packages,
     `mlflow>=2.14` dependency, `pytest-cov` dev dependency, golden marker).
 
 ## Testing
@@ -211,7 +211,7 @@ Default suite target: under 30 seconds, no golden runs.
 - **simulate**: one `heston_step` against a hand-computed value; variance floor at zero;
   `LeverageField.at` piecewise-constant in t and interpolating in lnx; single-point grid;
   JSON round trip exact.
-- **estimators** (contract test parametrised over all six): output shape equals grid
+- **estimators** (contract test parametrised over the five Estimators: nn, nw, spline, per-slice ridge, global ridge): output shape equals grid
   length, finite, positive; weights of all ones give the same output as no weights for
   estimators that accept weights; spline raises on weights. Specific: Kalman update with
   infinite prior information leaves beta unchanged and with zero prior reproduces
