@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from bench.algos import ALGOS, run_algo
-from bench.scenarios import make_registry
+from neural_particle_method.bench.algos import ALGOS, run_algo
+from neural_particle_method.bench.scenarios import make_registry
 from tests.conftest import TINY_EXPLICIT, TINY_IMPLICIT
 
 @pytest.mark.parametrize("name", list(ALGOS))

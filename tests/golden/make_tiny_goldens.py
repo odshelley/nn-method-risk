@@ -11,8 +11,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tests.conftest import TINY, TINY_EXPLICIT, TINY_IMPLICIT, TINY_N, TINY_REPRICE_N, TINY_REPRICE_STEPS  # noqa: E402
 
-from bench.algos import ALGOS, run_algo  # noqa: E402
-from bench.scenarios import make_registry, quote_k_grid  # noqa: E402
+from neural_particle_method.bench.algos import ALGOS, run_algo  # noqa: E402
+from neural_particle_method.bench.scenarios import make_registry, quote_k_grid  # noqa: E402
 from neural_particle_method.pricing.metrics import iv_metrics, target_ivs  # noqa: E402
 from neural_particle_method.pricing.reprice import RepriceConfig, reprice_iv  # noqa: E402
 

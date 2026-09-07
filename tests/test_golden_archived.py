@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bench.algos import run_algo
-from bench.scenarios import make_registry, quote_k_grid
+from neural_particle_method.bench.algos import run_algo
+from neural_particle_method.bench.scenarios import make_registry, quote_k_grid
 from neural_particle_method.pricing.metrics import iv_metrics, target_ivs
 from neural_particle_method.pricing.reprice import RepriceConfig, reprice_iv
 
