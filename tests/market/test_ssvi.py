@@ -1,7 +1,8 @@
 import numpy as np
 import QuantLib as ql
-from neural_particle_method.ssvi import (SSVIParams, no_arb_ok, total_variance,
-                                         implied_vol_ssvi, SSVILocalVol)
+from neural_particle_method.market.ssvi import (SSVIParams, no_arb_ok, total_variance,
+                                                 implied_vol_ssvi)
+from neural_particle_method.market.local_vol import SSVILocalVol
 
 GOOD = SSVIParams(sigma0=0.2, eta=1.0, gamma=0.4, rho=-0.6)
 

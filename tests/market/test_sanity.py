@@ -1,8 +1,8 @@
 """Fast sanity checks for the pricing and Dupire pipeline."""
 import numpy as np
-from neural_particle_method.heston import heston_call
-from neural_particle_method.bs import bs_call, implied_vol
-from neural_particle_method.dupire import DupireSurface
+from neural_particle_method.market.heston import heston_call
+from neural_particle_method.market.bs import bs_call, implied_vol
+from neural_particle_method.market.dupire import DupireSurface
 
 
 def test_heston_bs_limit():
