@@ -24,3 +24,8 @@ paper/*.blg
 papers/pdf/
 
 results/runs/
+
+# MLflow local store
+mlruns.db
+mlruns/
+mlartifacts/

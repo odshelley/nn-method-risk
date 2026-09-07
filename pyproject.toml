@@ -16,6 +16,7 @@ dependencies = [
     "tqdm>=4.66",
     "quantlib>=1.43",
     "pandas>=3.0.5",
+    "mlflow>=2.14",
 ]
 
 [project.scripts]
@@ -24,12 +25,21 @@ bench = "bench.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "pytest-cov>=5.0",
     "ruff>=0.6",
     "ipykernel>=6.29",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/neural_particle_method", "bench", "figures"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "golden: bit-for-bit replay of archived runs; minutes; run with -m golden",
+    "slow: multi-minute smoke runs; run with -m slow",
+]
+addopts = "-m 'not golden and not slow'"
 
 [tool.ruff]
 line-length = 100
