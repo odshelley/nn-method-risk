@@ -1,7 +1,10 @@
 """CLI for the calibration benchmark."""
 import argparse
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import replace
 from pathlib import Path
+
+from neural_particle_method.calibrate.config import ExplicitConfig, ImplicitConfig
 
 from .aggregate import aggregate
 from .algos import ALGOS
@@ -63,13 +66,14 @@ def main(argv=None):
         print("algos:", ", ".join(ALGOS))
         return 0
     if args.cmd == "run":
-        cfg = {"n_steps": args.n_steps} if args.n_steps else None
+        explicit = replace(ExplicitConfig(), n_steps=args.n_steps) if args.n_steps else ExplicitConfig()
+        implicit = replace(ImplicitConfig(), n_steps=args.n_steps) if args.n_steps else ImplicitConfig()
         out = run_path(args.scenario, args.algo, args.n, args.seed, args.results_dir)
         if out.exists():
             print(f"skip (exists): {out}")
             return 0
         p = run_one(args.scenario, args.algo, args.n, args.seed,
-                    results_dir=args.results_dir, cfg=cfg,
+                    results_dir=args.results_dir, explicit=explicit, implicit=implicit,
                     reprice_particles=args.reprice_n, reprice_steps=args.reprice_steps)
         print(f"wrote {p}")
         return 0

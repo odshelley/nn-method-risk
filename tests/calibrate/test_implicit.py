@@ -1,7 +1,9 @@
 import numpy as np
 
-from neural_particle_method.explicit import calibrate_explicit
-from neural_particle_method.implicit import calibrate_implicit
+from neural_particle_method.calibrate.config import ExplicitConfig, ImplicitConfig
+from neural_particle_method.calibrate.explicit import calibrate_explicit
+from neural_particle_method.calibrate.implicit import calibrate_implicit
+from neural_particle_method.estimators import make_estimator
 
 # AMENDMENT (controller-approved): xi=0.05 instead of the brief's 0.4. At the
 # brief's xi=0.4, the calibrated leverage L = 0.2/sqrt(E[V|X=x]) genuinely
@@ -27,29 +29,26 @@ def test_damped_update_is_contraction_on_toy():
 
 
 def test_implicit_flat_recovery_smoke():
-    recs, info = calibrate_implicit(FlatDupire(), DYN, T=0.5, n_steps=6,
-                                    n_particles=8_000, alpha=0.5, n_iters=3,
-                                    seed=1, pool_subsample=10_000, fit_steps=150)
-    assert len(recs) == 6
-    t, grid, Lg, fg = recs[3]
-    mid = np.abs(grid) < 0.3
-    assert np.abs(Lg[mid] - 1.0).max() < 0.2
-    assert len(info["deltas"]) == 3 and info["deltas"][-1] <= info["deltas"][0] + 0.05
+    cfg = ImplicitConfig(n_steps=6, n_particles=8_000, n_iters=3, pool_subsample=10_000, fit_steps=150)
+    r = calibrate_implicit(FlatDupire(), DYN, cfg, T=0.5, seed=1)
+    assert len(r.field) == 6
+    s = r.field[3]
+    mid = np.abs(s.grid) < 0.3
+    assert np.abs(s.L[mid] - 1.0).max() < 0.2
+    assert len(r.deltas) == 3 and r.deltas[-1] <= r.deltas[0] + 0.05
 
 
 def test_implicit_warm_start_from_explicit():
-    # L0_records (including calibrate_explicit's single-point k=0 grid) is a
+    # L0 (including calibrate_explicit's single-point k=0 grid) is a
     # load-bearing warm-start path with no prior coverage; exercise it end to end.
-    _, exp_info = calibrate_explicit(FlatDupire(), DYN, T=0.5, n_steps=6,
-                                     n_particles=4_000, method="nw", seed=2)
-    recs, info = calibrate_implicit(FlatDupire(), DYN, T=0.5, n_steps=6,
-                                    n_particles=8_000, alpha=0.5, n_iters=3,
-                                    seed=1, pool_subsample=10_000, fit_steps=150,
-                                    L0_records=exp_info["L_records"])
-    assert len(recs) == 6
-    for (t, grid, Lg, fg) in recs:
-        assert np.all(np.isfinite(Lg))
-    assert len(info["deltas"]) == 3
+    ecfg = ExplicitConfig(n_steps=6, n_particles=4_000)
+    exp_r = calibrate_explicit(FlatDupire(), DYN, make_estimator("nw"), ecfg, T=0.5, seed=2)
+    icfg = ImplicitConfig(n_steps=6, n_particles=8_000, n_iters=3, pool_subsample=10_000, fit_steps=150)
+    r = calibrate_implicit(FlatDupire(), DYN, icfg, T=0.5, seed=1, L0=exp_r.field)
+    assert len(r.field) == 6
+    for s in r.field:
+        assert np.all(np.isfinite(s.L))
+    assert len(r.deltas) == 3
 
 
 # v0 != theta so E[V|X] is genuinely time-varying (via deterministic mean
@@ -76,9 +75,8 @@ def test_implicit_same_time_pairing_regression():
     # one-step-ahead evaluation does.
     T, n_steps = 0.5, 6
     dt = T / n_steps
-    recs, _ = calibrate_implicit(FlatSigma(), DYN_TV, T=T, n_steps=n_steps,
-                                 n_particles=8_000, alpha=0.5, n_iters=3,
-                                 seed=1, pool_subsample=10_000, fit_steps=150)
+    cfg = ImplicitConfig(n_steps=n_steps, n_particles=8_000, n_iters=3, pool_subsample=10_000, fit_steps=150)
+    r = calibrate_implicit(FlatSigma(), DYN_TV, cfg, T=T, seed=1)
 
     def target(t):
         v_det = DYN_TV["theta"] + (DYN_TV["v0"] - DYN_TV["theta"]) * np.exp(-DYN_TV["kappa"] * t)
@@ -86,9 +84,9 @@ def test_implicit_same_time_pairing_regression():
 
     err_same, err_next = 0.0, 0.0
     for k in range(1, n_steps - 1):  # interior slices only
-        t, grid, Lg, fg = recs[k]
-        mid = np.abs(grid) < 0.3
-        Lk = Lg[mid].mean()
-        err_same += abs(Lk - target(t))
-        err_next += abs(Lk - target(t + dt))
+        s = r.field[k]
+        mid = np.abs(s.grid) < 0.3
+        Lk = s.L[mid].mean()
+        err_same += abs(Lk - target(s.t))
+        err_next += abs(Lk - target(s.t + dt))
     assert err_same < err_next

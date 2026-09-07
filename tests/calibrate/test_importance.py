@@ -1,6 +1,11 @@
 import numpy as np
-from neural_particle_method.importance import MixtureDesign, design_mixture
-from neural_particle_method.explicit import calibrate_explicit, mc_smile
+import pytest
+
+from neural_particle_method.calibrate.config import ExplicitConfig
+from neural_particle_method.calibrate.explicit import calibrate_explicit
+from neural_particle_method.calibrate.importance import MixtureDesign, design_mixture
+from neural_particle_method.estimators import make_estimator
+from neural_particle_method.explicit import mc_smile
 
 DYN = {"kappa": 2.0, "theta": 0.04, "xi": 0.5, "rho": -0.6, "v0": 0.04}
 # Flat Dupire implies L ~= 1 only when E[V|X] ~= v0 uniformly, i.e. at low vol-of-vol.
@@ -22,10 +27,9 @@ def test_design_caps_cost():
 
 def test_weights_bounded_and_normalised():
     d = design_mixture(DYN, T=0.5)
-    _, info = calibrate_explicit(FlatDupire(), DYN, T=0.5, n_steps=8,
-                                 n_particles=20_000, method="nw",
-                                 fit_subsample=5_000, seed=3, mixture=d)
-    w = info["weights"]
+    cfg = ExplicitConfig(n_steps=8, n_particles=20_000, fit_subsample=5_000)
+    r = calibrate_explicit(FlatDupire(), DYN, make_estimator("nw"), cfg, T=0.5, seed=3, mixture=d)
+    w = r.weights
     assert w.max() <= 1 / d.alphas[1] + 1e-9
     assert abs(w.mean() - 1.0) < 0.05
 
@@ -33,13 +37,12 @@ def test_flat_recovery_with_mixture():
     # At low vol-of-vol, E[V|X] ~= v0 uniformly, so flat Dupire has a known ground
     # truth L ~= 1; this isolates whether tilting introduces bias.
     d = design_mixture(DYN_LOWVOV, T=0.5)
-    _, info = calibrate_explicit(FlatDupire(), DYN_LOWVOV, T=0.5, n_steps=8,
-                                 n_particles=20_000, method="nw",
-                                 fit_subsample=5_000, seed=3, mixture=d)
-    t, grid, Lg, _ = info["L_records"][-1]
-    mid = np.abs(grid) < 0.3
-    assert np.abs(Lg[mid] - 1.0).max() < 0.15
-    assert "fit_s" in info and info["is_diag"]["max_w"] <= 2.0 + 1e-9
+    cfg = ExplicitConfig(n_steps=8, n_particles=20_000, fit_subsample=5_000)
+    r = calibrate_explicit(FlatDupire(), DYN_LOWVOV, make_estimator("nw"), cfg, T=0.5, seed=3, mixture=d)
+    s = r.field[-1]
+    mid = np.abs(s.grid) < 0.3
+    assert np.abs(s.L[mid] - 1.0).max() < 0.15
+    assert r.fit_s is not None and r.is_diag["max_w"] <= 2.0 + 1e-9
 
 def test_mixture_weighted_pricing_matches_untilted_reference():
     # DYN_LOWVOV's L-recovery test can't detect a broken weighting scheme: at low
@@ -50,15 +53,14 @@ def test_mixture_weighted_pricing_matches_untilted_reference():
     # tilted cloud is grossly biased (the tilt pushes mass into the wings without
     # correcting for it).
     d = design_mixture(DYN, T=0.5)
-    kwargs = dict(T=0.5, n_steps=8, n_particles=20_000, method="nw",
-                  fit_subsample=5_000, seed=3)
-    lnx_ref, _ = calibrate_explicit(FlatDupire(), DYN, mixture=None, **kwargs)
-    lnx_mix, info_mix = calibrate_explicit(FlatDupire(), DYN, mixture=d, **kwargs)
+    cfg = ExplicitConfig(n_steps=8, n_particles=20_000, fit_subsample=5_000)
+    r_ref = calibrate_explicit(FlatDupire(), DYN, make_estimator("nw"), cfg, T=0.5, seed=3, mixture=None)
+    r_mix = calibrate_explicit(FlatDupire(), DYN, make_estimator("nw"), cfg, T=0.5, seed=3, mixture=d)
 
     K_grid = [0.8, 1.0, 1.2]
-    ref = mc_smile(lnx_ref, K_grid)
-    weighted = mc_smile(lnx_mix, K_grid, weights=info_mix["weights"])
-    unweighted = mc_smile(lnx_mix, K_grid)
+    ref = mc_smile(r_ref.lnx, K_grid)
+    weighted = mc_smile(r_mix.lnx, K_grid, weights=r_mix.weights)
+    unweighted = mc_smile(r_mix.lnx, K_grid)
 
     rel_weighted = np.abs(weighted - ref) / ref
     rel_unweighted = np.abs(unweighted - ref) / ref
@@ -70,30 +72,23 @@ def test_flat_recovery_untilted_control():
     # Control: the untilted run at the same low vol-of-vol dynamics must also recover
     # L ~= 1, so test_flat_recovery_with_mixture demonstrably isolates the tilt's effect
     # rather than relying on properties only the mixture run happens to have.
-    _, info = calibrate_explicit(FlatDupire(), DYN_LOWVOV, T=0.5, n_steps=8,
-                                 n_particles=20_000, method="nw",
-                                 fit_subsample=5_000, seed=3, mixture=None)
-    t, grid, Lg, _ = info["L_records"][-1]
-    mid = np.abs(grid) < 0.3
-    assert np.abs(Lg[mid] - 1.0).max() < 0.15
+    cfg = ExplicitConfig(n_steps=8, n_particles=20_000, fit_subsample=5_000)
+    r = calibrate_explicit(FlatDupire(), DYN_LOWVOV, make_estimator("nw"), cfg, T=0.5, seed=3, mixture=None)
+    s = r.field[-1]
+    mid = np.abs(s.grid) < 0.3
+    assert np.abs(s.L[mid] - 1.0).max() < 0.15
 
 def test_spline_rejects_mixture():
     d = design_mixture(DYN, T=0.5)
-    try:
-        calibrate_explicit(FlatDupire(), DYN, T=0.5, n_steps=4,
-                            n_particles=2_000, method="spline",
-                            fit_subsample=500, seed=3, mixture=d)
-        assert False, "expected ValueError"
-    except ValueError as e:
-        assert "importance weights" in str(e)
+    cfg = ExplicitConfig(n_steps=4, n_particles=2_000, fit_subsample=500)
+    with pytest.raises(ValueError, match="importance weights"):
+        calibrate_explicit(FlatDupire(), DYN, make_estimator("spline"), cfg, T=0.5, seed=3, mixture=d)
 
 def test_snapshot_weights_recorded_under_mixture():
     d = design_mixture(DYN, T=0.5)
-    lnx, info = calibrate_explicit(FlatDupire(), DYN, T=0.5, n_steps=8,
-                                   n_particles=2_000, method="nw",
-                                   fit_subsample=500, seed=3, mixture=d,
-                                   snapshot_times=(0.25,))
-    assert set(info["snapshot_weights"]) == set(info["snapshots"])
-    sw = info["snapshot_weights"][0.25]
-    assert sw.shape == info["snapshots"][0.25].shape
+    cfg = ExplicitConfig(n_steps=8, n_particles=2_000, fit_subsample=500, snapshot_times=(0.25,))
+    r = calibrate_explicit(FlatDupire(), DYN, make_estimator("nw"), cfg, T=0.5, seed=3, mixture=d)
+    assert set(r.snapshot_weights) == set(r.snapshots)
+    sw = r.snapshot_weights[0.25]
+    assert sw.shape == r.snapshots[0.25].shape
     assert np.all(sw > 0) and sw.max() <= 1 / d.alphas[1] + 1e-9

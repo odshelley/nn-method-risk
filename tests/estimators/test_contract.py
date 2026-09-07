@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 import torch
 
+from neural_particle_method.calibrate.implicit import GlobalNet
 from neural_particle_method.estimators import make_estimator
 from neural_particle_method.estimators.ridge import GlobalRidge
-from neural_particle_method.implicit import GlobalNet
 
 RNG = np.random.default_rng(0)
 LNX = RNG.normal(0.0, 0.2, 3_000)

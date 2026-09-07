@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
+from neural_particle_method.calibrate.config import ExplicitConfig, ImplicitConfig
 from neural_particle_method.reprice import reprice_iv, iv_metrics, snap_times
 from neural_particle_method.ssvi import implied_vol_ssvi
 
@@ -40,7 +41,8 @@ def _jsonable(x):
     return x
 
 
-def run_one(sid, algo, n_particles, seed, results_dir="results/runs", cfg=None,
+def run_one(sid, algo, n_particles, seed, results_dir="results/runs",
+            explicit=ExplicitConfig(), implicit=ImplicitConfig(),
             reprice_particles=500_000, reprice_steps=200):
     sc = full_registry()[sid]
     out = run_path(sid, algo, n_particles, seed, results_dir)
@@ -50,10 +52,10 @@ def run_one(sid, algo, n_particles, seed, results_dir="results/runs", cfg=None,
            "scenario": {"ssvi": dataclasses.asdict(sc.ssvi), "dynamics": sc.dynamics,
                         "s0": sc.s0, "T": sc.T, "maturities": list(sc.maturities)}}
     try:
-        res = run_algo(algo, sc, n_particles, seed, cfg)
+        res = run_algo(algo, sc, n_particles, seed, explicit, implicit)
         k = quote_k_grid()
         mats = list(sc.maturities)
-        iv_model = reprice_iv(res.L_records, sc.dynamics, sc.s0, mats, k,
+        iv_model = reprice_iv(res.field.to_records(), sc.dynamics, sc.s0, mats, k,
                               n_particles=reprice_particles, n_steps=reprice_steps,
                               seed=seed + 10_000)
         ts = snap_times(mats, reprice_steps)

@@ -18,8 +18,8 @@ def replay(algo, n_particles=50_000, seed=0, sid="s01"):
     sc = make_registry()[sid]
     k = quote_k_grid()
     mats = list(sc.maturities)
-    res = run_algo(algo, sc, n_particles, seed, None)
-    ivs = reprice_iv(res.L_records, sc.dynamics, sc.s0, mats, k,
+    res = run_algo(algo, sc, n_particles, seed)
+    ivs = reprice_iv(res.field.to_records(), sc.dynamics, sc.s0, mats, k,
                      n_particles=500_000, n_steps=200, seed=seed + 10_000)
     ts = snap_times(mats, 200)
     tgt = np.stack([implied_vol_ssvi(sc.ssvi, k, t) for t in ts])
