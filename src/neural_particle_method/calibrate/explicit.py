@@ -37,7 +37,7 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
     v = np.full(n_particles, v0)
 
     slices, snapshots, snapshot_weights = [], {}, {}
-    snap_steps = {int(round(t / dt)): t for t in cfg.snapshot_times}
+    snap_steps = {int(round(t / dt)): t for t in cfg.snapshot_times}  # noqa: RUF046
 
     fit_s = 0.0
     theta_p = None

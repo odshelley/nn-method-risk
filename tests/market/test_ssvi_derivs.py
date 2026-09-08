@@ -12,7 +12,7 @@ def _fd(fn, x, h=1e-5):
 def test_k_derivatives_match_finite_differences():
     k = np.array([-0.4, -0.1, 0.0, 0.2, 0.5])
     T = 0.8
-    w, dwdk, d2wdk2, _ = w_and_derivs(P, k, T)
+    _, dwdk, d2wdk2, _ = w_and_derivs(P, k, T)
     fd1 = _fd(lambda kk: w_and_derivs(P, kk, T)[0], k)
     fd2 = _fd(lambda kk: w_and_derivs(P, kk, T)[1], k)
     assert np.allclose(dwdk, fd1, rtol=1e-6, atol=1e-9)

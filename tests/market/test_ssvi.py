@@ -1,8 +1,13 @@
 import numpy as np
 import QuantLib as ql
-from neural_particle_method.market.ssvi import (SSVIParams, no_arb_ok, total_variance,
-                                                 implied_vol_ssvi)
+
 from neural_particle_method.market.local_vol import SSVILocalVol
+from neural_particle_method.market.ssvi import (
+    SSVIParams,
+    implied_vol_ssvi,
+    no_arb_ok,
+    total_variance,
+)
 
 GOOD = SSVIParams(sigma0=0.2, eta=1.0, gamma=0.4, rho=-0.6)
 
@@ -27,7 +32,7 @@ def test_local_vol_matches_quantlib():
     dc, cal = ql.Actual365Fixed(), ql.NullCalendar()
     ts = np.arange(0.1, 1.81, 0.02)
     ks = np.arange(-0.5, 0.501, 0.02)
-    dates = [today + ql.Period(int(round(t * 365)), ql.Days) for t in ts]
+    dates = [today + ql.Period(int(round(t * 365)), ql.Days) for t in ts]  # noqa: RUF046
     strikes = list(np.exp(ks))
     vols = ql.Matrix(len(strikes), len(dates))
     for j, t in enumerate(ts):

@@ -58,7 +58,7 @@ def _implicit(sc, n, seed, e, i):
 
 
 def _implicit_ridge(sc, n, seed, e, i):
-    lv, warm, r, overnight = _implicit_core(sc, n, seed, e, i)
+    lv, _, r, overnight = _implicit_core(sc, n, seed, e, i)
     head = GlobalRidge(r.net, sc.T)
     t1 = time.perf_counter()
     er = calibrate_explicit(lv, sc.dynamics, head, replace(e, n_particles=n), s0=sc.s0, T=sc.T, seed=seed + 1)

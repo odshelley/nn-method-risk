@@ -22,7 +22,7 @@ def snap_times(maturities, n_steps, T=None):
     """Grid-snapped time for each requested maturity, mirroring reprice_iv's dt exactly."""
     T = max(maturities) if T is None else T
     dt = T / n_steps
-    return [int(round(m / dt)) * dt for m in maturities]
+    return [int(round(m / dt)) * dt for m in maturities]  # noqa: RUF046
 
 
 def reprice_iv(field, params, s0, maturities, k_grid, cfg=RepriceConfig(), seed=10_000):
@@ -37,7 +37,7 @@ def reprice_iv(field, params, s0, maturities, k_grid, cfg=RepriceConfig(), seed=
     t_snap = dict(zip(maturities, snap_times(maturities, n_steps, T)))
     snap = {}
     for m in maturities:
-        snap.setdefault(int(round(m / dt)), []).append(m)
+        snap.setdefault(int(round(m / dt)), []).append(m)  # noqa: RUF046
     lnx = np.full(n_particles, np.log(s0))
     v = np.full(n_particles, hp.v0)
     ivs = np.full((len(maturities), len(k_grid)), np.nan)

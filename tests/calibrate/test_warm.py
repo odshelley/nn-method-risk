@@ -2,8 +2,14 @@ import numpy as np
 import torch
 
 from neural_particle_method.calibrate.implicit import GlobalNet, simulate_slices
-from neural_particle_method.calibrate.warm import (bump, distil, dyn_variants, records_from_betas,
-                                                    scaled_bump, seq_path)
+from neural_particle_method.calibrate.warm import (
+    bump,
+    distil,
+    dyn_variants,
+    records_from_betas,
+    scaled_bump,
+    seq_path,
+)
 from neural_particle_method.market.local_vol import SSVILocalVol
 from neural_particle_method.market.ssvi import SSVIParams, no_arb_ok
 from neural_particle_method.simulate.dynamics import HestonParams

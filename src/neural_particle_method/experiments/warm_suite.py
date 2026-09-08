@@ -12,17 +12,26 @@ from ..bench.scenarios import make_registry, quote_k_grid
 from ..calibrate.config import ExplicitConfig
 from ..calibrate.explicit import calibrate_explicit
 from ..calibrate.implicit import GlobalNet, calibrate_implicit, simulate_slices
-from ..calibrate.warm import (beta_correction, distil, dyn_variants, full_resolve, kalman_pass,
-                              records_from_betas, records_from_head, scaled_bump, seq_path)
+from ..calibrate.warm import (
+    beta_correction,
+    distil,
+    dyn_variants,
+    full_resolve,
+    kalman_pass,
+    records_from_betas,
+    records_from_head,
+    scaled_bump,
+    seq_path,
+)
 from ..estimators import make_estimator
 from ..estimators.kalman import KalmanHead
 from ..estimators.ridge import GlobalRidge
 from ..market.local_vol import SSVILocalVol
 from ..pricing.metrics import iv_metrics, target_ivs
 from ..pricing.reprice import reprice_iv
-from ..simulate.leverage import DEFAULT_GRID as GRID, LeverageField, Slice
+from ..simulate.leverage import DEFAULT_GRID as GRID
+from ..simulate.leverage import LeverageField, Slice
 from ..tracking.store import flatten_metrics, git_hash, to_jsonable
-from .config import WarmConfig
 
 OVERNIGHT_EXPERIMENT = "overnight"
 WARM_EXPERIMENT = "warm"
@@ -72,7 +81,7 @@ def overnight(store, sc, seed, cfg):
 # ---------------------------------------------------------------- arm: dyn
 
 def arm_dyn(store, sc, seed, cfg):
-    net, betas0, recsS, on_s, lvS = overnight(store, sc, seed, cfg)
+    net, betas0, _, on_s, lvS = overnight(store, sc, seed, cfg)
     dyn, s0, T, mats, kq = sc.dynamics, sc.s0, sc.T, list(sc.maturities), quote_k_grid()
     v0 = dyn.v0
     res, times = {}, {"overnight": round(on_s, 2)}
@@ -114,7 +123,7 @@ def arm_dyn(store, sc, seed, cfg):
 # ---------------------------------------------------------------- arm: seq
 
 def arm_seq(store, sc, seed, cfg):
-    net, betas0, recsS, on_s, lvS = overnight(store, sc, seed, cfg)
+    net, betas0, recsS, on_s, _ = overnight(store, sc, seed, cfg)
     dyn, s0, T, mats, kq = sc.dynamics, sc.s0, sc.T, list(sc.maturities), quote_k_grid()
     v0 = dyn.v0
     path = seq_path(sc.ssvi, cfg.seq_len, np.random.default_rng(seed + 7000))
@@ -173,7 +182,7 @@ def arm_seq(store, sc, seed, cfg):
 # ---------------------------------------------------------------- arm: xover
 
 def arm_xover(store, sc, seed, cfg):
-    net, betas0, recsS, on_s, lvS = overnight(store, sc, seed, cfg)
+    net, betas0, _, on_s, _ = overnight(store, sc, seed, cfg)
     dyn, s0, T, mats, kq = sc.dynamics, sc.s0, sc.T, list(sc.maturities), quote_k_grid()
     v0 = dyn.v0
     res, times = {}, {"overnight": round(on_s, 2)}
@@ -203,7 +212,7 @@ def arm_xover(store, sc, seed, cfg):
 # ---------------------------------------------------------------- arm: norm
 
 def arm_norm(store, sc, seed, cfg, eps=0.02):
-    net, betas0, recsS, on_s, lvS = overnight(store, sc, seed, cfg)
+    net, betas0, _, _, lvS = overnight(store, sc, seed, cfg)
     dyn, s0, T = sc.dynamics, sc.s0, sc.T
     v0 = dyn.v0
     n_steps, dt = cfg.n_steps, T / cfg.n_steps

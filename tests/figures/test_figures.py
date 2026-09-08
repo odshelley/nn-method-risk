@@ -3,7 +3,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from neural_particle_method.figures import ALL, fig1_accuracy as f1, fig2_wings as f2
+from neural_particle_method.figures import ALL
+from neural_particle_method.figures import fig1_accuracy as f1
+from neural_particle_method.figures import fig2_wings as f2
 from neural_particle_method.tracking.store import Store
 
 
@@ -11,9 +13,10 @@ def _summary(tmp_path):
     rows = []
     for sid in ("s01", "s02", "f_xi0.3_rho-0.7", "f_xi0.6_rho-0.7"):
         for algo in ("nw", "explicit_nn", "ridge", "explicit_nn_is", "implicit_nn"):
-            rows.append(dict(sid=sid, algo=algo, n_particles=50_000, seed=0, status="ok", git_hash="x",
-                             pooled_rmse_bp=10.0, pooled_max_bp=20.0, wings_rmse_bp=15.0, wings_max_bp=25.0,
-                             n_failed=0, total_s=5.0, fit_s=1.0))
+            rows.append({"sid": sid, "algo": algo, "n_particles": 50_000, "seed": 0, "status": "ok",
+                         "git_hash": "x", "pooled_rmse_bp": 10.0, "pooled_max_bp": 20.0,
+                         "wings_rmse_bp": 15.0, "wings_max_bp": 25.0, "n_failed": 0, "total_s": 5.0,
+                         "fit_s": 1.0})
     p = tmp_path / "summary.csv"
     pd.DataFrame(rows).to_csv(p, index=False)
     return p

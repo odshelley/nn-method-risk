@@ -21,5 +21,15 @@ def make_estimator(name, seed=0, first_steps=400, later_steps=120):
     raise KeyError(f"unknown estimator {name!r}; choose from {NAMES}")
 
 
-__all__ = ["Estimator", "GlobalRidge", "KalmanHead", "NNRegressor", "NadarayaWatson", "PSpline",
-           "RidgeHead", "SliceRidge", "make_estimator", "NAMES"]
+__all__ = [
+    "NAMES",
+    "Estimator",
+    "GlobalRidge",
+    "KalmanHead",
+    "NNRegressor",
+    "NadarayaWatson",
+    "PSpline",
+    "RidgeHead",
+    "SliceRidge",
+    "make_estimator",
+]

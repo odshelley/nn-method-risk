@@ -1,4 +1,10 @@
-from neural_particle_method.experiments.config import BUMP_SMOKE, FULL, SMOKE, BumpConfig, WarmConfig
+from neural_particle_method.experiments.config import (
+    BUMP_SMOKE,
+    FULL,
+    SMOKE,
+    BumpConfig,
+    WarmConfig,
+)
 
 
 def test_full_and_smoke_match_legacy_values():

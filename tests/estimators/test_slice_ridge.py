@@ -1,4 +1,5 @@
 import numpy as np
+
 from neural_particle_method.estimators.ridge import SliceRidge as RidgeHead
 
 

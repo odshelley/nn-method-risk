@@ -12,9 +12,8 @@ def store(tmp_path):
 def _fake_run(store, algo, rmse, fail=False, n_particles=1000):
     key = {"sid": "s01", "algo": algo, "n_particles": n_particles, "seed": 0}
     if fail:
-        with pytest.raises(RuntimeError):
-            with store.run("bench", {**key, "git_hash": "abc"}):
-                raise RuntimeError("x")
+        with pytest.raises(RuntimeError), store.run("bench", {**key, "git_hash": "abc"}):
+            raise RuntimeError("x")
         return
     with store.run("bench", {**key, "git_hash": "abc"}) as h:
         h.log_metrics({"pooled_rmse_bp": rmse, "pooled_max_bp": 30.0, "wings_rmse_bp": 20.0,

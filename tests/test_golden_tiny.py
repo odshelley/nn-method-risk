@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 
 from neural_particle_method.bench.algos import ALGOS, run_algo
-from tests.conftest import TINY_EXPLICIT, TINY_IMPLICIT, TINY_N, TINY_REPRICE_N, TINY_REPRICE_STEPS
 from neural_particle_method.bench.scenarios import make_registry, quote_k_grid
 from neural_particle_method.pricing.metrics import iv_metrics, target_ivs
 from neural_particle_method.pricing.reprice import RepriceConfig, reprice_iv
+from tests.conftest import TINY_EXPLICIT, TINY_IMPLICIT, TINY_N, TINY_REPRICE_N, TINY_REPRICE_STEPS
 
 GOLDEN = Path(__file__).parent / "golden"
 

@@ -1,7 +1,6 @@
 """Neural-net conditional-expectation estimator: warm-startable per-slice regressor."""
-import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 V_SCALE = 0.04  # rough variance scale for output conditioning
 Z_SCALE = 0.3   # rough log-spot scale for input conditioning

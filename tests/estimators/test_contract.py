@@ -45,11 +45,11 @@ def test_unit_weights_equal_no_weights(est):
 def _ctor_kwargs(est):
     name = type(est).__name__
     if name == "NNRegressor":
-        return dict(seed=0, first_steps=40, later_steps=20)
+        return {"seed": 0, "first_steps": 40, "later_steps": 20}
     if name == "SliceRidge":
-        return dict(seed=0, body_steps=40)
+        return {"seed": 0, "body_steps": 40}
     if name == "GlobalRidge":
-        return dict(net=_global_net(), T=1.0)
+        return {"net": _global_net(), "T": 1.0}
     return {}
 
 

@@ -4,14 +4,15 @@ import time
 
 import numpy as np
 
-from ..calibrate.config import ExplicitConfig, ImplicitConfig
+from ..calibrate.config import ExplicitConfig
 from ..calibrate.explicit import calibrate_explicit
 from ..calibrate.implicit import calibrate_implicit, simulate_slices
 from ..estimators import make_estimator
 from ..estimators.ridge import GlobalRidge
 from ..market.ssvi import SSVIParams, no_arb_ok
 from ..simulate.dynamics import HestonParams
-from ..simulate.leverage import DEFAULT_GRID as GRID, LeverageField, Slice
+from ..simulate.leverage import DEFAULT_GRID as GRID
+from ..simulate.leverage import LeverageField, Slice
 
 ALPHA = 0.5
 

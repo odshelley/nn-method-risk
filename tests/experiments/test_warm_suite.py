@@ -1,9 +1,9 @@
 import pytest
 
+from neural_particle_method.bench.scenarios import make_registry
 from neural_particle_method.experiments.bump_correct import run_pair
 from neural_particle_method.experiments.config import BUMP_SMOKE, SMOKE
 from neural_particle_method.experiments.warm_suite import ARMS, job_list, run_warm, summarise
-from neural_particle_method.bench.scenarios import make_registry
 from neural_particle_method.tracking.store import Store
 
 

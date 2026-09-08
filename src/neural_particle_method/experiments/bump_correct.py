@@ -28,7 +28,7 @@ def run_pair(store, sc, seed, cfg):
 
     dyn, s0, T, mats, kq = sc.dynamics, sc.s0, sc.T, list(sc.maturities), quote_k_grid()
     v0 = dyn.v0
-    N, n_steps, sub, n_iters, fit_steps = cfg.N, cfg.n_steps, cfg.sub, cfg.n_iters, cfg.fit_steps
+    N, n_steps, sub, _, _ = cfg.N, cfg.n_steps, cfg.sub, cfg.n_iters, cfg.fit_steps
     lvS = SSVILocalVol(sc.ssvi, s0, T_max=T)
     pB = bump(sc.ssvi)
     lvB = SSVILocalVol(pB, s0, T_max=T)

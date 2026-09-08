@@ -3,7 +3,7 @@ import pytest
 
 from neural_particle_method.calibrate.config import ExplicitConfig
 from neural_particle_method.calibrate.explicit import calibrate_explicit
-from neural_particle_method.calibrate.importance import MixtureDesign, design_mixture
+from neural_particle_method.calibrate.importance import design_mixture
 from neural_particle_method.estimators import make_estimator
 from neural_particle_method.pricing.reprice import mc_smile
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..estimators.nn import V_SCALE, Z_SCALE
 from ..simulate.dynamics import HestonParams

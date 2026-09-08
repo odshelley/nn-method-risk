@@ -1,5 +1,10 @@
+from neural_particle_method.bench.scenarios import (
+    fig3_registry,
+    full_registry,
+    make_registry,
+    quote_k_grid,
+)
 from neural_particle_method.market.ssvi import no_arb_ok
-from neural_particle_method.bench.scenarios import make_registry, fig3_registry, full_registry, quote_k_grid
 from neural_particle_method.simulate.dynamics import HestonParams
 
 
