@@ -183,7 +183,8 @@ def _appendix_tex(store, settings):
             "\\midrule",
         ]
         for sid, r in piv.iterrows():
-            lines.append(f"{sid} & " + " & ".join(_cell(v) for v in r.values) + "\\\\")
+            row_sid = str(sid).replace("_", "\\_")
+            lines.append(f"{row_sid} & " + " & ".join(_cell(v) for v in r.values) + "\\\\")
         lines += ["\\bottomrule", "\\end{tabular}"]
         blocks.append("% cold suite, pooled MAE bp\n" + "\n".join(lines))
     lagged = _finished(store, settings.experiment("suite_lagged"))
@@ -200,7 +201,8 @@ def _appendix_tex(store, settings):
             "\\midrule",
         ]
         for sid, r in piv.iterrows():
-            lines.append(f"{sid} & " + " & ".join(_cell(v) for v in r.values) + "\\\\")
+            row_sid = str(sid).replace("_", "\\_")
+            lines.append(f"{row_sid} & " + " & ".join(_cell(v) for v in r.values) + "\\\\")
         lines += ["\\bottomrule", "\\end{tabular}"]
         blocks.append("% lagged suite, pooled MAE bp\n" + "\n".join(lines))
     return "\n\n".join(blocks) + "\n" if blocks else "% no finished suite runs\n"

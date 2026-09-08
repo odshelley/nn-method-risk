@@ -37,6 +37,21 @@ def store(tmp_path):
             "pooled_mae_bp": 20.0, "pooled_rmse_bp": 25.0, "wings_mae_bp": 30.0,
             "mae_bp/T0.25": 35.0, "online_s": 2.5,
         })
+    heston_cold_params = {"sid": "li_simple", "algo": "nw", "seed": 0, **common}
+    with s.run("suite_cold", heston_cold_params) as h:
+        h.log_metrics({
+            "pooled_mae_bp": 15.0, "pooled_rmse_bp": 18.0, "wings_mae_bp": 22.0,
+            "lev_rmse": 0.05, "fit_s": 1.0, "mae_bp/T0.25": 15.0,
+        })
+    heston_lagged_params = {
+        "sid": "li_simple", "method": "explicit_rkhs", "offline_n": 200_000, "lag": "surface",
+        "seed": 0, "n_steps": 200,
+    }
+    with s.run("suite_lagged", heston_lagged_params) as h:
+        h.log_metrics({
+            "pooled_mae_bp": 22.0, "pooled_rmse_bp": 27.0, "wings_mae_bp": 33.0,
+            "mae_bp/T0.25": 37.0, "online_s": 2.7,
+        })
     return s
 
 
@@ -67,3 +82,10 @@ def test_lagged_frame_and_files(store, tmp_path):
     assert "\\begin{tabular}" in cold and "NW & 20 & 20 &" in cold
     assert "Explicit NN & -- & --" in cold
     assert "PDE (attainable floor) & 3 & 3 &" in cold
+
+
+def test_appendix_escapes_underscore_scenario_ids(store, tmp_path):
+    section4_tables(store, tmp_path / "tables", FULL)
+    appendix = (tmp_path / "tables" / "suite_appendix.tex").read_text()
+    assert "li\\_simple &" in appendix
+    assert "li_simple &" not in appendix
