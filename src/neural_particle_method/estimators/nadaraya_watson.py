@@ -39,10 +39,10 @@ class GHLKernel:
     Without a local-vol object the ATM vol is proxied by sqrt(mean(v)) of the cloud."""
     supports_weights = True
 
-    def __init__(self, c=1.0, kernel="quartic", local_vol=None, s0=1.0):
+    def __init__(self, c=1.0, kernel="quartic", local_vol=None, s0=1.0, fixed_scale=None):
         if kernel not in ("quartic", "gaussian"):
             raise ValueError(f"unknown kernel {kernel!r}")
-        self.c, self.kernel, self.local_vol, self.s0 = c, kernel, local_vol, s0
+        self.c, self.kernel, self.local_vol, self.s0, self.fixed_scale = c, kernel, local_vol, s0, fixed_scale
 
     def sigma_atm(self, t, v):
         if self.local_vol is not None:
@@ -51,6 +51,8 @@ class GHLKernel:
         return float(np.sqrt(np.mean(v)))
 
     def bandwidth(self, t, n, v):
+        if self.fixed_scale is not None:
+            return self.fixed_scale * self.s0 * n ** (-0.2)
         return self.c * 1.5 * self.s0 * self.sigma_atm(t, v) * np.sqrt(max(t, 0.25)) * n ** (-0.2)
 
     def fit_predict(self, t, lnx, v, grid, weights=None, ctx=None):

@@ -3,6 +3,7 @@ import argparse
 from dataclasses import replace
 from pathlib import Path
 
+from .bench.acceptance import run_acceptance
 from .bench.aggregate import aggregate
 from .bench.algos import ALGOS
 from .bench.runner import BENCH_EXPERIMENT, run_key, run_one
@@ -36,6 +37,7 @@ def _parser():
     p.add_argument("--budgets", type=int, nargs="*", default=[10_000, 100_000])
     p.add_argument("--algos", nargs="*", default=list(KNOBS))
     p.add_argument("--jobs", type=int, default=1)
+    p = sub.add_parser("acceptance"); p.add_argument("--cards", nargs="*", default=None)
     p = sub.add_parser("aggregate"); p.add_argument("--out", default="results/summary.csv"); p.add_argument("--digest", default="results/digest.md")
     p = sub.add_parser("figures"); p.add_argument("--summary", default="results/summary.csv"); p.add_argument("--outdir", default="figures/out")
     p = sub.add_parser("experiment"); p.add_argument("which", choices=["bump", "warm"]); p.add_argument("--smoke", action="store_true")
@@ -79,6 +81,9 @@ def main(argv=None):
         jobs = sensitivity_grid(sids=args.sids, budgets=args.budgets, algos=args.algos)
         run_sensitivity(store, jobs, n_jobs=args.jobs)
         return 0
+    if args.cmd == "acceptance":
+        out = run_acceptance(store, names=args.cards or None)
+        return 0 if all(ok for _, ok, _, _ in out) else 1
     if args.cmd == "aggregate":
         df = aggregate(store, args.out, args.digest)
         print(f"{len(df)} runs -> {args.out}")

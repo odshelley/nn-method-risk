@@ -27,6 +27,9 @@ Li (2023) uses h = S0 * N^(-1/5) with truncation eta = 1e-3 and grid |G_t| = max
 
 **Acceptance criterion.** Reproduce Li (2023) Table 2.4 (kernel, Heston market: kappa 1.5768, theta 0.0484, xi 0.5751, rho -0.7, v0 0.1024; N = 1e5, M = 1000) at bandwidth h0: average absolute IV error 1.44% (simple LSVM) and 1.18% (complex LSVM), within the run-to-run band; his h0/3 and h0/10 rows (0.71 to 0.75%) pin the bandwidth-sensitivity curve.
 
+**Achieved (li_simple):** 0.1728% (PASS, run fceb3d1ed0cd4526908a88d29e8bf5dc, N=100000, seed 0)
+**Achieved (li_complex):** 0.8547% (PASS, run e62003bfa5e44428b272879d33a295d7, N=100000, seed 0)
+
 ## Card 2: Exact conditional-Gaussian method (Muguruza 2019)
 
 **Owner:** neural-particle-code session. **Registry:** `muguruza` (needs the per-step vol-path hook in `calibrate/explicit.py`).
@@ -43,6 +46,8 @@ where mu_i and sigma_i^2 are the per-step conditional mean and variance of log S
 **Structural caveat to probe.** The formula needs the conditional-Gaussian step structure: log-spot Gaussian given the vol path, leverage frozen within the step. Exact for the Heston test case as the step size shrinks; probe step-size sensitivity (M sweep) where the frozen-leverage approximation is the only error source.
 
 **Acceptance criterion.** Reproduce the variance-reduction claim of his section 7 qualitatively: match the kernel benchmark's calibrated smile at equal N with visibly lower estimator variance across repetition bands.
+
+**Achieved:** +28.5 bp pooled RMSE vs nw_ghl, tolerance 10 bp (FAIL, run 8f7c25e25a5442149af9071b3d44a631, N=50000, seed 0; nw_ghl reference run 4299e7fa9e09459ab9dfa1e36318e740)
 
 ## Card 3: RKHS ridge (Bayer, Belomestny, Butkovsky, Schoenmakers)
 
@@ -62,6 +67,9 @@ with G_i = V_i. Their numerical section: Gaussian kernel with variance 0.1, L = 
 
 **Acceptance criterion.** Reproduce Bayer et al. Fig. 1 (calibrated smile at N in {1e3, 1e4, 1e5}) on their Heston parameters within the repetition band, and Li's failure at rho = -0.7.
 
+**Achieved (li_simple):** 1.152% (PASS, run 7d028a33e86d4633bbb1bf88687bbebc, N=100000, seed 0)
+**Achieved (li_complex):** 0.8433% (PASS, run c10e8e673d2b4d11bfa7e251dcf3d4c2, N=100000, seed 0)
+
 ## Card 4: Equal-frequency bins (van der Stoep et al. via Li 2023)
 
 **Owner:** this session. **Registry:** `bins` (`estimators/bins.py`).
@@ -73,6 +81,9 @@ with G_i = V_i. Their numerical section: Gaussian kernel with variance 0.1, L = 
 **Documented failure modes to probe.** Piecewise-constant bias in the wings where buckets are wide; degradation as l grows at fixed N (variance) and as l shrinks (bias); no smoothness for the leverage function without post-hoc interpolation.
 
 **Acceptance criterion.** Li (2023) Table 4.2, Heston market, N = 1e5, l = 20: average absolute IV error 0.91% (simple LSVM) and 1.01% (complex LSVM); match within the repetition band.
+
+**Achieved (li_simple):** 0.1583% (PASS, run a2e5743b3ef24feb9961b4536ec0db03, N=100000, seed 0)
+**Achieved (li_complex):** 0.8214% (PASS, run 96cfa0296cdb49a2867acc458046754b, N=100000, seed 0)
 
 ## Card 5: PURBF (Hakala 2019)
 
@@ -93,6 +104,8 @@ weights by ridge-regularised normal equations w = (A^T A - lambda id)^(-1) A^T y
 **Documented failure modes to probe.** Centre placement sensitivity in thin wings; pruning-constant sensitivity.
 
 **Acceptance criterion.** Necessarily qualitative: the paper contains no numeric error tables; all comparisons are figures on proprietary Leonteq FX snapshots (EUR/USD 6M/5Y, USD/JPY 5Y, EUR/BRL 3Y). Criterion: at his configuration on our Heston market with N = 2,048, PURBF with 5-NN widths visibly dominates plain and local-linear kernel regression in the wings without oscillation in the bulk (his Figs. 6, 7, 9 pattern); freeze our first accepted run as the numeric regression target thereafter.
+
+**Achieved:** 0.5549% (PASS against the frozen provisional target of 1.44%, run 65f89c21ec304208bd575bd7878275ce, N=2048, seed 0)
 
 ## Card 6: PDE / Fokker-Planck reference (anchor, not competitor)
 

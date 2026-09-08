@@ -31,6 +31,7 @@ def test_bandwidth_rule():
     assert np.isclose(est.bandwidth(0.1, n, v=None), 1.5 * 0.2 * np.sqrt(0.25) * n ** (-0.2))
     proxy = GHLKernel()
     assert np.isclose(proxy.bandwidth(0.5, n, v=np.full(n, 0.04)), 1.5 * 0.2 * np.sqrt(0.5) * n ** (-0.2))
+    assert GHLKernel(fixed_scale=1.0).bandwidth(0.5, 10_000, None) == 10_000 ** -0.2
 
 
 def test_constant_and_linear_recovery():
