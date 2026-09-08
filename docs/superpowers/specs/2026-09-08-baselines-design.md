@@ -22,7 +22,7 @@ criterion reproducing a number from its source.
 | Budgets | 1e3, 1e4, 1e5 particles; reprice budget unchanged at 500 000 paths, 200 steps. |
 | Muguruza | Corollary 4.1 conditional formula only. |
 | PDE anchor | Implemented by a separate session (PDE-method) on its own branch as a `LeverageField` on the harness time grid; the leverage-error metric is wired in when it lands. Not a blocker. |
-| PURBF | Included; the Hakala paper is obtained and ingested first; the card is written from the source. |
+| PURBF | Included; the Hakala paper is obtained (papers/pdf/hakala_2019_applied_ml_slv_calibration_purbf.pdf) and the card is written from it. |
 | Control variates | Excluded this round; related-work mention on the kernel card only. |
 | Work split | Papers session: `BASELINES.md` cards, `rkhs`, `bins`, Hakala sourcing. This session: harness (Heston family, step-context hook, budgets, sweeps, sensitivity, figures), `nw_ghl`, `muguruza`, `purbf`. |
 
@@ -162,13 +162,22 @@ particle gives single-particle noise (thesis section 4.3). Acceptance: thesis Ta
 absolute IV error 0.91% (simple) and 1.01% (complex) at N = 1e5, l = 20, within 0.3 points.
 Implemented by the papers session.
 
-### `purbf` — partition-of-unity RBF (Hakala 2019)
+### `purbf` — partition-of-unity RBF (Hakala 2019, Frontiers in AI 2:4)
 
-File `purbf.py`, class `PURBF(n_patches, overlap, rbf)`; the three defaults are deliberately unspecified here and are fixed by the card once the source is ingested. Overlapping patches over the
-log-spot range, local RBF least-squares fit per patch, blended by a smooth partition of unity.
-Defaults, knob (`n_patches`), failure mode, and acceptance number are taken from the Hakala paper
-once obtained and ingested; the card is written from the source before implementation. Until the
-paper is in, this estimator is a stub raising `NotImplementedError` and is excluded from sweeps.
+File `purbf.py`, class `PURBF(n_centres=..., n_neighbours=5, lam=...)`. Source at
+`papers/pdf/hakala_2019_applied_ml_slv_calibration_purbf.pdf` (ingested by the papers session).
+From the source: f(x) = sum_j w_j K_{h_j}(x - c_j) / sum_j K_{h_j}(x - c_j) with C << N centres;
+centres are the subsample's min and max plus a random subset, pruned so that no two centres are
+closer than a global constant times the local width; per-centre widths h_j from the distance to
+the 5 nearest centres (his best variant); global rule-of-thumb h = (4 sigma^5 / 3 n)^(1/5) as the
+fallback width; weights from the ridge normal equations w = (A^T A + lam I)^(-1) A^T y with
+A_ij = K_{h_j}(x_i - c_j) (his eq. 3 prints the sign of lam as minus; implement plus, noted on the
+card). Exact default values for `n_centres`, the pruning constant, and `lam` are those of his
+best-performing configuration and are transcribed onto the card by the papers session from the
+paper's experiments section; the implementation reads them from the card. Knob: `n_centres`.
+`supports_weights = True` (row weights). Failure to probe: centre pruning versus wing coverage at
+N = 1e3. Acceptance: reproduce the ordering and magnitude of his benchmark (PURBF beats NW and
+local-linear on his SLV example) within the tolerance stated on the card.
 
 ### Ours (unchanged)
 
@@ -218,7 +227,7 @@ Drafted by the papers session; achieved numbers filled in from the `acceptance` 
   `ConditionalMC` gets its own contract test that constructs a synthetic `StepContext`.
 - Analytic checks: `GHLKernel` and `BinMC` recover a constant E[V|X] exactly and a linear one
   within tolerance; `RKHSRidge` with lam = 1e-12 interpolates a smooth function at the centres;
-  `PURBF` reproduces a quadratic across a patch boundary with no seam (tolerance 1e-6); `ConditionalMC`
+  `PURBF` reproduces a quadratic across neighbouring centres with no seam (tolerance 1e-4); `ConditionalMC`
   on one hand-built step (three particles) matches a hand-computed weighted average to 1e-12.
 - Heston market: `test_heston_market_flat_limit` (xi -> 0 and dynamics = market gives leverage one
   within 0.02 on the mid-band); `test_heston_market_reprices_market` (15 bp at T = 1).
@@ -232,3 +241,12 @@ Drafted by the papers session; achieved numbers filled in from the `acceptance` 
 - Control variates (Cozma et al.), Table 1 (real FX surface), the exact-distribution variant of
   Muguruza, the PDE solver itself (separate session), and any change to the paper's existing
   `bench` results.
+
+## Notes for implementers
+
+- The golden replay tests read archived run JSONs under `results/runs/`, which are gitignored.
+  A fresh worktree or clone must copy `results/runs/` from a checkout that has them before
+  `uv run pytest -m golden` can pass. README gets a line saying so.
+- Branch `baselines-rkhs-bins` (papers session, off `refactor-mlflow`) already carries
+  `BASELINES.md`, `estimators/rkhs.py`, `estimators/bins.py`, and their tests. Harness work
+  lands on `refactor-mlflow` first; that branch rebases onto it.
