@@ -30,6 +30,11 @@ def test_aggregate_writes_csv_and_digest(store, tmp_path):
     assert set(df.status) == {"ok", "failed"}
     md = (tmp_path / "d.md").read_text()
     assert "1 failed" in md and "s01: best = ridge" in md
+    csv_text = (tmp_path / "s.csv").read_text()
+    assert ",0.0," not in csv_text
+    lines = {ln.split(",")[1]: ln for ln in csv_text.splitlines()[1:]}
+    assert lines["nw"].split(",")[9] == "0"
+    assert lines["spline"].split(",")[9] == ""
 
 
 def test_aggregate_empty(store, tmp_path):

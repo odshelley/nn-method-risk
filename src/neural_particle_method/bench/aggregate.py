@@ -25,6 +25,7 @@ def aggregate(store, out_csv="results/summary.csv", out_md="results/digest.md"):
     df = pd.DataFrame(rows, columns=COLUMNS)
     if len(df):
         df = df.sort_values(["sid", "algo", "n_particles", "seed"]).reset_index(drop=True)
+        df["n_failed"] = df["n_failed"].astype("Int64")
     Path(out_csv).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_csv, index=False)
     n_fail = int((df.status == "failed").sum())

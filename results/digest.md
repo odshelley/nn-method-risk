@@ -1,5 +1,5 @@
 # Benchmark digest
-876 runs, 0 failed, 0 unreadable
+876 runs, 0 failed
 
 - f_xi0.3_rho-0.3: best = nw (52.1 bp)
 - f_xi0.3_rho-0.7: best = nw (50.9 bp)
