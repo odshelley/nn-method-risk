@@ -37,6 +37,7 @@ def _parser():
     p.add_argument("--budgets", type=int, nargs="*", default=[10_000, 100_000])
     p.add_argument("--algos", nargs="*", default=list(KNOBS))
     p.add_argument("--jobs", type=int, default=1)
+    p.add_argument("--n-steps", type=int, default=None)
     p = sub.add_parser("acceptance"); p.add_argument("--cards", nargs="*", default=None)
     p = sub.add_parser("aggregate"); p.add_argument("--out", default="results/summary.csv"); p.add_argument("--digest", default="results/digest.md")
     p.add_argument("--experiment", default="bench")
@@ -80,7 +81,9 @@ def main(argv=None):
         return 0
     if args.cmd == "sensitivity":
         jobs = sensitivity_grid(sids=args.sids, budgets=args.budgets, algos=args.algos)
-        run_sensitivity(store, jobs, n_jobs=args.jobs)
+        e = ExplicitConfig() if args.n_steps is None else replace(ExplicitConfig(), n_steps=args.n_steps)
+        i = ImplicitConfig() if args.n_steps is None else replace(ImplicitConfig(), n_steps=args.n_steps)
+        run_sensitivity(store, jobs, n_jobs=args.jobs, explicit=e, implicit=i)
         return 0
     if args.cmd == "acceptance":
         out = run_acceptance(store, names=args.cards or None)
