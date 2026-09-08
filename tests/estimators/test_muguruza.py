@@ -30,10 +30,28 @@ def test_hand_computed_three_particles():
     assert abs(got[0] - expected) < 1e-12
 
 
-def test_zero_variance_particles_are_dropped():
+def test_zero_variance_particles_are_point_masses():
+    # particle 0 is healthy (v_prev = 0.04, V = 0.05); particle 1 is degenerate (v_prev = 0, V = 0.9)
+    # and contributes a point mass at its own mu (which is exactly grid[0] = 0.0 here) with weight 1.
     ctx = _ctx([0.0, 0.0], [0.04, 0.0], [1.0, 1.0], [0.0, 0.0], [0.0, 0.0])
-    f = ConditionalMC().fit_predict(0.1, np.zeros(2), np.array([0.05, 0.9]), np.array([0.0]), ctx=ctx)
-    assert abs(f[0] - 0.05) < 1e-12
+    grid = np.array([0.0])
+    rho = DYN.rho
+    mu0 = (ctx.lnx_prev[0] - 0.5 * ctx.L_p[0] ** 2 * ctx.v_prev[0] * ctx.dt
+           + ctx.L_p[0] * np.sqrt(ctx.v_prev[0]) * rho * ctx.zb[0] * np.sqrt(ctx.dt))
+    s2_0 = (1 - rho ** 2) * ctx.L_p[0] ** 2 * ctx.v_prev[0] * ctx.dt
+    phi = np.exp(-0.5 * (grid[0] - mu0) ** 2 / s2_0) / np.sqrt(s2_0)
+    expected = (phi * 0.05 + 1.0 * 0.9) / (phi + 1.0)
+    got = ConditionalMC().fit_predict(0.1, np.zeros(2), np.array([0.05, 0.9]), grid, ctx=ctx)
+    assert abs(got[0] - expected) < 1e-12
+
+
+def test_all_degenerate_does_not_raise():
+    ctx = _ctx([0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [0.0, 0.0], [0.0, 0.0])
+    grid = np.array([-0.1, 0.0, 0.1])
+    f = ConditionalMC().fit_predict(0.1, np.zeros(2), np.array([0.2, 0.4]), grid, ctx=ctx)
+    assert np.all(np.isfinite(f))
+    # both particles are degenerate with mu = 0, which lands exactly on grid[1]
+    assert abs(f[1] - 0.3) < 1e-12
 
 
 def test_weights_and_tilt_enter():
