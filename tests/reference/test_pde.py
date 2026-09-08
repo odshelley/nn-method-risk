@@ -63,6 +63,7 @@ def test_xi_to_zero_flat_surface_gives_unit_leverage():
         assert np.abs(s.L - 1.0).max() < 1e-2, s.t
 
 
+@pytest.mark.slow
 def test_calibrated_to_own_market_reprices_it(li_market):
     """(b) Market = Li Heston, calibrated dynamics = Li: the exact leverage is 1 and the PDE
     reprices the market. Coarse grid (nx=401 on [-3, 3], nv=100, 50 steps): measured 4.9 bp max."""
@@ -79,6 +80,7 @@ def test_calibrated_to_own_market_reprices_it(li_market):
             assert core.sum() > 50 and np.abs(s.L[core] - 1.0).max() < 0.05, s.t
 
 
+@pytest.mark.slow
 def test_calibrated_lsv_reprices_heston_market(li_market):
     """(b) Different calibrated dynamics: the frozen-leverage scheme's O(dt) bias dominates at
     50 steps (docs/pde_reference.md table 2). Small grid here (measured 16.5 bp max at
@@ -97,6 +99,7 @@ def test_calibrated_lsv_reprices_heston_market(li_market):
         assert np.isin(s.grid, res.x_grid).all() and len(s.grid) == len(s.L) == len(s.f)
 
 
+@pytest.mark.slow
 def test_ssvi_scenario_reprices_targets_at_snapped_maturities():
     """(b) s01 with the analytic Dupire local vol, T = 2, maturities snapped like reprice_iv.
     Short maturities carry the scheme's O(dt) bias (6 steps to T = 0.25); T >= 1 is at a few bp."""

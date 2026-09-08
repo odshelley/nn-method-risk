@@ -97,7 +97,9 @@ constant coefficients.
 
 ## Validation
 
-Tests in `tests/reference/` (about 30 s in the default suite; `-m slow` adds the reference-grid runs):
+Tests in `tests/reference/`. The default suite keeps only the cheap ones (about 6 s: operator
+conservation, CIR law, xi -> 0, pricing helpers); the repricing checks below run with
+`uv run pytest tests/reference -m slow` (about 2 min):
 
 - Operator: interior conservation to 1e-13; marginal non-negative; with L = 0 the
   v-marginal reproduces the CIR transition law (mean, variance, and the non-central

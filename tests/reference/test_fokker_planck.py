@@ -76,6 +76,7 @@ def _heston_iv_err_bp(params, T, nx, nv, n_steps=50, n_sub=2):
     return (iv - iv_ex) * 1e4
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("params,tol_bp", [(LI, 8.0), (FELLER, 4.5)])
 def test_pure_heston_reprices_heston_call_coarse(params, tol_bp):
     """Coarse grid (nx=401 on [-3, 3], nv=100); the reference grid is the slow test."""
