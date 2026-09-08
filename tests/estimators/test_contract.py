@@ -22,6 +22,8 @@ def _all():
             make_estimator("nw"),
             make_estimator("ridge", seed=0, first_steps=40),
             make_estimator("spline"),
+            make_estimator("bins"),
+            make_estimator("rkhs"),
             GlobalRidge(_global_net(), T=1.0)]
 
 
