@@ -32,3 +32,27 @@ def test_run_one_picks_up_the_reference_and_logs_lev_rmse(tmp_path):
     rid = run_one(store, "li_simple", "nw", TINY_N, 0, explicit, TINY_IMPLICIT, TINY_REPRICE)
     m = store.get_metrics(rid)
     assert "lev_rmse" in m and m["lev_rmse"] >= 0.0
+
+
+def test_reference_is_keyed_by_n_steps_and_lag(tmp_path):
+    store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
+    a = run_reference(store, "li_simple", n_steps=6, n_x=41, n_v=20)
+    b = run_reference(store, "li_simple", n_steps=4, n_x=41, n_v=20)
+    assert a != b
+    assert store.get_params(a)["lag"] == "none"
+    explicit = replace(TINY_EXPLICIT, n_steps=4)
+    rid = run_one(store, "li_simple", "nw", TINY_N, 0, explicit, TINY_IMPLICIT, TINY_REPRICE)
+    m = store.get_metrics(rid)
+    assert "lev_rmse" in m            # matched the 4-step reference, not the 6-step one
+
+
+def test_reference_accepts_an_explicit_scenario(tmp_path):
+    from dataclasses import replace as dc_replace
+
+    from neural_particle_method.bench.scenarios import full_registry
+    store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
+    sc = dc_replace(full_registry()["li_simple"], s0=1.02)
+    rid = run_reference(store, "li_simple", n_steps=6, n_x=41, n_v=20, scenario=sc, lag="surface_spot")
+    p = store.get_params(rid)
+    assert p["lag"] == "surface_spot" and p["s0"] == "1.02"
+    assert run_reference(store, "li_simple", n_steps=6, n_x=41, n_v=20) != rid

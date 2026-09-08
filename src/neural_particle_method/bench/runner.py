@@ -25,9 +25,9 @@ def _prefixed(prefix, d):
     return {f"{prefix}.{k}": v for k, v in d.items()}
 
 
-def _leverage_error(store, sid, field):
-    """RMSE against the PDE reference leverage for this scenario, when one is in the store."""
-    rid = store.find_finished(PDE_EXPERIMENT, {"sid": sid})
+def _leverage_error(store, sid, field, n_steps, lag="none"):
+    """RMSE against the PDE reference leverage for this scenario at the same step count and lag."""
+    rid = store.find_finished(PDE_EXPERIMENT, {"sid": sid, "n_steps": int(n_steps), "lag": lag})
     if rid is None:
         return {}
     with tempfile.TemporaryDirectory() as d:
@@ -43,7 +43,8 @@ def _leverage_error(store, sid, field):
 
 
 def run_one(store, sid, algo, n_particles, seed, explicit=ExplicitConfig(), implicit=ImplicitConfig(),
-            reprice=RepriceConfig(), *, experiment=BENCH_EXPERIMENT, knobs=None, extra_key=None):
+            reprice=RepriceConfig(), *, experiment=BENCH_EXPERIMENT, knobs=None, extra_key=None,
+            save_model=None):
     key = {**run_key(sid, algo, n_particles, seed), **(extra_key or {})}
     existing = store.find_finished(experiment, key)
     if existing is not None:
@@ -71,9 +72,11 @@ def run_one(store, sid, algo, n_particles, seed, explicit=ExplicitConfig(), impl
         metrics["budget"] = int(n_particles)
         if extra_key and "knob_value" in extra_key:
             metrics["knob_value"] = float(extra_key["knob_value"])
-        metrics.update(_leverage_error(store, sid, res.field))
+        metrics.update(_leverage_error(store, sid, res.field, explicit.n_steps))
         h.log_metrics(metrics)
         h.log_json("leverage.json", res.field.to_json())
         h.log_json("iv_err_bp.json", ((iv_model - iv_target) * 1e4).tolist())
         h.log_json("diagnostics.json", to_jsonable(res.diagnostics))
+        if save_model is not None:
+            save_model(h, res)
         return h.run_id

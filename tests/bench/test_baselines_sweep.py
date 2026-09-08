@@ -46,7 +46,8 @@ def test_lev_rmse_logged_when_pde_reference_exists(tmp_path):
     store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     rid = run_one(store, "s01", "nw", TINY_N, 0, TINY_EXPLICIT, TINY_IMPLICIT, TINY_REPRICE)
     lev = json.loads(store.download(rid, "leverage.json", tmp_path / "d").read_text())
-    with store.run("pde_reference", {"sid": "s01"}) as h:      # a fake reference equal to the nw field
+    ref_key = {"sid": "s01", "n_steps": TINY_EXPLICIT.n_steps, "lag": "none"}
+    with store.run("pde_reference", ref_key) as h:      # a fake reference equal to the nw field
         h.log_json("leverage.json", lev)
     rid2 = run_one(store, "s01", "nw", TINY_N, 1, TINY_EXPLICIT, TINY_IMPLICIT, TINY_REPRICE)
     m = store.get_metrics(rid2)
@@ -61,7 +62,8 @@ def test_lev_rmse_skipped_when_time_grids_differ(tmp_path, capsys):
     lev = json.loads(store.download(rid, "leverage.json", tmp_path / "d").read_text())
     field = LeverageField.from_json(lev)
     coarse = LeverageField(list(field)[::2])   # every other slice: a coarser, misaligned time grid
-    with store.run("pde_reference", {"sid": "s01", "n_steps": 3}) as h:
+    ref_key = {"sid": "s01", "n_steps": TINY_EXPLICIT.n_steps, "lag": "none"}
+    with store.run("pde_reference", ref_key) as h:  # matching key, coarser/misaligned time grid
         h.log_json("leverage.json", coarse.to_json())
     rid2 = run_one(store, "s01", "nw", TINY_N, 1, TINY_EXPLICIT, TINY_IMPLICIT, TINY_REPRICE)
     m = store.get_metrics(rid2)
