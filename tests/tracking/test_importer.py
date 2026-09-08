@@ -64,3 +64,18 @@ def test_import_all_reports_counts(store, tmp_path):
     (tmp_path / "bump").mkdir(); (tmp_path / "warm").mkdir()
     counts = import_all(store, tmp_path)
     assert counts == {"bench": 2, "bump": 0, "warm": 0, "overnight": 0}
+
+
+def test_import_warm_routes_smoke_files_to_separate_experiment(store, tmp_path):
+    d = tmp_path / "warm"; d.mkdir()
+    (d / "seq_s01_s0.json").write_text(json.dumps(SEQ))
+    (d / "smoke_seq_s01_s0.json").write_text(json.dumps(SEQ))
+    assert import_warm(store, d) == 2
+
+    warm = store.search("warm")
+    smoke = store.search("warm_smoke")
+    assert len(warm) == 1
+    assert len(smoke) == 1
+    assert smoke.loc[0, "tags.smoke"] == "true"
+
+    assert import_warm(store, d) == 0

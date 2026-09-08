@@ -93,15 +93,19 @@ def import_warm(store, warm_dir="results/warm"):
     n = 0
     for p in sorted(Path(warm_dir).glob("*.json")):
         d = _read(p)
-        if d is None or "arm" not in d or _already(store, "warm", p):
+        if d is None or "arm" not in d:
+            continue
+        # legacy smoke-test runs (filename prefixed "smoke_", arm field itself is bare)
+        # go to a separate experiment so they never collide with genuine runs sharing
+        # the same (arm, sid, seed) params, and never leak into the paper summary.
+        is_smoke = p.name.startswith("smoke_")
+        experiment = "warm_smoke" if is_smoke else "warm"
+        if _already(store, experiment, p):
             continue
         params = {"arm": d["arm"], "sid": d["sid"], "seed": d["seed"], "legacy_path": _rel(p)}
-        # legacy smoke-test runs prefix the arm name (e.g. "smoke_norm") but keep the
-        # document shape of the underlying arm; strip the prefix only to pick the right
-        # _log_doc branch, the raw arm name is still what gets stored as the param.
-        base_arm = d["arm"].removeprefix("smoke_")
-        with store.run("warm", params, TAGS) as h:
-            _log_doc(h, base_arm, to_jsonable(d))
+        tags = {**TAGS, "smoke": "true"} if is_smoke else TAGS
+        with store.run(experiment, params, tags) as h:
+            _log_doc(h, d["arm"], to_jsonable(d))
         n += 1
     return n
 
@@ -113,7 +117,10 @@ def import_overnight_cache(store, cache_dir="results/warm/cache"):
     n = 0
     for p in sorted(Path(cache_dir).glob("*.pt")):
         m = _CACHE.match(p.name)
-        if not m or _already(store, "overnight", p):
+        if not m:
+            print(f"warning: skipping unrecognised cache file {p}")
+            continue
+        if _already(store, "overnight", p):
             continue
         blob = torch.load(p, weights_only=False)
         params = {"sid": m["sid"], "seed": int(m["seed"]), "N": int(m["N"]), "n_steps": int(m["k"]),
