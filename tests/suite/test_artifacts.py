@@ -50,7 +50,8 @@ def test_slice_bank_time_rule_matches_leverage_field():
     x = np.zeros(3)
     dt = sc.T / E.n_steps
     np.testing.assert_allclose(bank.f(dt * 1.5, x), bank.f(dt, x))          # last time <= t
-    np.testing.assert_allclose(bank.f(0.0, x), bank.f(dt, x))               # before the first slice: first slice
+    # before the first slice: first slice
+    np.testing.assert_allclose(bank.f(0.0, x), bank.f(dt, x))
 
 
 def test_global_net_model_matches_the_network():
@@ -77,7 +78,9 @@ def test_save_and_load_round_trip(store, tmp_path):
     assert lr.meta["body"] == "explicit" and lr.meta["kind"] == "explicit_slices"
     assert isinstance(lr.model, SliceBank) and lr.params["sid"] == "s01"
     x = np.linspace(-0.2, 0.2, 9)
-    np.testing.assert_allclose(lr.model.f(0.3, x), SliceBank.from_regressor(est).f(0.3, x), rtol=1e-6)
+    np.testing.assert_allclose(
+        lr.model.f(0.3, x), SliceBank.from_regressor(est).f(0.3, x), rtol=1e-6
+    )
     for a, b in zip(lr.field, r.field):
         np.testing.assert_array_equal(a.L, b.L)
         np.testing.assert_array_equal(a.f, b.f)

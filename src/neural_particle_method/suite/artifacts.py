@@ -20,7 +20,8 @@ def _slice_index(times, t):
 
 
 class SliceBank:
-    """Per-slice explicit networks; slice in force at t is the last time <= t (as LeverageField.at)."""
+    """Per-slice explicit networks; slice in force at t is the last time <= t (as
+    LeverageField.at)."""
 
     def __init__(self, times, nets):
         self.times, self.nets = np.asarray(times, dtype=float), list(nets)
@@ -94,7 +95,8 @@ class GlobalNetModel:
         return np.concatenate([h.weight.detach().numpy()[0], h.bias.detach().numpy()])
 
     def state(self):
-        return {"T": self.T, "hidden": self.net.body[0].out_features, "state_dict": self.net.state_dict()}
+        return {"T": self.T, "hidden": self.net.body[0].out_features,
+                "state_dict": self.net.state_dict()}
 
     @classmethod
     def from_state(cls, d):
@@ -124,7 +126,10 @@ def _to_model(model, T):
 
 
 def save_model(h, model, meta):
-    """Log model.pt and model_meta.json to run handle `h`. `meta` must carry "T" for implicit nets."""
+    """Log model.pt and model_meta.json to run handle `h`.
+
+    `meta` must carry "T" for implicit nets.
+    """
     kind = model_kind(model)
     doc = {**meta, "kind": kind}
     if kind != "field_only":
@@ -150,12 +155,16 @@ class LoadedRun:
 def load_run(store, run_id):
     """Rebuild a suite run's field and trained object from its artifacts alone."""
     with tempfile.TemporaryDirectory() as d:
-        field = LeverageField.from_json(json.loads(store.download(run_id, "leverage.json", d).read_text()))
+        leverage_text = store.download(run_id, "leverage.json", d).read_text()
+        field = LeverageField.from_json(json.loads(leverage_text))
         names = {a.path for a in store.client.list_artifacts(run_id)}
         meta = (json.loads(store.download(run_id, "model_meta.json", d).read_text())
                 if "model_meta.json" in names else {})
         model = None
         if "model.pt" in names:
             blob = torch.load(store.download(run_id, "model.pt", d), weights_only=True)
-            model = (SliceBank if blob["kind"] == "explicit_slices" else GlobalNetModel).from_state(blob["state"])
-    return LoadedRun(run_id, store.get_params(run_id), store.get_metrics(run_id), field, model, meta)
+            cls = SliceBank if blob["kind"] == "explicit_slices" else GlobalNetModel
+            model = cls.from_state(blob["state"])
+    return LoadedRun(
+        run_id, store.get_params(run_id), store.get_metrics(run_id), field, model, meta
+    )
