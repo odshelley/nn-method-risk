@@ -87,7 +87,8 @@ def test_per_slice_nw_implicit_runs_all_shifts():
 def test_fit_v_floor_changes_the_fit_only_when_variance_goes_negative():
     sc = full_registry()["s11"]   # Feller-violating: raw Euler v goes negative
     est = make_estimator("nw", seed=0, first_steps=5, later_steps=2, local_vol=sc.local_vol(), s0=sc.s0)
-    raw = calibrate_explicit(sc.local_vol(), sc.dynamics, est, replace(TINY_E, fit_v_floor=False), s0=sc.s0, T=sc.T, seed=0)
+    raw = calibrate_explicit(sc.local_vol(), sc.dynamics, est, replace(TINY_E, fit_v_floor=False),
+                             s0=sc.s0, T=sc.T, seed=0)
     flo = calibrate_explicit(sc.local_vol(), sc.dynamics, est, replace(TINY_E, fit_v_floor=True), s0=sc.s0, T=sc.T, seed=0)
     assert np.array_equal(raw.field[0].f, flo.field[0].f)          # slice 0 is v0 in both
     assert np.all(flo.field[1].f >= raw.field[1].f - 1e-12) and not np.array_equal(raw.field[1].f, flo.field[1].f)

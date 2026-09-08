@@ -17,7 +17,8 @@ class ExplicitConfig:
     later_steps: int = 120
     snapshot_times: tuple = ()
     grid: str = "quantile"  # "quantile": per-slice cloud quantiles (paper); "fixed": DEFAULT_GRID
-    fit_v_floor: bool = True  # fit the estimator on max(v, 0), the variance the dynamics use; False = pre-fix paper behaviour
+    # fit the estimator on max(v, 0), the variance the dynamics use; False = pre-fix paper behaviour
+    fit_v_floor: bool = True
 
     def as_params(self):
         return _flat(asdict(self))

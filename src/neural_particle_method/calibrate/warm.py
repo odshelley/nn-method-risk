@@ -129,7 +129,8 @@ def full_resolve(lv, params, s0, T, cfg, seed, L0=None, n_iters=None, fit_v_floo
     """Explicit warm start (unless L0 given) followed by the damped implicit solve. Returns (field, seconds)."""
     t0 = time.perf_counter()
     if L0 is None:
-        ecfg = ExplicitConfig(n_steps=cfg.n_steps, n_particles=cfg.n_particles, fit_v_floor=fit_v_floor)
+        ecfg = ExplicitConfig(n_steps=cfg.n_steps, n_particles=cfg.n_particles,
+                              fit_v_floor=fit_v_floor)
         L0 = calibrate_explicit(lv, params, make_estimator("nn", seed=seed, first_steps=ecfg.first_steps,
                                                             later_steps=ecfg.later_steps),
                                 ecfg, s0=s0, T=T, seed=seed).field
