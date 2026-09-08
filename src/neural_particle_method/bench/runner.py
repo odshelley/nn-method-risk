@@ -1,12 +1,19 @@
 """Run one (scenario, algo, N, seed) and record it in the store."""
+import json
+import tempfile
+
+import numpy as np
+
 from ..calibrate.config import ExplicitConfig, ImplicitConfig
 from ..pricing.metrics import iv_metrics
 from ..pricing.reprice import RepriceConfig, reprice_iv, snap_times
+from ..simulate.leverage import DEFAULT_GRID, LeverageField
 from ..tracking.store import git_hash, to_jsonable
 from .algos import run_algo
 from .scenarios import full_registry, quote_k_grid
 
 BENCH_EXPERIMENT = "bench"
+PDE_EXPERIMENT = "pde_reference"
 SCHEMA = 2
 
 
@@ -18,19 +25,33 @@ def _prefixed(prefix, d):
     return {f"{prefix}.{k}": v for k, v in d.items()}
 
 
+def _leverage_error(store, sid, field):
+    """RMSE against the PDE reference leverage for this scenario, when one is in the store."""
+    rid = store.find_finished(PDE_EXPERIMENT, {"sid": sid})
+    if rid is None:
+        return {}
+    with tempfile.TemporaryDirectory() as d:
+        ref = LeverageField.from_json(json.loads(store.download(rid, "leverage.json", d).read_text()))
+    a, b = field.resample(DEFAULT_GRID), ref.resample(DEFAULT_GRID)
+    n = min(len(a), len(b))
+    per = {f"lev_rmse/T{a[k].t:g}": float(np.sqrt(np.mean((a[k].L - b[k].L) ** 2))) for k in range(n)}
+    pooled = float(np.sqrt(np.mean([(a[k].L - b[k].L) ** 2 for k in range(n)])))
+    return {"lev_rmse": pooled, **per}
+
+
 def run_one(store, sid, algo, n_particles, seed, explicit=ExplicitConfig(), implicit=ImplicitConfig(),
-            reprice=RepriceConfig()):
-    key = run_key(sid, algo, n_particles, seed)
-    existing = store.find_finished(BENCH_EXPERIMENT, key)
+            reprice=RepriceConfig(), *, experiment=BENCH_EXPERIMENT, knobs=None, extra_key=None):
+    key = {**run_key(sid, algo, n_particles, seed), **(extra_key or {})}
+    existing = store.find_finished(experiment, key)
     if existing is not None:
         return existing
     sc = full_registry()[sid]
-    params = {**key, "git_hash": git_hash(), "schema": SCHEMA,
+    params = {**key, "git_hash": git_hash(), "schema": SCHEMA, "budget": int(n_particles),
               **_prefixed("explicit", explicit.as_params()), **_prefixed("implicit", implicit.as_params()),
-              **_prefixed("reprice", reprice.as_params()),
-              **sc.as_params()}
-    with store.run(BENCH_EXPERIMENT, params) as h:
-        res = run_algo(algo, sc, n_particles, seed, explicit, implicit)
+              **_prefixed("reprice", reprice.as_params()), **sc.as_params(),
+              **_prefixed("estimator", knobs or {})}
+    with store.run(experiment, params) as h:
+        res = run_algo(algo, sc, n_particles, seed, explicit, implicit, knobs=knobs)
         k = quote_k_grid()
         mats = list(sc.maturities)
         iv_model = reprice_iv(res.field, sc.dynamics, sc.s0, mats, k, reprice, seed=seed + 10_000)
@@ -42,6 +63,8 @@ def run_one(store, sid, algo, n_particles, seed, explicit=ExplicitConfig(), impl
         for c in ("intraday_s", "overnight_s"):
             if c in res.diagnostics:
                 metrics[c] = res.diagnostics[c]
+        metrics["budget"] = int(n_particles)
+        metrics.update(_leverage_error(store, sid, res.field))
         h.log_metrics(metrics)
         h.log_json("leverage.json", res.field.to_json())
         h.log_json("iv_err_bp.json", ((iv_model - iv_target) * 1e4).tolist())

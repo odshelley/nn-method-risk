@@ -7,7 +7,7 @@ from .bench.aggregate import aggregate
 from .bench.algos import ALGOS
 from .bench.runner import BENCH_EXPERIMENT, run_key, run_one
 from .bench.scenarios import full_registry
-from .bench.sweep import paper_grid, sweep
+from .bench.sweep import baselines_grid, paper_grid, sweep
 from .calibrate.config import ExplicitConfig, ImplicitConfig
 from .experiments.bump_correct import run_pair
 from .experiments.config import BUMP_FULL, BUMP_SMOKE, FULL, SMOKE
@@ -29,7 +29,7 @@ def _parser():
     p.add_argument("--n", type=int, required=True); p.add_argument("--seed", type=int, default=0)
     p.add_argument("--n-steps", type=int, default=None)
     p.add_argument("--reprice-n", type=int, default=500_000); p.add_argument("--reprice-steps", type=int, default=200)
-    p = sub.add_parser("sweep"); p.add_argument("--preset", default="paper", choices=["paper"]); p.add_argument("--jobs", type=int, default=1)
+    p = sub.add_parser("sweep"); p.add_argument("--preset", default="paper", choices=["paper", "baselines"]); p.add_argument("--jobs", type=int, default=1)
     p = sub.add_parser("aggregate"); p.add_argument("--out", default="results/summary.csv"); p.add_argument("--digest", default="results/digest.md")
     p = sub.add_parser("figures"); p.add_argument("--summary", default="results/summary.csv"); p.add_argument("--outdir", default="figures/out")
     p = sub.add_parser("experiment"); p.add_argument("which", choices=["bump", "warm"]); p.add_argument("--smoke", action="store_true")
@@ -64,7 +64,10 @@ def main(argv=None):
         print(f"run_id {rid}")
         return 0
     if args.cmd == "sweep":
-        sweep(store, paper_grid(), n_jobs=args.jobs)
+        if args.preset == "baselines":
+            sweep(store, baselines_grid(), n_jobs=args.jobs, experiment="baselines")
+        else:
+            sweep(store, paper_grid(), n_jobs=args.jobs)
         return 0
     if args.cmd == "aggregate":
         df = aggregate(store, args.out, args.digest)

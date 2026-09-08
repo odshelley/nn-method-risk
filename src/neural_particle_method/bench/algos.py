@@ -18,11 +18,12 @@ class CalibResult:
     diagnostics: dict
 
 
-def _explicit(sc, n, seed, ecfg, method, mixture=None, estimator=None):
+def _explicit(sc, n, seed, ecfg, method, mixture=None, estimator=None, knobs=None):
     lv = sc.local_vol()
     cfg = replace(ecfg, n_particles=n)
     est = estimator if estimator is not None else make_estimator(
-        method, seed=seed, first_steps=cfg.first_steps, later_steps=cfg.later_steps)
+        method, seed=seed, first_steps=cfg.first_steps, later_steps=cfg.later_steps,
+        local_vol=lv, s0=sc.s0, **(knobs or {}))
     t0 = time.perf_counter()
     r = calibrate_explicit(lv, sc.dynamics, est, cfg, s0=sc.s0, T=sc.T, seed=seed, mixture=mixture)
     total = time.perf_counter() - t0
@@ -30,14 +31,14 @@ def _explicit(sc, n, seed, ecfg, method, mixture=None, estimator=None):
     return CalibResult(r.field, {"total_s": total, "fit_s": r.fit_s}, diag)
 
 
-def _nw(sc, n, seed, e, i): return _explicit(sc, n, seed, e, "nw")
-def _nn(sc, n, seed, e, i): return _explicit(sc, n, seed, e, "nn")
-def _ridge(sc, n, seed, e, i): return _explicit(sc, n, seed, e, "ridge")
-def _spline(sc, n, seed, e, i): return _explicit(sc, n, seed, e, "spline")
+def _nw(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "nw", knobs=knobs)
+def _nn(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "nn", knobs=knobs)
+def _ridge(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "ridge", knobs=knobs)
+def _spline(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "spline", knobs=knobs)
 
 
-def _nn_is(sc, n, seed, e, i):
-    return _explicit(sc, n, seed, e, "nn", mixture=design_mixture(sc.dynamics, sc.T))
+def _nn_is(sc, n, seed, e, i, knobs=None):
+    return _explicit(sc, n, seed, e, "nn", mixture=design_mixture(sc.dynamics, sc.T), knobs=knobs)
 
 
 def _implicit_core(sc, n, seed, e, i):
@@ -50,13 +51,13 @@ def _implicit_core(sc, n, seed, e, i):
     return lv, warm, r, total
 
 
-def _implicit(sc, n, seed, e, i):
+def _implicit(sc, n, seed, e, i, knobs=None):
     _, warm, r, total = _implicit_core(sc, n, seed, e, i)
     return CalibResult(r.field, {"total_s": total, "fit_s": r.fit_s + warm.timings["fit_s"]},
                        {"deltas": r.deltas})
 
 
-def _implicit_ridge(sc, n, seed, e, i):
+def _implicit_ridge(sc, n, seed, e, i, knobs=None):
     lv, _, r, overnight = _implicit_core(sc, n, seed, e, i)
     head = GlobalRidge(r.net, sc.T)
     t1 = time.perf_counter()
@@ -66,9 +67,18 @@ def _implicit_ridge(sc, n, seed, e, i):
                        {"deltas": r.deltas, "overnight_s": overnight, "intraday_s": intraday})
 
 
+def _nw_ghl(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "nw_ghl", knobs=knobs)
+def _muguruza(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "muguruza", knobs=knobs)
+def _rkhs(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "rkhs", knobs=knobs)
+def _bins(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "bins", knobs=knobs)
+def _purbf(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "purbf", knobs=knobs)
+
+PAPER_ALGOS = ("nw", "explicit_nn", "ridge", "explicit_nn_is", "implicit_nn", "spline", "implicit_ridge")
+BASELINE_ALGOS = ("nw_ghl", "muguruza", "rkhs", "bins", "purbf")
 ALGOS = {"nw": _nw, "explicit_nn": _nn, "ridge": _ridge, "explicit_nn_is": _nn_is,
-         "implicit_nn": _implicit, "spline": _spline, "implicit_ridge": _implicit_ridge}
+         "implicit_nn": _implicit, "spline": _spline, "implicit_ridge": _implicit_ridge,
+         "nw_ghl": _nw_ghl, "muguruza": _muguruza, "rkhs": _rkhs, "bins": _bins, "purbf": _purbf}
 
 
-def run_algo(name, scenario, n_particles, seed, explicit=ExplicitConfig(), implicit=ImplicitConfig()):
-    return ALGOS[name](scenario, n_particles, seed, explicit, implicit)
+def run_algo(name, scenario, n_particles, seed, explicit=ExplicitConfig(), implicit=ImplicitConfig(), knobs=None):
+    return ALGOS[name](scenario, n_particles, seed, explicit, implicit, knobs=knobs)

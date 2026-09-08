@@ -1,6 +1,6 @@
 import pytest
 
-from neural_particle_method.bench.algos import ALGOS
+from neural_particle_method.bench.algos import PAPER_ALGOS
 from neural_particle_method.bench.runner import run_one
 from neural_particle_method.bench.sweep import paper_grid, sweep
 from neural_particle_method.pricing.reprice import RepriceConfig
@@ -12,7 +12,7 @@ TINY_REPRICE = RepriceConfig(TINY_REPRICE_N, TINY_REPRICE_STEPS)
 
 def test_paper_grid_size():
     jobs = paper_grid()
-    assert len(jobs) == 20 * len(ALGOS) * 2 * 3 + 6 * 2 * 3
+    assert len(jobs) == 20 * len(PAPER_ALGOS) * 2 * 3 + 6 * 2 * 3
     assert jobs[0] == ("s01", "nw", 50_000, 0)
 
 

@@ -23,11 +23,12 @@ from tests.conftest import (
 OUT = Path(__file__).parent
 
 
-def main():
+def main(algos=None):
+    algos = algos if algos else list(ALGOS)
     sc = make_registry()["s01"]
     k = quote_k_grid()
     mats = list(sc.maturities)
-    for algo in ALGOS:
+    for algo in algos:
         res = run_algo(algo, sc, TINY_N, 0, TINY_EXPLICIT, TINY_IMPLICIT)
         ivs = reprice_iv(res.field.to_records(), sc.dynamics, sc.s0, mats, k,
                          cfg=RepriceConfig(TINY_REPRICE_N, TINY_REPRICE_STEPS), seed=10_000)
@@ -44,4 +45,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
