@@ -62,7 +62,7 @@ with `local_vol()` returning `DupireSurface.from_price_fn(lambda K, T: heston_ca
 
 - `li_simple`: market kappa 1.5768, theta 0.0484, xi 0.5751, rho -0.7, v0 0.1024; dynamics same but rho -0.5 (thesis eq. 3.3.2 "simple LSVM").
 - `li_complex`: same market; dynamics kappa 1, theta 0.0144, xi 0.5751, rho 0, v0 0.0144 (thesis "complex LSVM").
-- `bayer`: market kappa 2.19, theta 0.17023, xi 1.04, rho -0.83, v0 0.0045; dynamics kappa 1, theta 0.0144, xi 0.5751, rho -0.9, v0 0.0144 (Bayer et al. section 5; their CIR floor 1e-3 is reproduced by full truncation plus a floor of 1e-3 on V in the estimator input only, documented on the card).
+- `bayer`: market kappa 2.19, theta 0.17023, xi 1.04, rho -0.83, v0 0.0045; dynamics kappa 1, theta 0.0144, xi 0.5751, rho -0.9, v0 0.0144 (Bayer et al. section 5). Bayer et al. floor their CIR at 1e-3; the harness uses full truncation at 0 for every method and the `rkhs` card records this difference as a known deviation.
 
 `bench/algos.py` accepts either scenario type: it calls `sc.local_vol()` and `sc.target_ivs(...)`;
 `ScenarioSpec` gets the same two methods wrapping `SSVILocalVol` and `implied_vol_ssvi`, and
@@ -164,7 +164,7 @@ Implemented by the papers session.
 
 ### `purbf` — partition-of-unity RBF (Hakala 2019)
 
-File `purbf.py`, class `PURBF(n_patches=..., overlap=..., rbf=...)`. Overlapping patches over the
+File `purbf.py`, class `PURBF(n_patches, overlap, rbf)`; the three defaults are deliberately unspecified here and are fixed by the card once the source is ingested. Overlapping patches over the
 log-spot range, local RBF least-squares fit per patch, blended by a smooth partition of unity.
 Defaults, knob (`n_patches`), failure mode, and acceptance number are taken from the Hakala paper
 once obtained and ingested; the card is written from the source before implementation. Until the
