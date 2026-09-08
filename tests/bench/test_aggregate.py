@@ -9,8 +9,8 @@ def store(tmp_path):
     return Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
 
 
-def _fake_run(store, algo, rmse, fail=False):
-    key = {"sid": "s01", "algo": algo, "n_particles": 1000, "seed": 0}
+def _fake_run(store, algo, rmse, fail=False, n_particles=1000):
+    key = {"sid": "s01", "algo": algo, "n_particles": n_particles, "seed": 0}
     if fail:
         with pytest.raises(RuntimeError):
             with store.run("bench", {**key, "git_hash": "abc"}):
@@ -35,6 +35,15 @@ def test_aggregate_writes_csv_and_digest(store, tmp_path):
     lines = {ln.split(",")[1]: ln for ln in csv_text.splitlines()[1:]}
     assert lines["nw"].split(",")[9] == "0"
     assert lines["spline"].split(",")[9] == ""
+
+
+def test_aggregate_sorts_n_particles_numerically(store, tmp_path):
+    _fake_run(store, "nw", 12.0, n_particles=200_000)
+    _fake_run(store, "nw", 8.0, n_particles=50_000)
+    df = aggregate(store, tmp_path / "s.csv", tmp_path / "d.md")
+    assert list(df.n_particles) == [50_000, 200_000]
+    rows = [ln for ln in (tmp_path / "s.csv").read_text().splitlines()[1:] if ln]
+    assert [int(ln.split(",")[2]) for ln in rows] == [50_000, 200_000]
 
 
 def test_aggregate_empty(store, tmp_path):
