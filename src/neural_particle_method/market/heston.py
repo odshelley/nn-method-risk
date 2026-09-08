@@ -34,3 +34,12 @@ def heston_call(K, T, v0, kappa, theta, xi, rho, s0=1.0, n_quad=256, u_max=200.0
     price = s0 * P1 - K_arr * P2
     price = np.maximum(price, np.maximum(s0 - K_arr, 0.0) + 1e-14)
     return price if np.ndim(K) else float(price[0])
+
+
+def heston_iv(k_grid, T, params, s0=1.0):
+    """Implied vol of the semi-analytic Heston call at log-moneyness k_grid and maturity T."""
+    from .bs import implied_vol
+
+    K = s0 * np.exp(np.asarray(k_grid, dtype=float))
+    prices = np.atleast_1d(heston_call(K, T, params.v0, params.kappa, params.theta, params.xi, params.rho, s0))
+    return np.array([implied_vol(float(p), s0, float(kk), T) for p, kk in zip(prices, K)])

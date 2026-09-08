@@ -46,7 +46,10 @@ def main(argv=None):
         print(f"scenarios ({len(reg)}):")
         for sid, sc in reg.items():
             d = sc.dynamics
-            print(f"  {sid}: sigma0={sc.ssvi.sigma0:.3f} xi={d.xi} rho={d.rho}")
+            if sc.family == "heston":
+                print(f"  {sid}: heston market xi={sc.market.xi} rho={sc.market.rho}; dynamics rho={sc.dynamics.rho}")
+            else:
+                print(f"  {sid}: sigma0={sc.ssvi.sigma0:.3f} xi={d.xi} rho={d.rho}")
         print("algos:", ", ".join(ALGOS))
         return 0
     store = Store(args.tracking_uri, args.artifact_root)

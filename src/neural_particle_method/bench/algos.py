@@ -8,7 +8,6 @@ from ..calibrate.implicit import calibrate_implicit
 from ..calibrate.importance import design_mixture
 from ..estimators import make_estimator
 from ..estimators.ridge import GlobalRidge
-from ..market.local_vol import SSVILocalVol
 from ..simulate.leverage import LeverageField
 
 
@@ -20,7 +19,7 @@ class CalibResult:
 
 
 def _explicit(sc, n, seed, ecfg, method, mixture=None, estimator=None):
-    lv = SSVILocalVol(sc.ssvi, sc.s0, T_max=sc.T)
+    lv = sc.local_vol()
     cfg = replace(ecfg, n_particles=n)
     est = estimator if estimator is not None else make_estimator(
         method, seed=seed, first_steps=cfg.first_steps, later_steps=cfg.later_steps)
@@ -42,7 +41,7 @@ def _nn_is(sc, n, seed, e, i):
 
 
 def _implicit_core(sc, n, seed, e, i):
-    lv = SSVILocalVol(sc.ssvi, sc.s0, T_max=sc.T)
+    lv = sc.local_vol()
     warm = _explicit(sc, n, seed, e, "nn")
     t0 = time.perf_counter()
     r = calibrate_implicit(lv, sc.dynamics, replace(i, n_particles=n), s0=sc.s0, T=sc.T,

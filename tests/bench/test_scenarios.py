@@ -25,4 +25,4 @@ def test_fig3_cross():
 def test_grids():
     k = quote_k_grid()
     assert len(k) == 13 and k[0] < 0 < k[-1]
-    assert len(full_registry()) == 26
+    assert len(full_registry()) == 29
