@@ -10,6 +10,23 @@ from ..simulate.stepper import heston_step
 from .config import ExplicitConfig
 
 
+@dataclass(frozen=True)
+class StepContext:
+    """What an estimator may know about the step that produced the current cloud (see spec)."""
+    lnx_prev: np.ndarray
+    v_prev: np.ndarray
+    L_p: np.ndarray
+    zb: np.ndarray
+    zp: np.ndarray
+    theta_p: np.ndarray | None
+    dt: float
+    params: HestonParams
+
+    def __getitem__(self, idx):
+        return StepContext(self.lnx_prev[idx], self.v_prev[idx], self.L_p[idx], self.zb[idx], self.zp[idx],
+                           None if self.theta_p is None else self.theta_p[idx], self.dt, self.params)
+
+
 @dataclass
 class ExplicitResult:
     lnx: np.ndarray
@@ -28,6 +45,8 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
     if mixture is not None and not estimator.supports_weights:
         raise ValueError(f"{type(estimator).__name__} estimator does not support importance weights")
     hp = HestonParams.from_dict(params)
+    wants_ctx = bool(getattr(estimator, "needs_step_context", False))
+    ctx = None
     v0 = hp.v0
     n_steps, n_particles, fit_subsample, L_max = cfg.n_steps, cfg.n_particles, cfg.fit_subsample, cfg.L_max
     rng = np.random.default_rng(seed)
@@ -60,7 +79,10 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
             idx = rng.choice(n_particles, size=min(fit_subsample, n_particles), replace=False)
             wi = None if w is None else w[idx]
             t0 = time.perf_counter()
-            f_grid = estimator.fit_predict(t, lnx[idx], v[idx], grid, weights=wi)
+            if wants_ctx:
+                f_grid = estimator.fit_predict(t, lnx[idx], v[idx], grid, weights=wi, ctx=ctx[idx])
+            else:
+                f_grid = estimator.fit_predict(t, lnx[idx], v[idx], grid, weights=wi)
             fit_s += time.perf_counter() - t0
         f_grid = np.clip(f_grid, 1e-4, None)
         sig = local_vol.sigma(max(t, local_vol.T_grid[0]), np.exp(grid), s0)
@@ -70,6 +92,8 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
         L_p = np.interp(lnx, grid, L_grid) if len(grid) > 1 else np.full(n_particles, L_grid[0])
         zb = rng.standard_normal(n_particles)
         zp = rng.standard_normal(n_particles)
+        if wants_ctx:
+            ctx = StepContext(lnx, np.maximum(v, 0.0), L_p, zb, zp, theta_p, dt, hp)
         lnx, v = heston_step(lnx, v, L_p, zb, zp, hp, dt, sdt, theta_p=theta_p)
         if mixture is not None:
             dbperp = zp * sdt + eta_p * dt

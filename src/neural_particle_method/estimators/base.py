@@ -8,4 +8,6 @@ class Estimator(Protocol):
     supports_weights: bool
 
     def fit_predict(self, t: float, lnx: np.ndarray, v: np.ndarray, grid: np.ndarray,
-                    weights: np.ndarray | None = None) -> np.ndarray: ...
+                    weights: np.ndarray | None = None, ctx=None) -> np.ndarray:
+        """`ctx` is passed only when the estimator sets `needs_step_context = True`."""
+        ...
