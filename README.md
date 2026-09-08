@@ -37,3 +37,5 @@ All runs go to MLflow. Default store: `sqlite:///mlruns.db` and `mlartifacts/` i
 - `uv run pytest -m golden` — bit-for-bit replay of four archived runs (minutes)
 - `uv run pytest -m slow` — smoke runs of every experiment arm
 - `uv run pytest --cov=neural_particle_method` — coverage report
+- The golden replays read archived run JSONs under `results/runs/` (gitignored). A fresh clone or
+  worktree needs a copy of `results/runs/` from a checkout that has them before `uv run pytest -m golden` can pass.
