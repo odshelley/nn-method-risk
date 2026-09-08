@@ -12,15 +12,15 @@ from .fokker_planck import FokkerPlanck
 X_LO, X_HI = np.log(0.4), np.log(2.2)
 
 
-def default_x_grid(n=481, pad_lo=1.2, pad_hi=0.6, x0=0.0):
-    """Uniform cell centres covering [ln 0.4 - pad_lo, ln 2.2 + pad_hi] with x0 on a centre.
+def default_x_grid(n=801, half_width=3.0, x0=0.0):
+    """Uniform cell centres on [x0 - half_width, x0 + half_width] with x0 on a centre.
 
-    The left pad is the larger one because the Heston left tail is the fat one.
+    Mass leaving through the outer faces is lost (absorbing boundary), and mass lost on the
+    right at e^x ~ 20 costs 20 times its weight in every call price, so the domain must hold
+    the whole right tail: half_width ~ 6 sigma_max sqrt(T). Check `PDEResult.forward`.
     """
-    lo, hi = X_LO - pad_lo + x0, X_HI + pad_hi + x0
-    h = (hi - lo) / (n - 1)
-    i0 = int(np.ceil((x0 - lo) / h))
-    return x0 + (np.arange(n) - i0) * h
+    h = 2.0 * half_width / (n - 1)
+    return x0 + (np.arange(n) - (n - 1) // 2) * h
 
 
 def default_v_grid(params, T, n=200, v_max=None, stretch=2.0):
@@ -50,8 +50,11 @@ def solve_leverage_pde(local_vol, params, *, s0=1.0, T, n_steps, x_grid, v_grid,
                        n_substeps=2, scheme="cn", L_max=4.0, snapshot_times=()):
     """Explicit-in-leverage calibration with the density evolved by the Fokker-Planck equation.
 
-    Mirrors `calibrate_explicit`: at step k the leverage is built from E[V | X] at t = k dt and
-    frozen over the step. Step 0 uses the same one-point slice as the particle scheme.
+    Mirrors `calibrate_explicit`: at step k the leverage is built from sigma_Dup and E[V | X]
+    at t = k dt and frozen over the step (an O(dt) scheme bias shared with the particle
+    method). Step 0 uses the same one-point slice as the particle scheme; later slices live
+    on the resolved part of `x_grid` (marginal density above 1e-6 of its peak, the analogue
+    of the particle scheme's quantile grid) and are extrapolated as constants beyond it.
     """
     t0 = time.perf_counter()
     hp = HestonParams.from_dict(params)
@@ -66,12 +69,13 @@ def solve_leverage_pde(local_vol, params, *, s0=1.0, T, n_steps, x_grid, v_grid,
         if k == 0:
             grid, f_grid = np.array([x0]), np.array([hp.v0])
         else:
-            grid, f_grid = fp.x, fp.cond_mean_v(m)
+            cells = fp.resolved(m)
+            grid, f_grid = fp.x[cells], fp.cond_mean_v(m, cells)
         f_grid = np.clip(f_grid, 1e-4, None)
         sig = local_vol.sigma(max(t, local_vol.T_grid[0]), np.exp(grid), s0)
-        L_grid = np.clip(sig / np.sqrt(f_grid), 0.0, L_max)
-        slices.append(Slice(t, grid.copy(), np.array(L_grid, dtype=float).copy(), f_grid.copy()))
-        A = fp.operator(L_grid[0] if len(grid) == 1 else L_grid)
+        L_grid = np.clip(np.asarray(sig, dtype=float) / np.sqrt(f_grid), 0.0, L_max)
+        slices.append(Slice(t, grid.copy(), L_grid.copy(), f_grid.copy()))
+        A = fp.operator(L_grid[0] if len(grid) == 1 else np.interp(fp.x, grid, L_grid))
         m = fp.advance(m, A, dt, n_substeps, first=(k == 0), scheme=scheme)
         if k + 1 in snap_steps:
             snapshots[snap_steps[k + 1]] = fp.marginal(m)

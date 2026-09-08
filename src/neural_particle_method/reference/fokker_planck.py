@@ -110,17 +110,20 @@ class FokkerPlanck:
         """Cell-averaged marginal density of X, per unit x."""
         return m.sum(axis=1) / self.dx
 
-    def cond_mean_v(self, m, rel_floor=1e-12):
-        """E[V | X = x_i]; cells with negligible marginal mass take the nearest defined value."""
-        num = m @ self.mean_v
-        den = m.sum(axis=1)
-        ok = den > rel_floor * den.max()
-        f = np.full(self.nx, np.nan)
-        f[ok] = num[ok] / den[ok]
-        if not ok.all():
-            idx = np.arange(self.nx)
-            f = np.interp(idx, idx[ok], f[ok])
-        return f
+    def resolved(self, m, rel_floor=1e-6):
+        """Slice (lo, hi) of x cells whose marginal density exceeds rel_floor of its peak.
+
+        Below that level the mixed-derivative stencil leaves sign-alternating masses that are of
+        no consequence for pricing but useless for a conditional expectation. The analogue of
+        the particle scheme's quantile grid."""
+        q = self.marginal(m)
+        ok = np.flatnonzero(q > rel_floor * q.max())
+        return slice(int(ok[0]), int(ok[-1]) + 1)
+
+    def cond_mean_v(self, m, cells=slice(None)):
+        """E[V | X = x_i] on the given cells (default: all; pass `resolved(m)`)."""
+        mm = m[cells]
+        return (mm @ self.mean_v) / mm.sum(axis=1)
 
     # ----- operator ------------------------------------------------------------------
     def operator(self, L):

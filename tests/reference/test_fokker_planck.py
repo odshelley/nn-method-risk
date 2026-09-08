@@ -78,8 +78,8 @@ def _heston_iv_err_bp(params, T, nx, nv, n_steps=50, n_sub=2):
 
 @pytest.mark.parametrize("params,tol_bp", [(LI, 8.0), (FELLER, 4.5)])
 def test_pure_heston_reprices_heston_call_coarse(params, tol_bp):
-    """Coarse grid (nx=241, nv=100): measured 6.3 / 3.2 bp max; the fine grid is the slow test."""
-    err_bp = _heston_iv_err_bp(params, 1.0, nx=241, nv=100)
+    """Coarse grid (nx=401 on [-3, 3], nv=100); the reference grid is the slow test."""
+    err_bp = _heston_iv_err_bp(params, 1.0, nx=401, nv=100)
     assert np.all(np.isfinite(err_bp))
     assert np.max(np.abs(err_bp)) < tol_bp, err_bp
 
@@ -87,6 +87,6 @@ def test_pure_heston_reprices_heston_call_coarse(params, tol_bp):
 @pytest.mark.slow
 @pytest.mark.parametrize("params,tol_bp", [(LI, 2.5), (FELLER, 1.2)])
 def test_pure_heston_reprices_heston_call_reference_grid(params, tol_bp):
-    """Default reference grid (nx=481, nv=200): measured 1.7 / 0.8 bp max."""
-    err_bp = _heston_iv_err_bp(params, 1.0, nx=481, nv=200, n_sub=4)
+    """Default reference grid (nx=801, nv=200)."""
+    err_bp = _heston_iv_err_bp(params, 1.0, nx=801, nv=200)
     assert np.max(np.abs(err_bp)) < tol_bp, err_bp

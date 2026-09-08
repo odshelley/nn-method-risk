@@ -80,12 +80,15 @@ throughout, for the convergence study.
 weights so that the discrete mean is exact.
 
 **Leverage update.** At step k, t = k dt: q_i = sum_j m_ij / dx_i is the marginal,
-f_i = sum_j m_ij (W'_j / W_j) / sum_j m_ij is E[V | X = x_i]. Cells whose marginal mass is
-below 1e-12 of the maximum take the nearest well-defined value. Then
+f_i = sum_j m_ij (W'_j / W_j) / sum_j m_ij is E[V | X = x_i]. The slice grid is the
+resolved range of x cells, those with q_i above 1e-6 of the peak (below that level the
+mixed-derivative stencil leaves sign-alternating masses that are harmless for pricing but
+useless in a ratio); this is the analogue of the particle scheme's [0.001, 0.999] quantile
+grid, and L is extrapolated as a constant beyond it, as `LeverageField.at` does. Then
 L_i = clip(sigma_Dup(max(t, t_min), e^{x_i}) / sqrt(max(f_i, 1e-4)), 0, L_max), the same
 clipping as `calibrate_explicit`. At k = 0 the density is a point mass, and the slice is the
 same one-point slice the particle scheme uses: grid [ln s0], f = v0, L = sigma(t_min, s0)/sqrt(v0).
-Later slices are on `x_grid`. Slices are collected into a `LeverageField`.
+Slices are collected into a `LeverageField`.
 
 **Repricing.** Call prices from the terminal marginal treat the density as piecewise
 constant per cell and integrate (e^x - K)^+ exactly over each cell, so the payoff kink
@@ -128,9 +131,12 @@ class PDEResult:
 ```
 
 `local_vol` is anything with `.sigma(t, x, s0)` and `.T_grid`; `params` is `HestonParams`
-or a dict. Defaults: `default_x_grid(n=301)` is uniform on [ln 0.4 - 0.6, ln 2.2 + 0.6];
-`default_v_grid(params, T, n=100)` is sinh-stretched towards 0 on [0, v_max] with
-v_max = max(v0, theta) + 6 xi sqrt(max(v0, theta) T).
+or a dict. Defaults: `default_x_grid(n=801, half_width=3.0)` is uniform on [-3, 3] with
+ln s0 on a cell centre (the domain must hold the whole right tail: mass absorbed at e^x = 20
+costs 20 times its weight in every call price, which showed up as a 30 bp error at T = 2 on
+a narrower domain); `default_v_grid(params, T, n=200)` is sinh-stretched towards 0 on
+[0, v_max] with v_max = max(v0, theta) + 6 xi sqrt(max(v0, theta) T). `PDEResult.forward`
+and `.mass` report what the boundaries lost.
 
 ## Validation
 
@@ -141,8 +147,9 @@ v_max = max(v0, theta) + 6 xi sqrt(max(v0, theta) T).
 - **Pure Heston.** With L fixed to 1 the terminal marginal reprices `heston_call` at the
   Li parameters (Feller violated) on the quote grid; the tolerance in vol bp is fixed
   from the convergence study.
-- **(a) Trivial leverage.** xi = 0.01, v0 = theta, flat sigma_Dup = sqrt(theta): every
-  slice has L = 1 up to discretisation.
+- **(a) Trivial leverage.** xi = 0.01, rho = 0, v0 = theta, flat sigma_Dup = sqrt(theta):
+  every slice has L = 1 up to discretisation and the physical O(xi^2) tilt of E[V | X]
+  (with rho != 0 the tilt is O(rho xi x / theta), 10% at xi = 0.02, so rho = 0 is required).
 - **(b) Calibrated LSV.** Heston market (Li parameters) -> `DupireSurface.from_price_fn`
   -> calibrated model with different dynamics -> PDE-implied IVs at T = 1 match the
   Heston market IVs on the quote grid to a stated tolerance in bp. Same for the SSVI
