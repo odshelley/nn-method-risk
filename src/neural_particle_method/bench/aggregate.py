@@ -7,11 +7,11 @@ from .runner import BENCH_EXPERIMENT
 
 METRIC_COLS = ("pooled_rmse_bp", "pooled_max_bp", "wings_rmse_bp", "wings_max_bp", "n_failed")
 COLUMNS = ("sid", "algo", "n_particles", "seed", "status") + METRIC_COLS + \
-          ("total_s", "fit_s", "intraday_s", "git_hash")
+          ("total_s", "fit_s", "intraday_s", "git_hash") + ("budget", "knob_name", "knob_value")
 
 
-def aggregate(store, out_csv="results/summary.csv", out_md="results/digest.md"):
-    raw = store.search(BENCH_EXPERIMENT)
+def aggregate(store, out_csv="results/summary.csv", out_md="results/digest.md", experiment=BENCH_EXPERIMENT):
+    raw = store.search(experiment)
     rows = []
     for _, r in raw.iterrows():
         row = {"sid": r.get("params.sid"), "algo": r.get("params.algo"),
@@ -21,6 +21,9 @@ def aggregate(store, out_csv="results/summary.csv", out_md="results/digest.md"):
         for c in METRIC_COLS + ("total_s", "fit_s", "intraday_s"):
             row[c] = r.get(f"metrics.{c}")
         row["git_hash"] = r.get("params.git_hash")
+        row["budget"] = int(r["params.budget"]) if pd.notna(r.get("params.budget")) else None
+        row["knob_name"] = r.get("params.knob_name")
+        row["knob_value"] = float(r["params.knob_value"]) if pd.notna(r.get("params.knob_value")) else None
         rows.append(row)
     df = pd.DataFrame(rows, columns=COLUMNS)
     if len(df):

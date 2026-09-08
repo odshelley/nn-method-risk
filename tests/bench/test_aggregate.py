@@ -60,3 +60,11 @@ def test_aggregate_running_run_is_not_counted_as_failed(store, tmp_path):
     assert (df.status == "failed").sum() == 0
     md = (tmp_path / "d.md").read_text()
     assert "0 failed" in md
+
+
+def test_aggregate_other_experiment_and_new_columns(store, tmp_path):
+    with store.run("baselines", {"sid": "s01", "algo": "bins", "n_particles": 1000, "seed": 0, "budget": 1000}) as h:
+        h.log_metrics({"pooled_rmse_bp": 1.0, "budget": 1000})
+    df = aggregate(store, tmp_path / "b.csv", tmp_path / "b.md", experiment="baselines")
+    assert len(df) == 1 and df.loc[0, "budget"] == 1000 and "knob_name" in df.columns
+    assert len(aggregate(store, tmp_path / "s.csv", tmp_path / "d.md")) == 0

@@ -39,6 +39,7 @@ def _parser():
     p.add_argument("--jobs", type=int, default=1)
     p = sub.add_parser("acceptance"); p.add_argument("--cards", nargs="*", default=None)
     p = sub.add_parser("aggregate"); p.add_argument("--out", default="results/summary.csv"); p.add_argument("--digest", default="results/digest.md")
+    p.add_argument("--experiment", default="bench")
     p = sub.add_parser("figures"); p.add_argument("--summary", default="results/summary.csv"); p.add_argument("--outdir", default="figures/out")
     p = sub.add_parser("experiment"); p.add_argument("which", choices=["bump", "warm"]); p.add_argument("--smoke", action="store_true")
     p.add_argument("--arms", nargs="*", default=list(ARMS)); p.add_argument("--sids", nargs="*", default=list(DEFAULT_SIDS))
@@ -85,7 +86,7 @@ def main(argv=None):
         out = run_acceptance(store, names=args.cards or None)
         return 0 if all(ok for _, ok, _, _ in out) else 1
     if args.cmd == "aggregate":
-        df = aggregate(store, args.out, args.digest)
+        df = aggregate(store, args.out, args.digest, experiment=args.experiment)
         print(f"{len(df)} runs -> {args.out}")
         return 0
     if args.cmd == "figures":
