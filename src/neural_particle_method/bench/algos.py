@@ -54,7 +54,7 @@ def _implicit_core(sc, n, seed, e, i):
 def _implicit(sc, n, seed, e, i, knobs=None):
     _, warm, r, total = _implicit_core(sc, n, seed, e, i)
     return CalibResult(r.field, {"total_s": total, "fit_s": r.fit_s + warm.timings["fit_s"]},
-                       {"deltas": r.deltas})
+                       {"deltas": r.deltas, "deltas_rms": r.deltas_rms})
 
 
 def _implicit_ridge(sc, n, seed, e, i, knobs=None):
@@ -73,12 +73,45 @@ def _rkhs(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "rkhs
 def _bins(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "bins", knobs=knobs)
 def _purbf(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "purbf", knobs=knobs)
 
+def _nn_wide(sc, n, seed, e, i, knobs=None):
+    """Explicit network on the fixed wide grid (mechanism test: grid extent)."""
+    return _explicit(sc, n, seed, replace(e, grid="fixed"), "nn", knobs=knobs)
+
+
+def _nw_wide(sc, n, seed, e, i, knobs=None):
+    """Nadaraya-Watson on the fixed wide grid (mechanism test: grid extent)."""
+    return _explicit(sc, n, seed, replace(e, grid="fixed"), "nw", knobs=knobs)
+
+
+def _implicit_one(sc, n, seed, e, i, knobs=None):
+    """One undamped re-simulate-and-fit from the explicit output (mechanism test: is it the iteration?)."""
+    _, warm, r, total = _implicit_core(sc, n, seed, e, replace(i, n_iters=1, alpha=1.0))
+    return CalibResult(r.field, {"total_s": total, "fit_s": r.fit_s + warm.timings["fit_s"]},
+                       {"deltas": r.deltas, "deltas_rms": r.deltas_rms})
+
+
 PAPER_ALGOS = ("nw", "explicit_nn", "ridge", "explicit_nn_is", "implicit_nn", "spline", "implicit_ridge")
 BASELINE_ALGOS = ("nw_ghl", "muguruza", "rkhs", "bins", "purbf")
 ALGOS = {"nw": _nw, "explicit_nn": _nn, "ridge": _ridge, "explicit_nn_is": _nn_is,
          "implicit_nn": _implicit, "spline": _spline, "implicit_ridge": _implicit_ridge,
          "nw_ghl": _nw_ghl, "muguruza": _muguruza, "rkhs": _rkhs, "bins": _bins, "purbf": _purbf}
+# Diagnostic variants, kept out of ALGOS so the paper/baseline grids and goldens are unchanged.
+def _nw_vfloor(sc, n, seed, e, i, knobs=None):
+    """Nadaraya-Watson fitted on max(v, 0) (mechanism test: raw-vs-truncated variance target)."""
+    return _explicit(sc, n, seed, replace(e, fit_v_floor=True), "nw", knobs=knobs)
+
+
+def _nn_vfloor(sc, n, seed, e, i, knobs=None):
+    return _explicit(sc, n, seed, replace(e, fit_v_floor=True), "nn", knobs=knobs)
+
+
+def _rkhs_vfloor(sc, n, seed, e, i, knobs=None):
+    return _explicit(sc, n, seed, replace(e, fit_v_floor=True), "rkhs", knobs=knobs)
+
+
+MECHANISM_ALGOS = {"explicit_nn_wide": _nn_wide, "nw_wide": _nw_wide, "implicit_nn_1": _implicit_one,
+                   "nw_vfloor": _nw_vfloor, "explicit_nn_vfloor": _nn_vfloor, "rkhs_vfloor": _rkhs_vfloor}
 
 
 def run_algo(name, scenario, n_particles, seed, explicit=ExplicitConfig(), implicit=ImplicitConfig(), knobs=None):
-    return ALGOS[name](scenario, n_particles, seed, explicit, implicit, knobs=knobs)
+    return {**ALGOS, **MECHANISM_ALGOS}[name](scenario, n_particles, seed, explicit, implicit, knobs=knobs)

@@ -1,0 +1,365 @@
+\documentclass[11pt,a4paper]{article}
+
+% Working notes for the Neural Particle Method project.
+% Contraction analysis of the damped implicit iteration. 8 September 2026.
+
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+\usepackage{microtype}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{xcolor}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}{Assumption}
+\crefname{assumption}{Assumption}{Assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+
+\theoremstyle{definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\abs}[1]{\left\lvert #1 \right\rvert}
+\newcommand{\ip}[2]{\left\langle #1,\, #2 \right\rangle}
+\newcommand{\sigDup}{\sigma_{\mathrm{Dup}}}
+\newcommand{\Lev}{L}
+\newcommand{\Phimap}{\Phi}
+\newcommand{\Phal}{\Phi_\alpha}
+\newcommand{\Psimap}{\Psi}
+\newcommand{\Psal}{\Psi_\alpha}
+\newcommand{\Id}{\mathrm{Id}}
+\newcommand{\Lset}{\mathcal{L}}
+\newcommand{\Lmax}{L_{\max}}
+\newcommand{\fmin}{f_{\min}}
+\newcommand{\Lexpl}{\Lev^{\mathrm{expl}}}
+\DeclareMathOperator{\clip}{clip}
+\renewcommand{\Re}{\operatorname{Re}}
+
+\title{Neural Particle Method: Contraction Analysis of the Damped Implicit Iteration}
+\author{Osian Shelley}
+\date{8 September 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Companion to \texttt{notes\_convergence.tex}. We prove what can honestly be proved about the damped fixed-point iteration of the implicit scheme, for the time-discretised, capped, regularised calibration map. The discrete fixed point exists, is unique, and equals the explicit scheme's output (\cref{lem:explicit}). Under a slice-wise Lipschitz stability assumption the damped iteration converges for every damping factor, and damping only slows it (\cref{thm:causal}). Damping is load-bearing only against the same-slice feedback introduced by the shared network, and only under a one-sided (numerical-range) condition (\cref{thm:implemented}); Lipschitz information alone can never make damping essential (\cref{prop:nogo}). The one-sided condition is the hypothesis carrying the convergence claim and must be measured, not derived.
+\end{abstract}
+
+\section{Summary in plain terms}\label{sec:plain}
+
+\begin{enumerate}
+\item \emph{Proved, no extra assumptions.} In the time-stepped setting the implicit method's fixed point exists, is unique, and is exactly what the explicit method computes: slice $k$ of the update depends only on earlier slices, so the fixed point is found by forward substitution. Existence was never the problem.
+\item \emph{Proved, one stability assumption.} If a small change in the leverage at one time step causes only a bounded change in the estimated conditional expectation at later steps, the damped iteration converges to that fixed point from any start, for any damping factor. Early slices lock in first. Undamped, it finishes in exactly $K$ iterations. The assumption is known for kernel-ridge estimators and unproved for the neural network.
+\item \emph{Proved, negative.} In that idealised picture damping does nothing useful; it only slows convergence. Whatever damping does in practice, it does not do it on the causal part of the scheme.
+\item \emph{Proved conditionally; the real content.} The implementation is not perfectly causal: the shared network lets slice $k$ see data generated with its own leverage. That feedback can make the undamped iteration overshoot. If the feedback is one-sided (pushes against itself rather than reinforcing itself), damping below an explicit threshold makes the iteration a contraction with an explicit rate, robust to Monte Carlo and training noise up to an explicit floor.
+\item \emph{Not proved.} That the feedback is one-sided. Nothing in the closeness-to-explicit idea supplies it. It is measurable: in the frozen-body configuration, the top eigenvalue of the symmetric part of the head Jacobian must be below one.
+\item \emph{Not provable this way.} Anything about the continuous-time model, whose well-posedness is open.
+\end{enumerate}
+
+\section{Setting}\label{sec:setting}
+
+Fix a horizon $T > 0$, $K \in \N$ steps, $\Delta \coloneqq T/K$, $t_k \coloneqq k\Delta$. The Dupire surface is bounded, $0 \le \sigDup \le \sigma_{\max} < \infty$, on the region used. A leverage cap $\Lmax > 0$ and a variance floor $\fmin > 0$ are fixed (in the code, $\Lmax = 4$ and $\fmin = 10^{-4}$).
+
+\begin{assumption}[Slice spaces and domain]\label{ass:A0}
+For each $k \in \{0, \dots, K-1\}$, $H_k$ is a real Hilbert space of functions of the log-spot with norm $\norm{\cdot}_k$ in which pointwise clipping $u \mapsto \min(\max(u, 0), \Lmax)$ is $1$-Lipschitz; for example $H_k = L^2(\nu_k)$ for a fixed reference measure $\nu_k$, or $H_k = \R^{G}$ with the Euclidean norm for the code's grid of $G = 81$ points. The domain is
+\[
+  \Lset \coloneqq \bigl\{ \Lev = (\Lev_0, \dots, \Lev_{K-1}) : \Lev_k \in H_k,\ 0 \le \Lev_k \le \Lmax \text{ a.e.} \bigr\}.
+\]
+\end{assumption}
+
+The population-level discrete calibration map is
+\begin{equation}\label{eq:phidisc}
+  \Phimap(\Lev)_k \;=\; \clip_{[0, \Lmax]}\!\left( \frac{\sigDup(t_k, \cdot)}{\sqrt{\max\bigl( R_k(\mu^{\Lev}_k),\, \fmin \bigr)}} \right), \qquad 0 \le k < K,
+\end{equation}
+where $\mu^{\Lev}_k$ is the law of $(\ln X_{t_k}, V_{t_k})$ under the Euler chain driven by $\Lev_0, \dots, \Lev_{k-1}$ (the step from $t_j$ to $t_{j+1}$ uses $\Lev_j$ only), and $R_k$ is the regression operator returning the estimate of $\E[V_{t_k} \mid \ln X_{t_k} = \cdot\,]$ from the law.
+
+\begin{assumption}[Causality]\label{ass:A2}
+There are maps $\varphi_k \colon H_0 \times \dots \times H_{k-1} \to H_k$ with $\Phimap(\Lev)_k = \varphi_k(\Lev_0, \dots, \Lev_{k-1})$ for all $\Lev \in \Lset$, $\varphi_0$ constant, and $\Phimap(\Lset) \subseteq \Lset$.
+\end{assumption}
+
+For the map \cref{eq:phidisc} this is a fact rather than an assumption: $\mu_0 = \delta_{(\ln s_0, v_0)}$ does not depend on $\Lev$, and $\mu^{\Lev}_k$ depends on $\Lev_0, \dots, \Lev_{k-1}$ only; the clipping gives $\Phimap(\Lset) \subseteq \Lset$.
+
+\begin{assumption}[Slice Lipschitz stability]\label{ass:A3}
+There are constants $\Lambda_{kj} \ge 0$, $0 \le j < k \le K-1$, with
+\[
+  \norm{\Phimap(\Lev)_k - \Phimap(M)_k}_k \;\le\; \sum_{j < k} \Lambda_{kj}\, \norm{\Lev_j - M_j}_j \qquad (\Lev, M \in \Lset).
+\]
+Write $\Lambda \coloneqq \max_{k, j} \Lambda_{kj}$.
+\end{assumption}
+
+\Cref{ass:A3} decomposes into three ingredients. The algebraic step is proved: for $y, y' \ge 0$,
+\[
+  \abs{ \max(y, \fmin)^{-1/2} - \max(y', \fmin)^{-1/2} } \le \tfrac12 \fmin^{-3/2} \abs{y - y'},
+\]
+because $y \mapsto \max(y, \fmin)^{-1/2}$ is continuous and piecewise $C^1$ with derivative $0$ on $y < \fmin$ and $-\tfrac12 y^{-3/2}$ on $y > \fmin$; multiplying by $\sigDup \le \sigma_{\max}$ and clipping gives $\norm{\Phimap(\Lev)_k - \Phimap(M)_k}_k \le \tfrac12 \sigma_{\max} \fmin^{-3/2} \norm{R_k(\mu^{\Lev}_k) - R_k(\mu^{M}_k)}_k$. The estimator stability $\norm{R_k(\mu) - R_k(\mu')}_k \le C_R\, d(\mu, \mu')$ for a metric $d$ on laws is proved for the RKHS ridge estimator by \citet{bayer2022rkhs}, who show it is Lipschitz in the Wasserstein-$1$ distance; it fails for the exact conditional expectation \citep{djete2022}; for the softplus network trained by Adam no such result exists. The chain stability $d(\mu^{\Lev}_k, \mu^{M}_k) \le \sum_{j < k} c_{kj} \norm{\Lev_j - M_j}_j$ is the one-step and moment stability of \citet{reisinger2023} for Lipschitz-regularised coefficients; it needs bounded leverage (given by $\Lmax$) and, for $W_2$-stability of the Euler pushforward, leverage uniformly Lipschitz in $x$, which the code's grid interpolation provides with a grid-dependent constant. Then $\Lambda_{kj} = \tfrac12 \sigma_{\max} \fmin^{-3/2} C_R\, c_{kj}$.
+
+\paragraph{Notation.} $\beta \coloneqq 1 - \alpha$, $\Phal \coloneqq (1-\alpha)\Id + \alpha \Phimap$, likewise $\Psal$. For $\gamma \ge 1$ the weighted norm is
+\[
+  \norm{\Lev}_\gamma \coloneqq \max_{0 \le k < K} \gamma^{-k} \norm{\Lev_k}_k,
+  \qquad \norm{\Lev}_\infty \coloneqq \max_k \norm{\Lev_k}_k,
+  \qquad \norm{\Lev}_\gamma \le \norm{\Lev}_\infty \le \gamma^{K-1} \norm{\Lev}_\gamma .
+\]
+The weighted causal constant is $\Lambda_\gamma \coloneqq \max_k \sum_{j < k} \Lambda_{kj} \gamma^{\,j - k}$. $N \in \R^{K \times K}$ is the strictly lower-triangular nonnegative matrix with $N_{kj} = \Lambda_{kj}$ for $j < k$; $N^K = 0$. Errors are $e^n_k \coloneqq \norm{\Lev^n_k - \Lev^*_k}_k$, and vector inequalities are componentwise. $\Lexpl$ denotes the output of the explicit scheme run with the same estimator, cap and floor.
+
+\section{The causal map}\label{sec:causal}
+
+\begin{lemma}[The explicit scheme is the unique fixed point]\label{lem:explicit}
+Assume \cref{ass:A0,ass:A2}. Define $\Lev^*$ recursively by $\Lev^*_0 \coloneqq \varphi_0$ and $\Lev^*_k \coloneqq \varphi_k(\Lev^*_0, \dots, \Lev^*_{k-1})$. Then
+\begin{enumerate}
+\item[(i)] $\Lev^* \in \Lset$ and $\Phimap(\Lev^*) = \Lev^*$;
+\item[(ii)] $\Lev^*$ is the only fixed point of $\Phimap$ in $\Lset$;
+\item[(iii)] $\Lev^* = \Lexpl$;
+\item[(iv)] for every $\Lev \in \Lset$ and $n \ge 1$, $\Phimap^n(\Lev)_k = \Lev^*_k$ for all $k < n$; in particular $\Phimap^K \equiv \Lev^*$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(i) By induction on $k$: $\Lev^*_0 = \varphi_0 = \Phimap(\Lev)_0 \in [0, \Lmax]$ for any $\Lev \in \Lset$; if $\Lev^*_0, \dots, \Lev^*_{k-1}$ lie in $[0, \Lmax]$, pad them with zero slices to obtain some $\Lev \in \Lset$, and then $\Lev^*_k = \varphi_k(\Lev^*_0, \dots, \Lev^*_{k-1}) = \Phimap(\Lev)_k \in [0, \Lmax]$ because $\Phimap(\Lset) \subseteq \Lset$. Hence $\Lev^* \in \Lset$ and $\Phimap(\Lev^*)_k = \varphi_k(\Lev^*_0, \dots, \Lev^*_{k-1}) = \Lev^*_k$.
+(ii) If $\Phimap(\Lev) = \Lev$ then $\Lev_0 = \varphi_0 = \Lev^*_0$, and if $\Lev_j = \Lev^*_j$ for all $j < k$ then $\Lev_k = \varphi_k(\Lev_0, \dots, \Lev_{k-1}) = \Lev^*_k$; induction on $k$ gives $\Lev = \Lev^*$.
+(iii) The explicit scheme computes at step $k$ the estimate on the cloud generated by $\Lev_0, \dots, \Lev_{k-1}$, applies the floor, the Dupire ratio and the cap, and sets $\Lev_k$ to the result; that is the recursion defining $\Lev^*$ (with the population law in place of the particle cloud; the difference is noise, \cref{thm:noise}).
+(iv) Induction on $n$. For $n = 1$, $\Phimap(\Lev)_0 = \varphi_0 = \Lev^*_0$. If the claim holds for $n$, then for $k < n+1$, $\Phimap^{n+1}(\Lev)_k = \varphi_k(\Phimap^n(\Lev)_0, \dots, \Phimap^n(\Lev)_{k-1})$, all arguments have index below $n$ and therefore equal $\Lev^*_0, \dots, \Lev^*_{k-1}$, so $\Phimap^{n+1}(\Lev)_k = \Lev^*_k$.
+\end{proof}
+
+\begin{remark}
+Existence and uniqueness of the discrete fixed point need no Lipschitz property; they follow from causality. This is the discrete counterpart of the observation in the main notes that the explicit scheme contains no fixed point: the explicit scheme \emph{is} the fixed point, computed by forward substitution. The question for the implicit scheme is the rate, and robustness to the non-causal coupling introduced by the global network (\cref{sec:implemented}).
+\end{remark}
+
+\begin{lemma}[Weighted Lipschitz constant of the causal part]\label{lem:weighted}
+Assume \cref{ass:A3}. For $\gamma > 1$ and $\Lev, M \in \Lset$,
+\[
+  \norm{\Phimap(\Lev) - \Phimap(M)}_\gamma \le \Lambda_\gamma \norm{\Lev - M}_\gamma, \qquad \Lambda_\gamma \le \frac{\Lambda}{\gamma - 1}.
+\]
+\end{lemma}
+
+\begin{proof}
+Write $d \coloneqq \Lev - M$. For each $k$,
+\[
+  \gamma^{-k} \norm{\Phimap(\Lev)_k - \Phimap(M)_k}_k
+  \le \sum_{j < k} \Lambda_{kj} \gamma^{-k} \norm{d_j}_j
+  = \sum_{j < k} \Lambda_{kj} \gamma^{\,j-k} \bigl( \gamma^{-j} \norm{d_j}_j \bigr)
+  \le \Bigl( \sum_{j < k} \Lambda_{kj} \gamma^{\,j-k} \Bigr) \norm{d}_\gamma .
+\]
+Take the maximum over $k$. For the bound, $\sum_{j < k} \Lambda_{kj} \gamma^{j-k} \le \Lambda \sum_{m \ge 1} \gamma^{-m} = \Lambda/(\gamma - 1)$.
+\end{proof}
+
+\begin{remark}[Uniformity in $\Delta$]\label{rem:uniform}
+If \cref{ass:A3} holds in the squared Volterra form
+\[
+  \norm{\Phimap(\Lev)_k - \Phimap(M)_k}_k^2 \le C \sum_{j < k} \Delta \norm{\Lev_j - M_j}_j^2,
+\]
+the form produced by an $L^2$ stability estimate for the Euler chain, then with the exponential weight $\norm{\Lev}_{\gamma, \exp} \coloneqq \max_k e^{-\gamma t_k} \norm{\Lev_k}_k$ the same computation gives
+\[
+  e^{-2\gamma t_k} \norm{\Phimap(\Lev)_k - \Phimap(M)_k}_k^2
+  \le C \norm{d}^2_{\gamma, \exp} \sum_{m \ge 1} \Delta e^{-2\gamma m \Delta}
+  \le \frac{C}{2\gamma} \norm{d}^2_{\gamma, \exp},
+\]
+using $\Delta / (e^{2\gamma\Delta} - 1) \le 1/(2\gamma)$. So $\Lambda_\gamma \le \sqrt{C/(2\gamma)}$ uniformly in $\Delta$. This is the discrete Bielecki--Gronwall structure behind the short-time existence result of \citet{abergel2010}. Whether $C$ is finite for the exact conditional expectation is exactly the open question.
+\end{remark}
+
+\begin{lemma}[Completeness]\label{lem:complete}
+For every $\gamma \ge 1$, $(\Lset, \norm{\cdot}_\gamma)$ is a complete metric space, and $\Lset$ is convex.
+\end{lemma}
+
+\begin{proof}
+$\prod_k H_k$ with $\norm{\cdot}_\gamma$ is a Banach space, since it is a finite product of Hilbert spaces and $\norm{\cdot}_\gamma$ is equivalent to the product max-norm with factor $\gamma^{K-1}$. $\Lset$ is closed: if $\Lev^{(m)} \to \Lev$ in $\norm{\cdot}_\gamma$ then $\Lev^{(m)}_k \to \Lev_k$ in $H_k$ for each $k$; in $L^2(\nu_k)$ a subsequence converges a.e., so $0 \le \Lev_k \le \Lmax$ a.e.; in $\R^G$ the bounds are closed conditions. A closed subset of a Banach space is complete. Convexity is pointwise.
+\end{proof}
+
+\begin{theorem}[Damped iteration on the exact causal map]\label{thm:causal}
+Assume \cref{ass:A0,ass:A2,ass:A3}. Let $\alpha \in (0, 1]$ and $\gamma > 1 + \Lambda$.
+\begin{enumerate}
+\item[(a)] $\Phal$ maps $\Lset$ into itself and is a contraction on $(\Lset, \norm{\cdot}_\gamma)$ with constant
+\[
+  r_\gamma(\alpha) \coloneqq 1 - \alpha (1 - \Lambda_\gamma) \le 1 - \alpha \Bigl( 1 - \frac{\Lambda}{\gamma - 1} \Bigr) < 1 .
+\]
+\item[(b)] For every $\Lev^0 \in \Lset$ the iterates $\Lev^{n+1} = \Phal(\Lev^n)$ converge to $\Lev^* = \Lexpl$, with
+\[
+  \norm{\Lev^n - \Lev^*}_\gamma \le r_\gamma(\alpha)^n \norm{\Lev^0 - \Lev^*}_\gamma,
+  \qquad
+  \norm{\Lev^n - \Lev^*}_\infty \le \gamma^{K-1} r_\gamma(\alpha)^n \norm{\Lev^0 - \Lev^*}_\infty .
+\]
+\item[(c)] Slice-wise, $e^n \le (\beta I + \alpha N)^n e^0$ componentwise, that is
+\[
+  e^n_k \le \sum_{m = 0}^{\min(n, k)} \binom{n}{m} \beta^{\,n-m} \alpha^m \, (N^m e^0)_k .
+\]
+In particular $e^n_0 = \beta^n e^0_0$, $e^n_k = O(n^k \beta^n)$, and for $\alpha = 1$ one has $e^n_k = 0$ for all $k < n$: the undamped iteration terminates after $K$ steps.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(a) For $\Lev \in \Lset$, $\Phal(\Lev)$ is a convex combination of two elements of the convex set $\Lset$. For $\Lev, M \in \Lset$, by the triangle inequality and \cref{lem:weighted},
+\[
+  \norm{\Phal(\Lev) - \Phal(M)}_\gamma \le (1-\alpha) \norm{\Lev - M}_\gamma + \alpha \norm{\Phimap(\Lev) - \Phimap(M)}_\gamma \le (1 - \alpha + \alpha \Lambda_\gamma) \norm{\Lev - M}_\gamma .
+\]
+Since $\gamma > 1 + \Lambda$, $\Lambda_\gamma \le \Lambda/(\gamma-1) < 1$, so $r_\gamma(\alpha) < 1$.
+(b) Banach's fixed-point theorem on the complete space of \cref{lem:complete} gives a unique fixed point of $\Phal$ and the geometric estimate. Fixed points of $\Phal$ and $\Phimap$ coincide, since $\Phal(\Lev) = \Lev \iff \alpha(\Phimap(\Lev) - \Lev) = 0$, so the limit is $\Lev^* = \Lexpl$ by \cref{lem:explicit}. The sup-norm bound follows from the norm equivalence.
+(c) Using $\Lev^* = \Phimap(\Lev^*)$, $\Lev^{n+1}_k - \Lev^*_k = \beta (\Lev^n_k - \Lev^*_k) + \alpha (\Phimap(\Lev^n)_k - \Phimap(\Lev^*)_k)$, so by \cref{ass:A3}, $e^{n+1}_k \le \beta e^n_k + \alpha \sum_{j < k} \Lambda_{kj} e^n_j$, i.e.\ $e^{n+1} \le (\beta I + \alpha N) e^n$. The matrix has nonnegative entries and so preserves componentwise inequalities; induction gives $e^n \le (\beta I + \alpha N)^n e^0$. As $I$ and $N$ commute, $(\beta I + \alpha N)^n = \sum_{m=0}^n \binom{n}{m} \beta^{n-m} \alpha^m N^m$, and row $k$ of $N^m$ vanishes for $m > k$, which truncates the sum. For $k = 0$ only $m = 0$ survives; $\binom{n}{m} \le n^m$ gives the polynomial bound; for $\alpha = 1$ only $m = n$ survives and $(N^n e^0)_k = 0$ for $k < n$.
+\end{proof}
+
+\begin{remark}[What \cref{thm:causal} says about damping]\label{rem:nodamp}
+The rate $r_\gamma(\alpha) = 1 - \alpha(1 - \Lambda_\gamma)$ decreases in $\alpha$: on the exact causal map, damping strictly slows convergence, and $\alpha = 1$ is optimal. The linearisation $D\Phimap(\Lev^*)$ is strictly lower block-triangular, so its spectrum is $\{0\}$ and the spectral condition of \texttt{notes\_convergence.tex} holds trivially. The empirical benefit of damping must come from the non-causal part of the implemented map.
+\end{remark}
+
+\begin{proposition}[Lipschitz information alone cannot make damping essential]\label{prop:nogo}
+Let $(E, \norm{\cdot})$ be a normed space, $C \subseteq E$ convex, and $\Psimap \colon C \to C$ Lipschitz with constant $\lambda$. Then $\Psal \coloneqq (1-\alpha)\Id + \alpha \Psimap$ has Lipschitz constant at most $1 - \alpha + \alpha\lambda$, and the bound is attained by $E = C = \R$, $\Psimap(x) = \lambda x$. Consequently a Lipschitz constant $\lambda$ guarantees that $\Psal$ is a contraction if and only if $\lambda < 1$, and then the constant is minimised at $\alpha = 1$.
+\end{proposition}
+
+\begin{proof}
+The bound is the triangle inequality. In the example $\Psal(x) = (1 - \alpha + \alpha\lambda)x$; $1 - \alpha + \alpha\lambda < 1 \iff \lambda < 1$ for $\alpha > 0$, and the constant decreases in $\alpha$ when $\lambda < 1$.
+\end{proof}
+
+A proof in which $\alpha$ is load-bearing must therefore use structure beyond Lipschitz constants: a \emph{one-sided} Lipschitz condition. That is what the linear algebra $\mu = 1 + \alpha(\lambda - 1)$ of the convergence notes uses implicitly (it needs $\Re \lambda < 1$, not $\abs{\lambda} < 1$).
+
+\section{The implemented map}\label{sec:implemented}
+
+\begin{assumption}[Structure of the implemented map]\label{ass:B}
+The implemented outer map, idealised at population level and with the network trained to its minimiser, is a map $\Psimap \colon \Lset \to \Lset$ admitting a decomposition
+\begin{equation}\label{eq:decomp}
+  \Psimap(\Lev)_k = \Phimap(\Lev)_k + D_k(\Lev_k) + G(\Lev)_k, \qquad 0 \le k < K,
+\end{equation}
+where
+\begin{enumerate}
+\item[(B1)] $\Phimap$ satisfies \cref{ass:A0,ass:A2,ass:A3} (causal part);
+\item[(B2)] $D_k \colon \{u \in H_k : 0 \le u \le \Lmax\} \to H_k$ is the same-slice feedback, with constants $\kappa \in \R$, $\lambda_D \ge 0$ independent of $k$:
+\[
+  \ip{D_k(u) - D_k(u')}{u - u'}_k \le \kappa \norm{u - u'}_k^2,
+  \qquad
+  \norm{D_k(u) - D_k(u')}_k \le \lambda_D \norm{u - u'}_k ;
+\]
+\item[(B3)] $G$ is the anti-causal remainder, with weighted Lipschitz constant $g_\gamma$: $\norm{G(\Lev) - G(M)}_\gamma \le g_\gamma \norm{\Lev - M}_\gamma$.
+\end{enumerate}
+\end{assumption}
+
+Provenance in the code. The global network takes $(t/T, x)$ as input and is smooth in $t$; the slice at grid time $t_k$ is read off as $f_\theta(t_k, \cdot)$, while the pooled training data live at $t_1, \dots, t_K$ and the data at $t_{k+1}$ were generated with $\Lev_k$. So $\Psimap(\Lev)_k$ depends on $\Lev_k$ (this is $D_k$) and, through temporal smoothing, on $\Lev_{k+1}, \Lev_{k+2}, \dots$ (this is $G$). This backward flow of information through shared parameters is what the main notes call the actual implicitness. By Cauchy--Schwarz, necessarily $-\lambda_D \le \kappa \le \lambda_D$. For linear $D_k = A_k$ on $H_k = \R^G$, $\kappa = \max_k \lambda_{\max}\bigl( \tfrac12 (A_k + A_k^\top) \bigr)$ is the numerical-range abscissa and $\lambda_D = \max_k \norm{A_k}_2$; in the frozen-body configuration this is the measurable quantity, and it is the symmetric part, not the spectrum, that must be measured.
+
+\begin{lemma}[One-sided step]\label{lem:onesided}
+Under (B2), for $u, u'$ in the domain of $D_k$, $d \coloneqq u - u'$, $w \coloneqq D_k(u) - D_k(u')$ and $\alpha \in (0, 1]$,
+\[
+  \norm{\beta d + \alpha w}_k \le \sqrt{q(\alpha)}\, \norm{d}_k,
+  \qquad q(\alpha) \coloneqq 1 - 2\alpha(1 - \kappa) + \alpha^2 c,
+  \qquad c \coloneqq 1 - 2\kappa + \lambda_D^2,
+\]
+with $q(\alpha) \ge 0$ and $c \ge (1 - \kappa)^2$. If $\kappa < 1$, moreover $\sqrt{q(\alpha)} \le 1 - \alpha(1 - \kappa) + \tfrac12 \alpha^2 c$.
+\end{lemma}
+
+\begin{proof}
+Expand: $\norm{\beta d + \alpha w}^2 = \beta^2 \norm{d}^2 + 2\alpha\beta \ip{w}{d} + \alpha^2 \norm{w}^2 \le (\beta^2 + 2\alpha\beta\kappa + \alpha^2 \lambda_D^2) \norm{d}^2$, using $\beta \ge 0$ and (B2). With $\beta = 1 - \alpha$ the bracket equals $q(\alpha)$. Nonnegativity: $q(\alpha) \ge \beta^2 - 2\alpha\beta\lambda_D + \alpha^2\lambda_D^2 = (\beta - \alpha\lambda_D)^2 \ge 0$ because $\kappa \ge -\lambda_D$; and $c \ge 1 - 2\kappa + \kappa^2 = (1-\kappa)^2$ because $\lambda_D \ge \abs{\kappa}$. For the last claim put $y \coloneqq q(\alpha) - 1 \ge -1$; then $\sqrt{1 + y} \le 1 + y/2$ since $(1 + y/2)^2 = 1 + y + y^2/4 \ge 1 + y$ and $1 + y/2 \ge 0$. Substituting $y$ gives the bound.
+\end{proof}
+
+\begin{theorem}[Damped iteration on the implemented map]\label{thm:implemented}
+Assume \cref{ass:B} with $\kappa < 1$. Let $c \coloneqq 1 - 2\kappa + \lambda_D^2$ and suppose $\gamma > 1$ satisfies
+\[
+  s_\gamma \coloneqq (1 - \kappa) - \Lambda_\gamma - g_\gamma > 0 .
+\]
+Then for every $\alpha \in (0, 1]$ with $\alpha < 2 s_\gamma / c$:
+\begin{enumerate}
+\item[(a)] $\Psal$ maps $\Lset$ into itself and is a contraction on $(\Lset, \norm{\cdot}_\gamma)$ with constant
+\[
+  \rho_\gamma(\alpha) \coloneqq \sqrt{q(\alpha)} + \alpha (\Lambda_\gamma + g_\gamma) \le 1 - \alpha \bigl( s_\gamma - \tfrac12 \alpha c \bigr) < 1 .
+\]
+\item[(b)] $\Psimap$ has a unique fixed point $\Lev^\sharp \in \Lset$, and $\norm{\Lev^n - \Lev^\sharp}_\gamma \le \rho_\gamma(\alpha)^n \norm{\Lev^0 - \Lev^\sharp}_\gamma$ for every $\Lev^0 \in \Lset$.
+\item[(c)] The simplified rate bound is minimised at $\alpha^\star = \min(1, s_\gamma / c)$; if $s_\gamma \le c$ this gives $\rho_\gamma(\alpha^\star) \le 1 - s_\gamma^2 / (2c)$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(a) Self-mapping as in \cref{thm:causal}. Fix $\Lev, M \in \Lset$, $d \coloneqq \Lev - M$. For each $k$,
+\[
+  \Psal(\Lev)_k - \Psal(M)_k
+  = \underbrace{\beta d_k + \alpha \bigl( D_k(\Lev_k) - D_k(M_k) \bigr)}_{\mathrm{(i)}}
+  + \alpha \underbrace{\bigl( \Phimap(\Lev)_k - \Phimap(M)_k \bigr)}_{\mathrm{(ii)}}
+  + \alpha \underbrace{\bigl( G(\Lev)_k - G(M)_k \bigr)}_{\mathrm{(iii)}} .
+\]
+By \cref{lem:onesided}, $\gamma^{-k} \norm{\mathrm{(i)}}_k \le \sqrt{q(\alpha)} \norm{d}_\gamma$. By \cref{lem:weighted}, $\max_k \gamma^{-k} \norm{\mathrm{(ii)}}_k \le \Lambda_\gamma \norm{d}_\gamma$. By (B3), $\max_k \gamma^{-k} \norm{\mathrm{(iii)}}_k \le g_\gamma \norm{d}_\gamma$. The triangle inequality gives $\norm{\Psal(\Lev) - \Psal(M)}_\gamma \le \rho_\gamma(\alpha) \norm{d}_\gamma$. The upper bound on $\rho_\gamma(\alpha)$ is the last inequality of \cref{lem:onesided} plus the definition of $s_\gamma$, and it is below $1$ precisely when $\alpha < 2 s_\gamma / c$.
+(b) Banach's theorem on $(\Lset, \norm{\cdot}_\gamma)$ applied to $\Psal$; fixed points of $\Psal$ and $\Psimap$ coincide.
+(c) $\alpha \mapsto 1 - \alpha s_\gamma + \tfrac12 \alpha^2 c$ is a convex quadratic with minimiser $s_\gamma / c$ and minimum $1 - s_\gamma^2 / (2c)$.
+\end{proof}
+
+\begin{remark}[Choice of $\gamma$; the trade-off]\label{rem:tradeoff}
+$\Lambda_\gamma \le \Lambda / (\gamma - 1)$ decreases in $\gamma$, but an anti-causal coupling of slice $k$ to slice $j > k$ with constant $g_{kj}$ contributes $g_{kj} \gamma^{\,j-k}$ to $g_\gamma$, which increases in $\gamma$. If $G$ couples only slices within $p$ steps ahead with total constant $g$, then $g_\gamma \le g \gamma^p$ and the hypothesis $s_\gamma > 0$ reads $(1 - \kappa) > \Lambda/(\gamma - 1) + g \gamma^p$, solvable in $\gamma$ if and only if $g$ is small enough relative to $1 - \kappa$ and $\Lambda$. This is the quantitative content of ``the implicit map must be close to a causal map'': the weighted norm arbitrates between the causal Lipschitz constants and the anti-causal coupling.
+\end{remark}
+
+\begin{remark}[Consistency with the linear spectral algebra]\label{rem:linear}
+Take $H_k = \R$, $\Phimap = G = 0$, $D_k(u) = \lambda u$ with $\lambda < 1$ real. Then $\kappa = \lambda$, $\lambda_D = \abs{\lambda}$, $c = (1 - \lambda)^2$, and $q(\alpha) = (1 - \alpha + \alpha\lambda)^2$, so $\sqrt{q(\alpha)} = \abs{1 + \alpha(\lambda - 1)}$ is exactly the eigenvalue map $\mu = 1 + \alpha(\lambda - 1)$ of \texttt{notes\_convergence.tex}; the threshold $2 s_\gamma / c = 2(1-\lambda)/(1-\lambda)^2$ agrees with the per-eigenvalue threshold there, and $\alpha^\star = 1/(1-\lambda)$ makes $\mu = 0$. For a normal linear $D$ with complex spectrum the sharp constant is $\sup_\lambda \abs{1 + \alpha(\lambda - 1)}$, whereas \cref{lem:onesided} uses only the numerical-range abscissa $\kappa$ and the norm $\lambda_D$. That is the ``numerical range, not spectrum'' caveat of the convergence notes made explicit: spectral radius below one gives local linear convergence by Ostrowski, but a contraction in a given norm needs the numerical range, and for the strongly non-normal linearisation at hand (nilpotent causal part plus feedback) the two can differ substantially.
+\end{remark}
+
+\begin{remark}[What damping buys]\label{rem:buys}
+If $\lambda_D > 1$ but $\kappa < 1$, the undamped map need not be a contraction in any norm on the slice (\cref{prop:nogo}), yet \cref{thm:implemented} gives a contraction for small $\alpha$. Within this framework this is the only mechanism by which damping is load-bearing, and it depends on the sign structure of the same-slice feedback, not on its size.
+\end{remark}
+
+\begin{corollary}[Distance from the explicit output; early slices are pinned first]\label{cor:distance}
+Under the hypotheses of \cref{thm:implemented}, with $\Lev^* = \Lexpl$ from \cref{lem:explicit} and $D(\Lev)_k \coloneqq D_k(\Lev_k)$,
+\[
+  \norm{\Lev^\sharp - \Lev^*}_\gamma \le \frac{\norm{D(\Lev^*) + G(\Lev^*)}_\gamma}{s_\gamma - \tfrac12 \alpha c},
+  \qquad
+  \norm{\Lev^\sharp_k - \Lev^*_k}_k \le \gamma^{k}\, \frac{\norm{D(\Lev^*) + G(\Lev^*)}_\gamma}{s_\gamma - \tfrac12 \alpha c} \quad (0 \le k < K).
+\]
+\end{corollary}
+
+\begin{proof}
+$\Lev^\sharp - \Lev^* = \Psal(\Lev^\sharp) - \Phal(\Lev^*) = [\Psal(\Lev^\sharp) - \Psal(\Lev^*)] + \alpha [\Psimap(\Lev^*) - \Phimap(\Lev^*)]$, and $\Psimap(\Lev^*) - \Phimap(\Lev^*) = D(\Lev^*) + G(\Lev^*)$. Taking $\norm{\cdot}_\gamma$ and using \cref{thm:implemented}(a), $\norm{\Lev^\sharp - \Lev^*}_\gamma \le \rho_\gamma(\alpha) \norm{\Lev^\sharp - \Lev^*}_\gamma + \alpha \norm{D(\Lev^*) + G(\Lev^*)}_\gamma$ with $1 - \rho_\gamma(\alpha) \ge \alpha(s_\gamma - \tfrac12 \alpha c) > 0$. Rearrange, and use $\norm{\Lev_k}_k \le \gamma^k \norm{\Lev}_\gamma$.
+\end{proof}
+
+The right-hand side is the residual of the explicit output under the implemented map, scaled by the reciprocal contraction gap; the slice-$k$ bound grows geometrically in $k$, which is the precise form of the statement that the implicit fixed point is closest to the explicit output at early times.
+
+\begin{theorem}[Bounded noise]\label{thm:noise}
+Assume the hypotheses of \cref{thm:implemented} and let the computed iteration be $\Lev^{n+1} = \Psal(\Lev^n) + \alpha\, \eta_n$ with $\norm{\eta_n}_\gamma \le \eta$ for all $n$, where $\eta_n$ collects the finite-particle error of the cloud and the optimisation error of the network at iteration $n$ (it enters with the factor $\alpha$ because the code forms $(1-\alpha)\Lev + \alpha \widehat{\Phimap}$ with the noisy $\widehat{\Phimap}$). If $\Lev^n \in \Lset$ for all $n$, which the clipping guarantees, then
+\[
+  \norm{\Lev^n - \Lev^\sharp}_\gamma
+  \le \rho_\gamma(\alpha)^n \norm{\Lev^0 - \Lev^\sharp}_\gamma + \frac{\alpha\eta}{1 - \rho_\gamma(\alpha)}
+  \le \rho_\gamma(\alpha)^n \norm{\Lev^0 - \Lev^\sharp}_\gamma + \frac{\eta}{s_\gamma - \tfrac12 \alpha c} .
+\]
+\end{theorem}
+
+\begin{proof}
+$\norm{\Lev^{n+1} - \Lev^\sharp}_\gamma \le \rho \norm{\Lev^n - \Lev^\sharp}_\gamma + \alpha\eta$ with $\rho \coloneqq \rho_\gamma(\alpha)$; unrolling gives the first bound, and $1 - \rho \ge \alpha(s_\gamma - \tfrac12 \alpha c)$ gives the second.
+\end{proof}
+
+\begin{remark}
+This is the implementable theorem of \texttt{notes\_convergence.tex} with explicit constants. In the simplified bound the floor $\eta / (s_\gamma - \tfrac12 \alpha c)$ increases with $\alpha$ while the rate improves with $\alpha$ up to $\alpha^\star$; damping does not reduce the noise floor by more than the factor $s_\gamma / (s_\gamma - \tfrac12 \alpha c)$. Its role is convergence, not variance reduction.
+\end{remark}
+
+\section{What is and is not established}\label{sec:status}
+
+\begin{enumerate}
+\item The original claim is not provable for the continuum map. Well-posedness of the calibrated McKean--Vlasov SDE is open in the Heston-type case, and the law-dependence of the exact conditional expectation is not Lipschitz in Wasserstein distance \citep{djete2022}. All statements above concern the time-discretised, capped, floored, regularised map.
+\item \Cref{ass:A3} is required for \cref{thm:causal}. It is established for the RKHS ridge estimator \citep{bayer2022rkhs} and for mollified kernel estimators with Lipschitz-regularised coefficients \citep{reisinger2023}; it is not established for the neural estimator.
+\item \Cref{ass:B}, in particular $\kappa < 1$, is the load-bearing hypothesis for any statement in which $\alpha$ matters (\cref{prop:nogo}). It is the nonlinear, numerical-range form of the spectral condition in the convergence notes and has no published counterpart: for the classical PDE inner iteration the contraction property is stated but not proved \citep[App.~E.3]{cozma2019}. It should be stated as a named hypothesis and measured in the frozen-body configuration.
+\item The route ``closeness to explicit plus damping'' is half right. Closeness (causality, weighted norm) removes the causal part of the Lipschitz constant and by itself gives \cref{thm:causal} with $\alpha = 1$ optimal. Damping is needed only against the same-slice feedback, and only under the one-sided condition.
+\item The implemented iteration is not the iteration of a fixed map: the network and optimiser state are carried across outer iterations and fresh random numbers are drawn each time. The theorems idealise $\Psimap$ as deterministic and push the rest into $\eta_n$.
+\item $\Lev^*$ and $\Lev^\sharp$ are fixed points of the clipped map. They coincide with the unclipped calibrated leverage only where the latter satisfies $0 \le \Lev \le \Lmax$ and $\E[V \mid X] \ge \fmin$.
+\end{enumerate}
+
+Open risks: the sup-norm constant $\gamma^{K-1}$ and the non-uniformity in $\Delta$ without the squared Volterra form (\cref{rem:uniform}); transient growth of the nilpotent causal linearisation, which damping does not reduce in this analysis; the unknown sign of $\kappa$; the growth $g_\gamma \sim \gamma^p$ when the network smooths over many slices, which may make $s_\gamma > 0$ unsatisfiable.
+
+\begin{thebibliography}{9}
+
+\bibitem[Abergel and Tachet(2010)]{abergel2010} F.~Abergel and R.~Tachet, ``A nonlinear partial integro-differential equation from mathematical finance,'' \textit{Discrete and Continuous Dynamical Systems A}, vol.~27, no.~3, pp.~907--917, 2010.
+
+\bibitem[Bayer et~al.(2024)]{bayer2022rkhs} C.~Bayer, D.~Belomestny, O.~Butkovsky, and J.~Schoenmakers, ``A reproducing kernel Hilbert space approach to singular local stochastic volatility McKean--Vlasov models,'' \textit{Finance and Stochastics}, 2024. \textit{arXiv preprint} arXiv:2203.01160.
+
+\bibitem[Cozma et~al.(2021)]{cozma2019} A.~Cozma, M.~Mariapragassam, and C.~Reisinger, ``Calibration of a hybrid local-stochastic volatility stochastic rates model with a control variate particle method,'' \textit{SIAM Journal on Financial Mathematics}, 2021. \textit{arXiv preprint} arXiv:1701.06001.
+
+\bibitem[Djete(2024)]{djete2022} M.~F. Djete, ``Non-regular McKean--Vlasov equations and calibration problem in local stochastic volatility models,'' \textit{arXiv preprint} arXiv:2208.09986, 2022 (revised 2024).
+
+\bibitem[Reisinger and Tsianni(2023)]{reisinger2023} C.~Reisinger and M.~O. Tsianni, ``Convergence of the Euler--Maruyama particle scheme for a regularised McKean--Vlasov equation arising from the calibration of local-stochastic volatility models,'' \textit{arXiv preprint} arXiv:2302.00434, 2023.
+
+\end{thebibliography}
+
+\end{document}

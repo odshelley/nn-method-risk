@@ -1,0 +1,252 @@
+\documentclass[11pt,a4paper]{article}
+
+% Working notes for the Neural Particle Method project.
+% Synthetic-data setup, machinery, and the planned benchmark suite.
+
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+\usepackage{microtype}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{xcolor}
+\setlength{\emergencystretch}{3em}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\sigDup}{\sigma_{\mathrm{Dup}}}
+\newcommand{\Lev}{L}
+\newcommand{\Lmax}{L_{\max}}
+\newcommand{\bp}{\,\mathrm{bp}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Neural Particle Method: Experimental Record\\ \large Synthetic-data setup, machinery, and the benchmark suite}
+\author{Osian Shelley}
+\date{8 September 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note records, in one place, the synthetic markets and dynamics used throughout the project, the simulation, estimation and scoring machinery, and the specification of the clean benchmark suite agreed on 8 September 2026 (\cref{sec:suite}), whose tables are to be filled from the MLflow store when the runs complete. The suite follows the discovery, in the diagnostics of 8 September, that all one-pass schemes were fitting the conditional expectation of the raw Euler variance rather than of its positive part, which the dynamics actually use (\cref{sec:floor}); the diagnostic runs themselves live in the MLflow experiments \code{mechanism}, \code{bump\_floor} and \code{bump\_floor\_nn}.
+\end{abstract}
+
+\tableofcontents
+
+\section{Conventions}\label{sec:conv}
+
+\emph{Explicit} denotes the one-pass, per-slice calibration with a per-slice neural network. Nadaraya--Watson (NW) is the classical particle method: the same one-pass structure with kernel regression. Other per-slice estimators are named by their estimator (RKHS, spline, ridge). \emph{Implicit} denotes the damped outer iteration with a single network in $(t,x)$. All errors are implied-volatility root-mean-square errors in volatility basis points against the target surface, unless stated otherwise. ``Pooled'' means over all quoted strikes and maturities together; ``wings'' means the quoted strikes with $|k|>0.25$; per-maturity columns restrict to one maturity.
+
+\section{Synthetic data}\label{sec:data}
+
+\subsection{Target surfaces: SSVI power law}\label{sec:ssvi}
+
+Each scenario's market is an SSVI implied-variance surface in the power-law parameterisation. With log-moneyness $k=\log(K/S_0)$, $S_0=1$, and parameters $(\sigma_0,\eta,\gamma,\rho_s)$,
+\begin{equation}\label{eq:ssvi}
+  \theta_T = \sigma_0^2 T,\qquad
+  \varphi(\theta_T) = \eta\,\theta_T^{-\gamma},\qquad
+  w(k,T) = \tfrac12\theta_T\Bigl(1+\rho_s\varphi k+\sqrt{(\varphi k+\rho_s)^2+1-\rho_s^2}\Bigr),
+\end{equation}
+where $w$ is total implied variance and the implied volatility is $\sqrt{w(k,T)/T}$. Parameters are drawn independently per scenario from
+\[
+  \sigma_0\sim U(0.12,0.35),\quad \eta\sim U(0.5,2.0),\quad \gamma\sim U(0.3,0.5),\quad \rho_s\sim U(-0.85,-0.10),
+\]
+resampled until the sufficient no-arbitrage conditions $0<\gamma\le\tfrac12$, $|\rho_s|<1$, $\eta(1+|\rho_s|)\le 2$ hold. Scenario $s_i$ uses the seed $1000+i$ (\code{bench/scenarios.py}, \code{make\_registry}).
+
+The Dupire local volatility is analytic from \cref{eq:ssvi}: with $w_k,w_{kk},w_T$ the derivatives of $w$,
+\begin{equation}\label{eq:dupire}
+  \sigDup^2(T,k) = \frac{w_T}{1-\frac{k}{w}w_k+\frac14\bigl(-\frac14-\frac1w+\frac{k^2}{w^2}\bigr)w_k^2+\frac12 w_{kk}},
+\end{equation}
+with the denominator floored at $0.05$, the local variance clipped to $[10^{-8},9]$, and the time argument clipped to $[t_{\min},T]$ with $t_{\min}=0.004$ (\code{market/local\_vol.py}). These clipping constants are part of the calibrated behaviour and are never changed.
+
+\subsection{Variance dynamics}\label{sec:dyn}
+
+The calibrated model is Heston-type LSV in log-spot $X=\log S$,
+\begin{equation}\label{eq:lsv}
+  dX_t = -\tfrac12\Lev^2(t,X_t)V_t\,dt+\Lev(t,X_t)\sqrt{V_t}\,dW_t,\qquad
+  dV_t = \kappa(\theta-V_t)\,dt+\xi\sqrt{V_t}\,dB_t,\qquad d\langle W,B\rangle_t=\rho\,dt .
+\end{equation}
+For scenario $s_i$ the dynamics parameters are drawn from the same seed as the surface: $\kappa\in\{1,2,3\}$, $\xi\in\{0.3,0.6,1.0\}$, $\rho\in\{-0.7,-0.3\}$, each uniform over its set, and $\theta=v_0=\sigma_0^2$ so that the variance level matches the surface's short-end level. The Feller ratio $2\kappa\theta/\xi^2$ therefore ranges from $0.05$ to $4.3$ across the grid. \Cref{tab:scen} lists all twenty scenarios. Horizon $T=2$ years; spot $S_0=1$; no rates or dividends.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{l rrrr rrr r}
+\toprule
+ & \multicolumn{4}{c}{SSVI surface} & \multicolumn{3}{c}{dynamics} & \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-8}
+sid & $\sigma_0$ & $\eta$ & $\gamma$ & $\rho_s$ & $\kappa$ & $\xi$ & $\rho$ & Feller\\
+\midrule
+s01 & 0.261 & 0.52 & 0.34 & $-0.21$ & 1 & 0.3 & $-0.7$ & 1.51 \\
+s02 & 0.208 & 1.04 & 0.45 & $-0.56$ & 3 & 0.6 & $-0.7$ & 0.72 \\
+s03 & 0.163 & 0.89 & 0.40 & $-0.35$ & 3 & 1.0 & $-0.7$ & 0.16 \\
+s04 & 0.120 & 0.70 & 0.33 & $-0.56$ & 2 & 0.6 & $-0.3$ & 0.16 \\
+s05 & 0.285 & 1.01 & 0.49 & $-0.72$ & 2 & 1.0 & $-0.3$ & 0.32 \\
+s06 & 0.304 & 1.00 & 0.38 & $-0.58$ & 3 & 1.0 & $-0.3$ & 0.55 \\
+s07 & 0.202 & 0.56 & 0.46 & $-0.49$ & 3 & 1.0 & $-0.3$ & 0.25 \\
+s08 & 0.158 & 1.72 & 0.34 & $-0.11$ & 1 & 1.0 & $-0.7$ & 0.05 \\
+s09 & 0.133 & 0.99 & 0.31 & $-0.64$ & 3 & 1.0 & $-0.3$ & 0.11 \\
+s10 & 0.142 & 1.30 & 0.48 & $-0.11$ & 3 & 1.0 & $-0.7$ & 0.12 \\
+s11 & 0.144 & 1.10 & 0.38 & $-0.11$ & 2 & 1.0 & $-0.7$ & 0.08 \\
+s12 & 0.191 & 1.01 & 0.33 & $-0.22$ & 3 & 1.0 & $-0.7$ & 0.22 \\
+s13 & 0.303 & 0.62 & 0.43 & $-0.51$ & 2 & 1.0 & $-0.3$ & 0.37 \\
+s14 & 0.220 & 1.38 & 0.48 & $-0.11$ & 1 & 0.6 & $-0.3$ & 0.27 \\
+s15 & 0.127 & 0.72 & 0.37 & $-0.33$ & 3 & 0.3 & $-0.3$ & 1.08 \\
+s16 & 0.172 & 1.16 & 0.37 & $-0.42$ & 1 & 0.6 & $-0.7$ & 0.17 \\
+s17 & 0.136 & 1.13 & 0.42 & $-0.50$ & 1 & 0.3 & $-0.3$ & 0.41 \\
+s18 & 0.257 & 1.18 & 0.47 & $-0.24$ & 3 & 0.6 & $-0.3$ & 1.10 \\
+s19 & 0.170 & 1.09 & 0.39 & $-0.23$ & 2 & 0.3 & $-0.7$ & 1.28 \\
+s20 & 0.253 & 0.93 & 0.32 & $-0.32$ & 3 & 0.3 & $-0.7$ & 4.27 \\
+\bottomrule
+\end{tabular}
+\caption{The twenty synthetic scenarios: SSVI surface parameters, variance dynamics, and the Feller ratio $2\kappa\theta/\xi^2$.}
+\label{tab:scen}
+\end{table}
+
+Two further families exist in the registry and were not used today: six variants of s01 with $(\xi,\rho)$ swept over the grid (\code{fig3\_registry}), and three Heston-market scenarios whose target surface is generated by a Heston model with parameters different from the calibrated dynamics (\code{li\_simple}, \code{li\_complex}, \code{bayer}; horizon 1 year; Dupire surface from prices on a $50\times121$ grid).
+
+\subsection{Quotes, bump, and scoring}\label{sec:quotes}
+
+Quoted strikes are $13$ log-strikes equally spaced in log between $0.6$ and $1.6$; maturities are $0.25$, $0.5$, $1$ and $2$ years. The wings are the strikes with $|k|>0.25$ (six of thirteen). The warm-start experiments bump the surface to $\sigma_0'=\sigma_0+0.01$, $\eta'=0.95\eta$, $\rho_s'=\min(\rho_s+0.03,-0.05)$, a level rise of one volatility point with curvature and skew nudged inside the no-arbitrage region.
+
+Scoring reprices vanilla calls under the calibrated leverage field on fresh paths: $500\,000$ particles, $200$ Euler steps over $[0,2]$, seed $10\,000$ plus a strategy-specific offset, call price as the sample mean of the payoff, Black--Scholes inversion at the grid-snapped maturity, and the exact SSVI implied volatility at the same snapped time as the target (\code{pricing/reprice.py}, \code{pricing/metrics.py}). The bump experiments use $300\,000$ repricing paths. Errors are reported as RMSE in volatility bp, pooled, wings-only, and per maturity.
+
+\section{Machinery}\label{sec:machinery}
+
+\subsection{Simulation}\label{sec:sim}
+
+Calibration and repricing share one stepper. With $\Delta=T/K$, $v^+=\max(v,0)$, $z_1=\rho z_b+\sqrt{1-\rho^2}z_p$ and independent standard normals $z_b,z_p$,
+\begin{equation}\label{eq:euler}
+  x_{k+1} = x_k-\tfrac12\Lev_k(x_k)^2v_k^+\Delta+\Lev_k(x_k)\sqrt{v_k^+}\sqrt{\Delta}\,z_1,\qquad
+  v_{k+1} = v_k+\kappa(\theta-v_k^+)\Delta+\xi\sqrt{v_k^+}\sqrt{\Delta}\,z_b .
+\end{equation}
+This is full truncation: the raw $v$ may be negative and is carried, but only $v^+$ enters any coefficient. Calibration uses $K=50$ steps unless stated; repricing always uses $200$. The leverage is stored per slice on a grid in log-spot and evaluated by linear interpolation, constant beyond the grid ends; the slice in force at time $t$ is the last grid time $\le t$. The explicit and NW passes use a per-slice grid at the $0.1\%$ to $99.9\%$ quantiles of the current cloud ($101$ points); the implicit loop uses a fixed grid of $81$ points from $\log 0.4$ to $\log 2.2$. The leverage is capped at $\Lmax=4$ and the fitted conditional expectation is floored at $10^{-4}$.
+
+\subsection{One-pass schemes and their estimators}\label{sec:onepass}
+
+At slice $k$, fit $f_k(x)\approx\E[V_{t_k}\mid X_{t_k}=x]$ on a subsample of $30\,000$ particles from the current cloud, set $\Lev_k=\operatorname{clip}(\sigDup(t_k,\cdot)/\sqrt{\max(f_k,10^{-4})},0,\Lmax)$, and advance the cloud. Slice $0$ uses $f_0\equiv v_0$. Estimators:
+\begin{itemize}
+\item \textbf{NW}: Gaussian Nadaraya--Watson with Silverman bandwidth $h=1.06\,\hat\sigma_x\,n^{-1/5}$ on the subsample.
+\item \textbf{Explicit (per-slice network)}: a $1\to64\to64\to1$ SiLU network with softplus output scaled by $0.04$, input scaled by $0.3$, trained by Adam at learning rate $10^{-2}$ on the unweighted squared loss; $400$ steps on the first fitted slice and $120$ steps on each later slice, warm-started from the previous slice's weights.
+\item \textbf{RKHS}: kernel ridge with a Gaussian kernel of variance $0.1$ in log-spot, $100$ centres at the $j\cdot100/101$ percentiles of the cloud, regularisation $\lambda=10^{-9}$ (Bayer et al.'s published choices).
+\item \textbf{Ridge head on a frozen body}: the implicit network's body (below) as a $65$-dimensional feature map, with a per-slice ridge readout, $\lambda=10^{-3}$ per sample, shrunk toward the previous slice's coefficients.
+\end{itemize}
+
+\subsection{Implicit loop}\label{sec:implicit}
+
+A single network $f_\theta(t,x)$, $2\to64\to64\to1$ SiLU with softplus output scaled by $0.04$, inputs $(t/T,\,x/0.3)$. Starting from the explicit output as $\Lev^0$, each outer iteration simulates a full cloud under $\Lev^n$ with fresh random numbers, draws a pooled subsample of $60\,000$ points across all slices, trains $\theta$ for $300$ Adam steps at learning rate $10^{-2}$ with the network and optimiser state carried over from the previous iteration, reads $\Phi(\Lev^n)_k=\operatorname{clip}(\sigDup(t_k)/\sqrt{\max(f_\theta(t_k,\cdot),10^{-4})},0,\Lmax)$ on the fixed grid, and sets $\Lev^{n+1}=(1-\alpha)\Lev^n+\alpha\Phi(\Lev^n)$ with $\alpha=\tfrac12$. The paper uses six iterations. The pooled data are truncated, $v^+$, before training.
+
+\subsection{The variance-target discrepancy}\label{sec:floor}
+
+The one-pass schemes hand the estimator the raw Euler $v$; the implicit loop hands it $v^+$. Since only $v^+$ drives the dynamics \cref{eq:euler}, the quantity the leverage must divide by is $\E[V^+\mid X]$. Under Feller violation a sizeable fraction of particles has $v<0$ after a coarse step (on s11, $v_0=0.02$, $\xi=1$, $\Delta=0.04$: the one-step standard deviation of $v$ is $0.028$), so $\E[v\mid X]<\E[v^+\mid X]$ by the mean negative excursion, the denominator is too small, and the leverage too large. The effect is independent of the particle count and shrinks with the step size. ``Floor on'' below means the estimator is given $v^+$ (\code{ExplicitConfig.fit\_v\_floor}); the default remains off so that the golden replays of the paper's runs are unchanged.
+
+\section{Benchmark suite (planned)}\label{sec:suite}
+
+This section specifies the clean benchmark agreed on 8 September 2026, to be run once the variance floor of \cref{sec:floor} is the package default. Every cell of the tables below is one MLflow run, keyed by method, scenario, seed and (for the lagged suite) lag type and offline particle count, in experiments \code{suite\_cold}, \code{suite\_offline}, \code{suite\_lagged} and \code{pde\_reference}. Every trained object is stored as a run artifact (network weights as a \code{torch} state dictionary, per-slice estimators and leverage fields as pickles and JSON) and can be reloaded by run id. The tables are marked TBD and will be filled from the store when the runs complete.
+
+\subsection{Common setup}\label{sec:suite-setup}
+
+\begin{itemize}
+\item \textbf{Scenarios.} The $20$ SSVI scenarios of \cref{tab:scen} and the three Heston-market scenarios used in the literature comparisons (\code{li\_simple}, \code{li\_complex}, \code{bayer}; a Heston market surface, a different Heston variance process as the calibrated model, one-year maturity, log-strikes on $[-0.9,0.9]$). The Heston block is reported separately because it scores a single maturity on a wider strike range.
+\item \textbf{Time grid.} $200$ Euler steps for calibration and $200$ for repricing, $\Delta=0.01$ on $[0,2]$, so that every method sits at its step-count plateau (the step-count diagnostics of 8 September 2026, MLflow experiment \code{mechanism}) and the comparison is about the estimator alone.
+\item \textbf{Particles.} $100\,000$ particles for every cold row and for every online stage. Offline bodies at $200\,000$ and $500\,000$ particles.
+\item \textbf{Seeds.} Two seeds ($0$, $1$) for every cold row and every online stage; one seed for each offline body. The reprice seed is $10\,000$ plus the calibration seed.
+\item \textbf{Floor.} All one-pass schemes fit $\E[V^+\mid X]$; \code{fit\_v\_floor} becomes the default in this work and the tiny golden replays are regenerated in the same commit.
+\item \textbf{Implicit configuration.} Warm start from the explicit network field, $30$ damped iterations at $\alpha=\tfrac12$ with fresh noise per iteration, persistent network and optimiser (the best practical setting found in the convergence diagnostics of 8 September 2026, experiment \code{mechanism}).
+\item \textbf{Scoring.} As in \cref{sec:quotes}: $500\,000$ repricing paths, Black--Scholes inversion at the snapped maturity, exact SSVI (or semi-analytic Heston) implied volatility as the target. Metrics per run: pooled and wings MAE and RMSE in volatility bp, both per maturity, the count of failed inversions, and the leverage RMSE against the PDE reference of the scenario.
+\item \textbf{Latency.} Wall-clock seconds of the calibration only (repricing excluded). For the lagged suite, only the online stage is timed.
+\item \textbf{PDE reference.} The Fokker--Planck reference leverage (\code{reference/pde.py}) is solved per scenario at $200$ steps and enters twice: repriced under the same Monte Carlo as every other row, which is the attainable floor of the scoring under this repricer (Gy\"ongy), and as the reference for the leverage-error column. Its repricing is repeated under a second reprice seed to measure the Monte Carlo noise floor of the score itself.
+\end{itemize}
+
+\subsection{Cold suite}\label{sec:suite-cold}
+
+One calibration from scratch per method, scenario and seed at $100\,000$ particles. Methods, with their estimator of $\E[V^+\mid X]$ per slice:
+\begin{enumerate}
+\item \textbf{NW}: Gaussian Nadaraya--Watson, Silverman bandwidth (\cref{sec:onepass}).
+\item \textbf{Explicit NN}: per-slice network, warm-started across slices (\cref{sec:onepass}).
+\item \textbf{Implicit NN}: damped global-network loop (\cref{sec:implicit}, configuration above).
+\item \textbf{RKHS}: Gaussian kernel ridge with $100$ quantile centres, Bayer et al.'s published knobs (\cref{sec:onepass}).
+\item \textbf{Spline}: penalised cubic B-spline, $25$ quantile knots, $\lambda=1$.
+\item \textbf{Literature block.} GHL kernel: Nadaraya--Watson in spot with the quartic kernel and the Guyon--Henry-Labord\`ere rule-of-thumb bandwidth $h(t)=1.5\,S_0\,\sigma_{\mathrm{LV}}(S_0,t)\sqrt{\max(t,0.25)}\,N^{-1/5}$. Bins: piecewise-constant regression on $20$ equal-frequency buckets (van der Stoep et al.). Muguruza: the kernel-free conditional Monte Carlo of Corollary~4.1, each particle contributing its one-step Gaussian conditional law of log-spot given the variance path. PU-RBF: Hakala's partition-of-unity radial basis functions, $40$ centres, $5$-nearest-neighbour widths, regulariser $0.2$.
+\item \textbf{PDE}: the reference leverage repriced by Monte Carlo (attainable floor).
+\end{enumerate}
+
+\begin{table}[h]\centering\footnotesize
+\caption{Cold suite, SSVI scenarios: mean and median over the $20$ scenarios and two seeds. TBD.}\label{tab:suite-cold}
+\begin{tabular}{l rr rr rr r r}
+\toprule
+ & \multicolumn{2}{c}{pooled MAE (bp)} & \multicolumn{2}{c}{pooled RMSE (bp)} & \multicolumn{2}{c}{wings MAE (bp)} & lev.\ RMSE & latency (s)\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+method & mean & median & mean & median & mean & median & median & median\\
+\midrule
+NW & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+Explicit NN & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+Implicit NN & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+RKHS & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+Spline & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+GHL kernel & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+Bins & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+Muguruza & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+PU-RBF & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
+PDE (attainable floor) & TBD & TBD & TBD & TBD & TBD & TBD & 0 & --\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The same table is repeated for the three Heston-market scenarios (one maturity, no wings split), and the per-scenario numbers behind both go in an appendix table.
+
+\subsection{What a lag is}\label{sec:suite-lag}
+
+An overnight calibration is done on surface $S_0$; the intraday market is $S_1$, and the question is how much of the overnight work survives. Because the synthetic surfaces are parametric, a lag is a move in parameter space and never a bump of quoted points, so arbitrage cannot be introduced by accident. Two lags are run for every cell.
+
+\emph{Surface lag.} For SSVI, the existing bump: $\sigma_0'=\sigma_0+0.01$, $\eta'=0.95\eta$, $\rho_s'=\min(\rho_s+0.03,-0.05)$, shrunk by quarters until the Gatheral--Jacquier sufficient conditions ($\eta(1+|\rho_s|)\le2$, $0<\gamma\le\tfrac12$) hold; calendar no-arbitrage is automatic since $\theta_T=\sigma_0^2T$ is increasing. For a Heston market, the matching move in vol terms: $\sqrt{v_0}$ and $\sqrt\theta$ up one volatility point, $\rho\to\min(\rho+0.03,-0.05)$, $\xi\to0.95\xi$; the surface is model-generated and arbitrage-free for any valid parameters.
+
+\emph{Surface plus spot lag.} The surface lag together with a sticky-strike spot move of $+2\%$, $S_1=S_0e^{\delta}$, $\delta=\log1.02$. Under sticky-strike the implied volatility at each absolute strike is unchanged, so in log-moneyness relative to the new spot the surface is translated: $\sigma_{\mathrm{IV}}'(k,T)=\sigma_{\mathrm{IV}}(k+\delta,T)$. A translation in $k$ preserves Durrleman's butterfly condition (it involves only $w$ and its $k$-derivatives at a point) and calendar monotonicity, so the shifted surface is arbitrage-free. Its Dupire local volatility is the same function of absolute log-spot as before; what changes is where the particles start. The stored denominators $f(t,x)=\E[V_t\mid X_t=x]$ were fitted for a cloud started at $S_0$, and a conditional expectation given spot depends on the starting point: with $\rho<0$ a particle sitting $2\%$ above the old start had its variance drift down, so the stale $f$ at the new spot is below $v_0$, the stale leverage is too high near the money, most at short maturities. Sticky-delta, by contrast, leaves the surface in moneyness unchanged and the whole calibration is scale invariant, so a sticky-delta spot move is invisible to every method; the surface-only lag already covers it. A $2\%$ daily move is one to one-and-a-half standard deviations at $20$--$30\%$ volatility.
+
+\subsection{Lagged suite}\label{sec:suite-lagged}
+
+\emph{Offline stage} (experiment \code{suite\_offline}, one run per scenario, body type and particle count): a full calibration on $S_0$ at $200\,000$ or $500\,000$ particles, $200$ steps, seed $0$: either the explicit NN pass (the per-slice networks and the per-slice denominators $f_k$ are saved) or the implicit loop (the global network is saved). These runs are cached and reused by every online cell below.
+
+\emph{Online stage} (experiment \code{suite\_lagged}, one run per scenario, method, offline size, lag and online seed): given the intraday surface $S_1$ and $100\,000$ fresh particles, build the intraday leverage and reprice. Only this stage is timed. Methods:
+\begin{enumerate}
+\item \textbf{Explicit NN, stale $f$, fresh Dupire}: $\Lev_k=\operatorname{clip}(\sigDup^{S_1}(t_k,\cdot)/\sqrt{\max(f_k,10^{-4})},0,\Lmax)$ with the offline per-slice $f_k$. Costs nothing online beyond the repricing.
+\item \textbf{Implicit NN, stale $f$, fresh Dupire}: the same with $f=f_\theta(t,\cdot)$ from the offline global network.
+\item \textbf{Explicit NN with RKHS head}: simulate the $100\,000$ online particles under the stale-$f$ leverage of item~1 with fresh Dupire, slice by slice; at each slice fit a Gaussian kernel ridge to the residual $v^+-f_k(x)$ on the online cloud, and use $f_k+\text{residual}$ as the denominator for the next step (a causal one-pass correction).
+\item \textbf{Implicit NN with RKHS head}: the same residual head on the global network's $f_\theta$.
+\item \textbf{Explicit NN with ridge head}: the per-slice network body frozen as a feature map ($64$ features plus a constant) with a per-slice ridge readout fitted on the online cloud, shrunk toward the offline readout (\cref{sec:onepass}, ``ridge head''); a linear head, since the last layer of the body is already linear in these features.
+\item \textbf{Implicit NN with ridge head}: the same on the global body in $(t,x)$.
+\end{enumerate}
+The online reference rows are NW re-solved from scratch on $S_1$ at $100\,000$ particles and $200$ steps (the best intraday strategy in the floor-corrected bump runs, experiment \code{bump\_floor}), and the stale leverage with no action.
+
+\begin{table}[h]\centering\footnotesize
+\caption{Lagged suite, SSVI scenarios: mean over the $20$ scenarios and two online seeds; latency is the online stage only. One block per lag type. TBD.}\label{tab:suite-lagged}
+\resizebox{\textwidth}{!}{\begin{tabular}{l l rr rr r}
+\toprule
+method & offline $N$ & pooled MAE & pooled RMSE & wings MAE & $T=0.25$ MAE & online latency (s)\\
+\midrule
+\multicolumn{7}{l}{\emph{Surface lag}}\\
+Stale leverage, no action & -- & TBD & TBD & TBD & TBD & 0\\
+NW re-solve on $S_1$ & -- & TBD & TBD & TBD & TBD & TBD\\
+Explicit NN, stale $f$, fresh Dupire & 200k / 500k & TBD & TBD & TBD & TBD & 0\\
+Implicit NN, stale $f$, fresh Dupire & 200k / 500k & TBD & TBD & TBD & TBD & 0\\
+Explicit NN + RKHS head & 200k / 500k & TBD & TBD & TBD & TBD & TBD\\
+Implicit NN + RKHS head & 200k / 500k & TBD & TBD & TBD & TBD & TBD\\
+Explicit NN + ridge head & 200k / 500k & TBD & TBD & TBD & TBD & TBD\\
+Implicit NN + ridge head & 200k / 500k & TBD & TBD & TBD & TBD & TBD\\
+\midrule
+\multicolumn{7}{l}{\emph{Surface plus $2\%$ sticky-strike spot lag}}\\
+(same rows) & & TBD & TBD & TBD & TBD & TBD\\
+\bottomrule
+\end{tabular}
+}\end{table}
+
+\subsection{Reproducibility}\label{sec:suite-repro}
+
+Each run records the git hash, the full configuration as parameters, the leverage field, the implied-volatility error grid, and the trained objects. A loader (\code{nparticle suite load <run\_id>}) rebuilds the leverage field and, where present, the network or per-slice estimators from the artifacts alone, so any row of the tables can be re-scored or reused as an offline body without recomputation.
+
+\end{document}

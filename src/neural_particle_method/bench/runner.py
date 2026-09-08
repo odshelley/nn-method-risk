@@ -62,6 +62,8 @@ def run_one(store, sid, algo, n_particles, seed, explicit=ExplicitConfig(), impl
         m = iv_metrics(iv_model, iv_target, k, mats)
         metrics = {c: m[c] for c in ("pooled_rmse_bp", "pooled_max_bp", "wings_rmse_bp", "wings_max_bp", "n_failed")}
         metrics.update({f"rmse_bp/T{r['T']:g}": r["rmse_bp"] for r in m["per_maturity"]})
+        metrics.update({"pooled_mae_bp": m["pooled_mae_bp"], "wings_mae_bp": m["wings_mae_bp"]})
+        metrics.update({f"mae_bp/T{r['T']:g}": r["mae_bp"] for r in m["mae_per_maturity"]})
         metrics.update(res.timings)
         for c in ("intraday_s", "overnight_s"):
             if c in res.diagnostics:

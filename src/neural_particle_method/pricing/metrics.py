@@ -18,6 +18,10 @@ def iv_metrics(iv_model, iv_target, k_grid, maturities, wing_cut=0.25):
         # round away float64 cancellation noise (~1e-13 bp), well below any real vol-bp difference
         return round(float(np.sqrt(np.mean(e ** 2))), 9), round(float(np.max(np.abs(e))), 9)
 
+    def mae(mask):
+        e = err[mask & ok]
+        return float("nan") if e.size == 0 else round(float(np.mean(np.abs(e))), 9)
+
     pooled = stats(np.ones_like(ok, dtype=bool))
     wing_stats = stats(np.tile(wings, (err.shape[0], 1)))
     per = []
@@ -26,9 +30,18 @@ def iv_metrics(iv_model, iv_target, k_grid, maturities, wing_cut=0.25):
         row[i] = True
         r, mx = stats(row)
         per.append({"T": float(T), "rmse_bp": r, "max_bp": mx})
+    all_mask = np.ones_like(ok, dtype=bool)
+    wing_mask = np.tile(wings, (err.shape[0], 1))
+    mae_per = []
+    for i, T in enumerate(maturities):
+        row = np.zeros_like(ok, dtype=bool)
+        row[i] = True
+        mae_per.append({"T": float(T), "mae_bp": mae(row)})
+    # `per_maturity` is kept verbatim (golden replays compare it); MAE lives in its own keys.
     return {"pooled_rmse_bp": pooled[0], "pooled_max_bp": pooled[1],
             "wings_rmse_bp": wing_stats[0], "wings_max_bp": wing_stats[1],
-            "n_failed": int((~ok).sum()), "per_maturity": per}
+            "n_failed": int((~ok).sum()), "per_maturity": per,
+            "pooled_mae_bp": mae(all_mask), "wings_mae_bp": mae(wing_mask), "mae_per_maturity": mae_per}
 
 
 def target_ivs(ssvi_params, k_grid, maturities, n_steps):

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..simulate.dynamics import HestonParams
-from ..simulate.leverage import LeverageField, Slice
+from ..simulate.leverage import DEFAULT_GRID, LeverageField, Slice
 from ..simulate.stepper import heston_step
 from .config import ExplicitConfig
 
@@ -70,19 +70,23 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
 
     for k in range(n_steps):
         t = k * dt
-        qs = np.linspace(0.001, 0.999, 101)
-        grid = np.quantile(lnx, qs) if k > 0 else np.array([np.log(s0)])
-        grid = np.unique(grid)
+        if cfg.grid == "fixed":
+            grid = DEFAULT_GRID.copy()
+        else:
+            qs = np.linspace(0.001, 0.999, 101)
+            grid = np.quantile(lnx, qs) if k > 0 else np.array([np.log(s0)])
+            grid = np.unique(grid)
         if k == 0:
             f_grid = np.full(len(grid), v0)
         else:
             idx = rng.choice(n_particles, size=min(fit_subsample, n_particles), replace=False)
             wi = None if w is None else w[idx]
+            v_fit = np.maximum(v[idx], 0.0) if cfg.fit_v_floor else v[idx]
             t0 = time.perf_counter()
             if wants_ctx:
-                f_grid = estimator.fit_predict(t, lnx[idx], v[idx], grid, weights=wi, ctx=ctx[idx])
+                f_grid = estimator.fit_predict(t, lnx[idx], v_fit, grid, weights=wi, ctx=ctx[idx])
             else:
-                f_grid = estimator.fit_predict(t, lnx[idx], v[idx], grid, weights=wi)
+                f_grid = estimator.fit_predict(t, lnx[idx], v_fit, grid, weights=wi)
             fit_s += time.perf_counter() - t0
         f_grid = np.clip(f_grid, 1e-4, None)
         sig = local_vol.sigma(max(t, local_vol.T_grid[0]), np.exp(grid), s0)

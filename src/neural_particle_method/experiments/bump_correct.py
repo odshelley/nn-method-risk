@@ -18,11 +18,11 @@ from .warm_suite import score
 BUMP_EXPERIMENT = "bump"
 
 
-def run_pair(store, sc, seed, cfg):
+def run_pair(store, sc, seed, cfg, experiment=BUMP_EXPERIMENT):
     """Bump-and-correct strategies on the overnight body for one scenario/seed. Returns the run id,
     skipping recomputation if a FINISHED run for {"sid", "seed"} already exists."""
     key = {"sid": sc.sid, "seed": seed}
-    rid = store.find_finished(BUMP_EXPERIMENT, key)
+    rid = store.find_finished(experiment, key)
     if rid is not None:
         return rid
 
@@ -34,13 +34,15 @@ def run_pair(store, sc, seed, cfg):
     lvB = SSVILocalVol(pB, s0, T_max=T)
     res, times = {}, {}
 
+    def ecfg(**kw):
+        return ExplicitConfig(n_steps=n_steps, n_particles=N, fit_v_floor=cfg.fit_v_floor, **kw)
+
     params = {**key, **cfg.as_params(),
               **{f"bumped.{k}": v for k, v in dataclasses.asdict(pB).items()},
               "git_hash": git_hash()}
-    with store.run(BUMP_EXPERIMENT, params) as h:
+    with store.run(experiment, params) as h:
         t0 = time.perf_counter()
-        w = calibrate_explicit(lvS, dyn, make_estimator("nn", seed=seed),
-                               ExplicitConfig(n_steps=n_steps, n_particles=N), s0=s0, T=T, seed=seed)
+        w = calibrate_explicit(lvS, dyn, make_estimator("nn", seed=seed), ecfg(), s0=s0, T=T, seed=seed)
         r = calibrate_implicit(lvS, dyn, cfg.implicit, s0=s0, T=T, seed=seed, L0=w.field)
         net = r.net
         rng = np.random.default_rng(seed + 50)
@@ -62,9 +64,7 @@ def run_pair(store, sc, seed, cfg):
 
         t0 = time.perf_counter()
         head = GlobalRidge(net, T)
-        e = calibrate_explicit(lvB, dyn, head,
-                               ExplicitConfig(n_steps=n_steps, n_particles=N, fit_subsample=sub),
-                               s0=s0, T=T, seed=seed + 1)
+        e = calibrate_explicit(lvB, dyn, head, ecfg(fit_subsample=sub), s0=s0, T=T, seed=seed + 1)
         times["causal_sweep"] = time.perf_counter() - t0
         res["causal_sweep"] = score(e.field, dyn, s0, mats, kq, pB, seed + 903, cfg.reprice)
 
@@ -78,11 +78,31 @@ def run_pair(store, sc, seed, cfg):
                                           dyn, s0, mats, kq, pB, seed + 904 + i, cfg.reprice)
 
         t0 = time.perf_counter()
-        w2 = calibrate_explicit(lvB, dyn, make_estimator("nn", seed=seed + 2),
-                                ExplicitConfig(n_steps=n_steps, n_particles=N), s0=s0, T=T, seed=seed + 2)
+        w2 = calibrate_explicit(lvB, dyn, make_estimator("nn", seed=seed + 2), ecfg(), s0=s0, T=T, seed=seed + 2)
         r2 = calibrate_implicit(lvB, dyn, cfg.implicit, s0=s0, T=T, seed=seed + 2, L0=w2.field)
         times["full_resolve"] = time.perf_counter() - t0
         res["full_resolve"] = score(r2.field, dyn, s0, mats, kq, pB, seed + 907, cfg.reprice)
+
+        # Explicit-overnight strategies (appended last so the rows above are untouched): keep the
+        # per-slice denominators of an explicit solve on S and refresh the Dupire numerator with S'.
+        t0 = time.perf_counter()
+        ex = calibrate_explicit(lvS, dyn, make_estimator(cfg.explicit_est, seed=seed + 3),
+                                ecfg(fit_subsample=sub), s0=s0, T=T, seed=seed + 3)
+        times["explicit_overnight"] = time.perf_counter() - t0
+        res["anchor_unbumped_explicit"] = score(ex.field, dyn, s0, mats, kq, sc.ssvi, seed + 900, cfg.reprice)
+        t0 = time.perf_counter()
+        L_max = ecfg().L_max
+        recs_ex = []
+        for t, g, _, f in ex.field.to_records():
+            sig = lvB.sigma(max(t, lvB.T_grid[0]), np.exp(g), s0)
+            recs_ex.append((t, g, np.clip(sig / np.sqrt(np.clip(f, 1e-4, None)), 0.0, L_max), f))
+        times["explicit_stale_f_fresh_sigma"] = time.perf_counter() - t0
+        res["explicit_stale_f_fresh_sigma"] = score(recs_ex, dyn, s0, mats, kq, pB, seed + 908, cfg.reprice)
+        t0 = time.perf_counter()
+        ex2 = calibrate_explicit(lvB, dyn, make_estimator(cfg.explicit_est, seed=seed + 4),
+                                 ecfg(fit_subsample=sub), s0=s0, T=T, seed=seed + 4)
+        times["explicit_resolve"] = time.perf_counter() - t0
+        res["explicit_resolve"] = score(ex2.field, dyn, s0, mats, kq, pB, seed + 909, cfg.reprice)
 
         doc = {"sid": sc.sid, "seed": seed, "rmse_bp": res,
                "build_s": {k: round(v, 2) for k, v in times.items()},

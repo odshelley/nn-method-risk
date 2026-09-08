@@ -33,4 +33,5 @@ def test_bump_smokes_through_store(tmp_path):
     rid = run_pair(store, make_registry()["s01"], 0, BUMP_SMOKE)
     m = store.get_metrics(rid)
     assert "rmse_bp/causal_sweep" in m and "build_s/full_resolve" in m
+    assert "rmse_bp/explicit_stale_f_fresh_sigma" in m and "rmse_bp/explicit_resolve" in m
     assert run_pair(store, make_registry()["s01"], 0, BUMP_SMOKE) == rid
