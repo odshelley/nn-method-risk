@@ -9,7 +9,7 @@ import pandas as pd
 XIS, RHOS = (0.3, 0.6, 1.0), (-0.7, -0.3)
 
 
-def make(summary_csv, runs_dir, outdir):
+def make(summary_csv, store, outdir):
     df = pd.read_csv(summary_csv)
     ok = df[(df.status == "ok") & (df.sid.str.startswith("f_"))]
     fig, axes = plt.subplots(1, 2, figsize=(7, 3), sharey=True)

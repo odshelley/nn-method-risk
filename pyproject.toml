@@ -31,7 +31,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/neural_particle_method", "bench", "figures"]
+packages = ["src/neural_particle_method", "bench"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

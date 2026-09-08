@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def make(summary_csv, runs_dir, outdir):
+def make(summary_csv, store, outdir):
     df = pd.read_csv(summary_csv)
     ok = df[(df.status == "ok") & (~df.sid.str.startswith("f_"))]
     g = ok.groupby("algo").pooled_rmse_bp.agg(["mean", "std"]).sort_values("mean")

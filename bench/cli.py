@@ -9,6 +9,7 @@ from neural_particle_method.bench.runner import BENCH_EXPERIMENT, run_key, run_o
 from neural_particle_method.bench.scenarios import full_registry
 from neural_particle_method.bench.sweep import paper_grid, sweep as _sweep
 from neural_particle_method.calibrate.config import ExplicitConfig, ImplicitConfig
+import neural_particle_method.figures as figures
 from neural_particle_method.pricing.reprice import RepriceConfig
 from neural_particle_method.tracking.store import Store
 
@@ -40,8 +41,8 @@ def main(argv=None):
     _add_store_args(p)
     p = sub.add_parser("figures")
     p.add_argument("--summary", default="results/summary.csv")
-    p.add_argument("--runs-dir", default="results/runs")
     p.add_argument("--outdir", default="figures/out")
+    _add_store_args(p)
     args = ap.parse_args(argv)
 
     if args.cmd == "list":
@@ -75,9 +76,8 @@ def main(argv=None):
         print(f"{len(df)} runs -> {args.out}")
         return 0
     if args.cmd == "figures":
-        import figures.fig1_accuracy, figures.fig2_wings, figures.fig3_plane, figures.fig4_latency
+        store = Store(args.tracking_uri, args.artifact_root)
         Path(args.outdir).mkdir(parents=True, exist_ok=True)
-        for mod in (figures.fig1_accuracy, figures.fig2_wings,
-                    figures.fig3_plane, figures.fig4_latency):
-            print("wrote", mod.make(args.summary, args.runs_dir, args.outdir))
+        for mod in figures.ALL:
+            print("wrote", mod.make(args.summary, store, args.outdir))
         return 0
