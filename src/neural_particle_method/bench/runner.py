@@ -34,6 +34,9 @@ def _leverage_error(store, sid, field):
         ref = LeverageField.from_json(json.loads(store.download(rid, "leverage.json", d).read_text()))
     a, b = field.resample(DEFAULT_GRID), ref.resample(DEFAULT_GRID)
     n = min(len(a), len(b))
+    if not np.allclose(a.times[:n], b.times[:n], atol=1e-9):
+        print(f"warning: pde_reference for {sid} has a different time grid; lev_rmse skipped")
+        return {}
     per = {f"lev_rmse/T{a[k].t:g}": float(np.sqrt(np.mean((a[k].L - b[k].L) ** 2))) for k in range(n)}
     pooled = float(np.sqrt(np.mean([(a[k].L - b[k].L) ** 2 for k in range(n)])))
     return {"lev_rmse": pooled, **per}

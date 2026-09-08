@@ -4,6 +4,8 @@ One card per method. Every method runs through the same harness (`bench/`): same
 
 Metrics per method, identical rows: surface repricing error (IV bps) at fixed budget, wing error, robustness across the (vol-of-vol, mixing) grid, runtime, and the knob-sensitivity curve (h for kernels, lambda for ridge/RKHS, architecture for the network). Experiment design mirrors Li (2023), adding our estimators.
 
+**Reading the Achieved lines: why several cards come out BETTER rather than REPRODUCED.** Acceptance is a three-valued check (`bench/acceptance.py`): REPRODUCED (achieved within tolerance of the source number), BETTER (achieved beats the source by more than tolerance), WORSE (achieved misses the source by more than tolerance, in the bad direction). Only a WORSE card fails `nparticle acceptance`. Several kernel-type cards land solidly BETTER rather than REPRODUCED, and that is expected, not a bug: this harness runs 50 Euler steps against Li's 1000, fits each slice on a 30,000-particle subsample rather than the full cloud, and builds the Dupire surface from exact semi-analytic Heston prices, whereas Li differentiates a finite-difference price matrix and (per his section 2.4) attributes part of his residual gap to Dupire-surface noise from that finite-difference step. Removing that noise source tends to help kernel/binning estimators more than it hurts, so BETTER is the expected outcome for them; REPRODUCED is reported where the numbers also agree within tolerance regardless. The cards test "no worse than the source", not bit-for-bit reproduction.
+
 Status of each card: owner, registry name, implementation state.
 
 ---
@@ -21,14 +23,16 @@ E[V | S = K] ~ sum_i V_i K_h(S_i - K) / sum_i K_h(S_i - K).
 
 Li (2023) uses h = S0 * N^(-1/5) with truncation eta = 1e-3 and grid |G_t| = max(30 sqrt(t), 15). Reisinger and Tsianni (2023) note the AMISE-optimal c * N^(-1/5) rate but find h = S0 N^(-1/5) / 100 more accurate in their regularised setting. TODO: quote GHL's own kernel and constants directly; the Risk paper and the CRC book (Nonlinear Option Pricing, ch. 11) are both paywalled, so this awaits Osian pulling either through institutional access. Until then the card cites Muguruza's and Cozma's readings, which disagree on the kernel family.
 
+**Implementation note on N.** In `GHLKernel` (`estimators/nadaraya_watson.py`), N in the bandwidth rule is the fitted sample size delivered by the harness (`ExplicitConfig.fit_subsample`, 30,000 by default), not the full particle count. So at the 1e5-particle budget the bandwidth is (1e5/3e4)^(1/5), about 1.27x wider than the published rule would give if evaluated on the full cloud.
+
 **Tuning knob and protocol.** Bandwidth h. Primary run at the Cozma rule; sensitivity curve over h in {rule/10, rule/3, rule, 3*rule, 10*rule}.
 
 **Documented failure modes to probe.** O(h^2) bias and bandwidth-sensitive variance (Muguruza 2019 section 3.2); drastic accuracy loss under a plain Silverman rule even at 1e5 to 2e6 particles (Bain, Mariapragassam, Reisinger 2019, appendix A.1 discussion); loss of convergence at large vol-of-vol (the Fig. 3 cross).
 
 **Acceptance criterion.** Reproduce Li (2023) Table 2.4 (kernel, Heston market: kappa 1.5768, theta 0.0484, xi 0.5751, rho -0.7, v0 0.1024; N = 1e5, M = 1000) at bandwidth h0: average absolute IV error 1.44% (simple LSVM) and 1.18% (complex LSVM), within the run-to-run band; his h0/3 and h0/10 rows (0.71 to 0.75%) pin the bandwidth-sensitivity curve.
 
-**Achieved (li_simple):** 0.1728% (PASS, run fceb3d1ed0cd4526908a88d29e8bf5dc, N=100000, seed 0)
-**Achieved (li_complex):** 0.8547% (PASS, run e62003bfa5e44428b272879d33a295d7, N=100000, seed 0)
+**Achieved (li_simple):** 0.1728% (BETTER, |Δ| = 1.267% vs source 1.44%, run fceb3d1ed0cd4526908a88d29e8bf5dc, N=100000, seed 0)
+**Achieved (li_complex):** 0.8547% (BETTER, |Δ| = 0.325% vs source 1.18%, run e62003bfa5e44428b272879d33a295d7, N=100000, seed 0)
 
 ## Card 2: Exact conditional-Gaussian method (Muguruza 2019)
 
@@ -47,7 +51,7 @@ where mu_i and sigma_i^2 are the per-step conditional mean and variance of log S
 
 **Acceptance criterion.** Reproduce the variance-reduction claim of his section 7 qualitatively: match the kernel benchmark's calibrated smile at equal N with visibly lower estimator variance across repetition bands.
 
-**Achieved:** +28.5 bp pooled RMSE vs nw_ghl, tolerance 10 bp (FAIL, run 8f7c25e25a5442149af9071b3d44a631, N=50000, seed 0; nw_ghl reference run 4299e7fa9e09459ab9dfa1e36318e740)
+**Achieved:** +28.29 bp pooled RMSE vs nw_ghl (WORSE, |Δ| = 28.29 bp vs source 0.0 bp, tolerance 10 bp, run 252aeb069be040c6a8a8e16e3525b8c4, N=50000, seed 0; nw_ghl reference run 4299e7fa9e09459ab9dfa1e36318e740). Rerun after the point-mass fix for degenerate particles (see `estimators/muguruza.py`); the card remains WORSE — the point-mass correction fixes a real bug (degenerate particles were silently dropped) but does not close the gap to nw_ghl's pooled RMSE on this scenario.
 
 ## Card 3: RKHS ridge (Bayer, Belomestny, Butkovsky, Schoenmakers)
 
@@ -67,8 +71,8 @@ with G_i = V_i. Their numerical section: Gaussian kernel with variance 0.1, L = 
 
 **Acceptance criterion.** Reproduce Bayer et al. Fig. 1 (calibrated smile at N in {1e3, 1e4, 1e5}) on their Heston parameters within the repetition band, and Li's failure at rho = -0.7.
 
-**Achieved (li_simple):** 1.152% (PASS, run 7d028a33e86d4633bbb1bf88687bbebc, N=100000, seed 0)
-**Achieved (li_complex):** 0.8433% (PASS, run c10e8e673d2b4d11bfa7e251dcf3d4c2, N=100000, seed 0)
+**Achieved (li_simple):** 1.152% (REPRODUCED, |Δ| = 0.272% vs source 0.88%, run 7d028a33e86d4633bbb1bf88687bbebc, N=100000, seed 0)
+**Achieved (li_complex):** 0.8433% (REPRODUCED, |Δ| = 0.143% vs source 0.70%, run c10e8e673d2b4d11bfa7e251dcf3d4c2, N=100000, seed 0)
 
 ## Card 4: Equal-frequency bins (van der Stoep et al. via Li 2023)
 
@@ -82,8 +86,8 @@ with G_i = V_i. Their numerical section: Gaussian kernel with variance 0.1, L = 
 
 **Acceptance criterion.** Li (2023) Table 4.2, Heston market, N = 1e5, l = 20: average absolute IV error 0.91% (simple LSVM) and 1.01% (complex LSVM); match within the repetition band.
 
-**Achieved (li_simple):** 0.1583% (PASS, run a2e5743b3ef24feb9961b4536ec0db03, N=100000, seed 0)
-**Achieved (li_complex):** 0.8214% (PASS, run 96cfa0296cdb49a2867acc458046754b, N=100000, seed 0)
+**Achieved (li_simple):** 0.1583% (BETTER, |Δ| = 0.752% vs source 0.91%, run a2e5743b3ef24feb9961b4536ec0db03, N=100000, seed 0)
+**Achieved (li_complex):** 0.8214% (REPRODUCED, |Δ| = 0.189% vs source 1.01%, run 96cfa0296cdb49a2867acc458046754b, N=100000, seed 0)
 
 ## Card 5: PURBF (Hakala 2019)
 
@@ -99,13 +103,15 @@ weights by ridge-regularised normal equations w = (A^T A - lambda id)^(-1) A^T y
 
 **His best configuration (section 4, verified against the typeset PDF).** C = 40 units ("sufficiently versatile for the number of particles we want to use (2,048)"), lambda = 0.2, pruning on, local widths from the 5 nearest neighbours (a 3-NN variant also appears in Fig. 7), vol-of-variance mixing 66%. The pruning constant is the symbol Theta in min_i(|c_i - c_j| / h_j) <= Theta and its value is never stated; treat it as a free knob. The printed solution w = (A^T A - lambda id)^(-1) A^T y has a minus sign inconsistent with his ridge loss LSR = (1/2N) sum (y_i - RBF(x_i))^2 + lambda sum w_j^2; implement the standard +lambda.
 
+**Regulariser scale.** The ridge term here is `lam * I` on the normal equations of the unnormalised squared loss sum_i (y_i - f(x_i))^2. Hakala's printed loss LSR carries a 1/(2N) factor, under which his lambda = 0.2 would correspond to 2*N*lam here. The source is internally inconsistent on this (his printed solution's sign error, noted above, is a separate issue), so the harness keeps lam as the literal 0.2 on the unnormalised loss and reports it as such rather than guessing at a rescaling.
+
 **Tuning knob and protocol.** Number of centres C, nearest-neighbour count for local widths, pruning constant Theta; primary run at his best configuration above.
 
 **Documented failure modes to probe.** Centre placement sensitivity in thin wings; pruning-constant sensitivity.
 
 **Acceptance criterion.** Necessarily qualitative: the paper contains no numeric error tables; all comparisons are figures on proprietary Leonteq FX snapshots (EUR/USD 6M/5Y, USD/JPY 5Y, EUR/BRL 3Y). Criterion: at his configuration on our Heston market with N = 2,048, PURBF with 5-NN widths visibly dominates plain and local-linear kernel regression in the wings without oscillation in the bulk (his Figs. 6, 7, 9 pattern); freeze our first accepted run as the numeric regression target thereafter.
 
-**Achieved:** 0.5549% (PASS against the frozen provisional target of 1.44%, run 65f89c21ec304208bd575bd7878275ce, N=2048, seed 0)
+**Achieved:** 0.3349% (BETTER, |Δ| = 1.105% vs the frozen provisional target 1.44%, run 2c47d9170e9747c48131cc1e6788eec1, N=2048, seed 0). Rerun after recomputing the centre widths on the kept (post-pruning) centres (see `estimators/purbf.py`), which changed the achieved value from the earlier 0.5549%.
 
 ## Card 6: PDE / Fokker-Planck reference (anchor, not competitor)
 

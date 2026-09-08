@@ -23,8 +23,8 @@ def test_cards_table():
 def test_check_runs_and_evaluates(tmp_path):
     store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     tiny = Card("tiny_bins", "li_simple", "bins", TINY_N, 0, {}, source_value=100.0, tolerance=0.3, metric="avg_abs_pct")
-    ok, achieved, rid = check(store, tiny, explicit=TINY_EXPLICIT, reprice=TINY_REPRICE)
-    assert ok and achieved >= 0.0 and store.get_params(rid)["card"] == "tiny_bins"
+    status, achieved, rid = check(store, tiny, explicit=TINY_EXPLICIT, reprice=TINY_REPRICE)
+    assert status == "BETTER" and achieved >= 0.0 and store.get_params(rid)["card"] == "tiny_bins"
     assert len(store.search("acceptance")) == 1
 
 
@@ -34,4 +34,4 @@ def test_run_acceptance_filters_by_name(tmp_path, monkeypatch):
     monkeypatch.setattr(acc, "CARDS", (tiny,))
     store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     out = run_acceptance(store, names=["tiny_bins"], explicit=TINY_EXPLICIT, reprice=TINY_REPRICE)
-    assert out == [("tiny_bins", True, out[0][2], out[0][3])]
+    assert out == [("tiny_bins", "BETTER", out[0][2], out[0][3])]

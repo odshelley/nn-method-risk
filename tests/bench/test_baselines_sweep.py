@@ -55,6 +55,20 @@ def test_lev_rmse_logged_when_pde_reference_exists(tmp_path):
     assert any(k.startswith("lev_rmse/T") for k in m) and len([k for k in m if k.startswith("lev_rmse/T")]) == len(ref)
 
 
+def test_lev_rmse_skipped_when_time_grids_differ(tmp_path, capsys):
+    store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
+    rid = run_one(store, "s01", "nw", TINY_N, 0, TINY_EXPLICIT, TINY_IMPLICIT, TINY_REPRICE)
+    lev = json.loads(store.download(rid, "leverage.json", tmp_path / "d").read_text())
+    field = LeverageField.from_json(lev)
+    coarse = LeverageField(list(field)[::2])   # every other slice: a coarser, misaligned time grid
+    with store.run("pde_reference", {"sid": "s01", "n_steps": 3}) as h:
+        h.log_json("leverage.json", coarse.to_json())
+    rid2 = run_one(store, "s01", "nw", TINY_N, 1, TINY_EXPLICIT, TINY_IMPLICIT, TINY_REPRICE)
+    m = store.get_metrics(rid2)
+    assert "lev_rmse" not in m and not any(k.startswith("lev_rmse/T") for k in m)
+    assert "different time grid" in capsys.readouterr().out
+
+
 def test_sweep_into_baselines_experiment(tmp_path):
     store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     jobs = [("s01", "bins", TINY_N, 0), ("s01", "nw_ghl", TINY_N, 0)]

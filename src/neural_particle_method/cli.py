@@ -6,6 +6,7 @@ from pathlib import Path
 from .bench.acceptance import run_acceptance
 from .bench.aggregate import aggregate
 from .bench.algos import ALGOS
+from .bench.reference_runs import run_reference
 from .bench.runner import BENCH_EXPERIMENT, run_key, run_one
 from .bench.scenarios import full_registry
 from .bench.sensitivity import KNOBS, run_sensitivity, sensitivity_grid
@@ -39,6 +40,11 @@ def _parser():
     p.add_argument("--jobs", type=int, default=1)
     p.add_argument("--n-steps", type=int, default=None)
     p = sub.add_parser("acceptance"); p.add_argument("--cards", nargs="*", default=None)
+    p = sub.add_parser("reference")
+    p.add_argument("--sids", nargs="*", default=["li_simple"])
+    p.add_argument("--n-steps", type=int, default=50)
+    p.add_argument("--n-x", type=int, default=801)
+    p.add_argument("--n-v", type=int, default=200)
     p = sub.add_parser("aggregate"); p.add_argument("--out", default="results/summary.csv"); p.add_argument("--digest", default="results/digest.md")
     p.add_argument("--experiment", default="bench")
     p = sub.add_parser("figures"); p.add_argument("--summary", default="results/summary.csv"); p.add_argument("--outdir", default="figures/out")
@@ -87,7 +93,12 @@ def main(argv=None):
         return 0
     if args.cmd == "acceptance":
         out = run_acceptance(store, names=args.cards or None)
-        return 0 if all(ok for _, ok, _, _ in out) else 1
+        return 1 if any(status == "WORSE" for _, status, _, _ in out) else 0
+    if args.cmd == "reference":
+        for sid in args.sids:
+            rid = run_reference(store, sid, n_steps=args.n_steps, n_x=args.n_x, n_v=args.n_v)
+            print(f"{sid}: run_id {rid}")
+        return 0
     if args.cmd == "aggregate":
         df = aggregate(store, args.out, args.digest, experiment=args.experiment)
         print(f"{len(df)} runs -> {args.out}")

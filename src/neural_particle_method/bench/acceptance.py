@@ -49,20 +49,33 @@ def _avg_abs_pct(store, rid):
     return float(np.nanmean(np.abs(err[-1])) / 100.0)
 
 
+def _status(delta, tolerance):
+    if abs(delta) <= tolerance:
+        return "REPRODUCED"
+    return "WORSE" if delta > tolerance else "BETTER"
+
+
 def check(store, card, explicit=ExplicitConfig(), implicit=ImplicitConfig(), reprice=RepriceConfig()):
+    """Returns (status, achieved, run_id). status is one of REPRODUCED / BETTER / WORSE.
+
+    For `avg_abs_pct` and `pooled_rmse_bp`, achieved - source > tolerance means the harness did
+    worse than the source (WORSE); achieved - source < -tolerance means it did better (BETTER);
+    within tolerance either way is REPRODUCED. `delta_vs_nw_ghl_bp` is already a delta against the
+    nw_ghl reference, so REPRODUCED/BETTER/WORSE are read off `achieved` directly against 0.
+    """
     rid = run_one(store, card.sid, card.algo, card.n_particles, card.seed, explicit, implicit, reprice,
                   experiment=ACCEPTANCE_EXPERIMENT, knobs=card.knobs, extra_key={"card": card.name})
     if card.metric == "avg_abs_pct":
         achieved = _avg_abs_pct(store, rid)
-        return achieved <= card.source_value + card.tolerance, achieved, rid
+        return _status(achieved - card.source_value, card.tolerance), achieved, rid
     if card.metric == "pooled_rmse_bp":
         achieved = store.get_metrics(rid)["pooled_rmse_bp"]
-        return achieved <= card.source_value + card.tolerance, achieved, rid
+        return _status(achieved - card.source_value, card.tolerance), achieved, rid
     if card.metric == "delta_vs_nw_ghl_bp":
         ref = run_one(store, card.sid, "nw_ghl", card.n_particles, card.seed, explicit, implicit, reprice,
                       experiment=ACCEPTANCE_EXPERIMENT, extra_key={"card": f"ref_nw_ghl_{card.sid}_{card.n_particles}"})
         achieved = store.get_metrics(rid)["pooled_rmse_bp"] - store.get_metrics(ref)["pooled_rmse_bp"]
-        return achieved <= card.tolerance, achieved, rid
+        return _status(achieved, card.tolerance), achieved, rid
     raise KeyError(card.metric)
 
 
@@ -71,7 +84,7 @@ def run_acceptance(store, names=None, explicit=ExplicitConfig(), implicit=Implic
     for card in CARDS:
         if names and card.name not in names:
             continue
-        ok, achieved, rid = check(store, card, explicit, implicit, reprice)
-        print(f"{card.name}: {'PASS' if ok else 'FAIL'} achieved={achieved:.4g} source={card.source_value} run={rid}", flush=True)
-        out.append((card.name, ok, achieved, rid))
+        status, achieved, rid = check(store, card, explicit, implicit, reprice)
+        print(f"{card.name}: {status} achieved={achieved:.4g} source={card.source_value} run={rid}", flush=True)
+        out.append((card.name, status, achieved, rid))
     return out
