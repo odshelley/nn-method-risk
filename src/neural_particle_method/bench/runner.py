@@ -64,6 +64,8 @@ def run_one(store, sid, algo, n_particles, seed, explicit=ExplicitConfig(), impl
             if c in res.diagnostics:
                 metrics[c] = res.diagnostics[c]
         metrics["budget"] = int(n_particles)
+        if extra_key and "knob_value" in extra_key:
+            metrics["knob_value"] = float(extra_key["knob_value"])
         metrics.update(_leverage_error(store, sid, res.field))
         h.log_metrics(metrics)
         h.log_json("leverage.json", res.field.to_json())

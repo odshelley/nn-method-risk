@@ -18,11 +18,15 @@ def nw_estimate(lnx, v, lnx_grid, weights=None, bandwidth=None):
 class NadarayaWatson:
     supports_weights = True
 
-    def __init__(self, bandwidth=None):
+    def __init__(self, bandwidth=None, bandwidth_scale=1.0):
         self.bandwidth = bandwidth
+        self.bandwidth_scale = bandwidth_scale
 
     def fit_predict(self, t, lnx, v, grid, weights=None):
-        return nw_estimate(lnx, v, grid, weights=weights, bandwidth=self.bandwidth)
+        bandwidth = self.bandwidth
+        if bandwidth is None:
+            bandwidth = 1.06 * np.std(lnx) * len(lnx) ** (-1 / 5) * self.bandwidth_scale
+        return nw_estimate(lnx, v, grid, weights=weights, bandwidth=bandwidth)
 
 
 def quartic_kernel(u):
