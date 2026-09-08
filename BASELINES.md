@@ -25,7 +25,7 @@ Li (2023) uses h = S0 * N^(-1/5) with truncation eta = 1e-3 and grid |G_t| = max
 
 **Documented failure modes to probe.** O(h^2) bias and bandwidth-sensitive variance (Muguruza 2019 section 3.2); drastic accuracy loss under a plain Silverman rule even at 1e5 to 2e6 particles (Bain, Mariapragassam, Reisinger 2019, appendix A.1 discussion); loss of convergence at large vol-of-vol (the Fig. 3 cross).
 
-**Acceptance criterion.** Reproduce Li (2023) Table 4.2 kernel row on the Heston market (kappa 1.5768, theta 0.0484, xi 0.5751, rho -0.7, v0 0.1024) at N = 1e5, M = 1000 within the run-to-run band.
+**Acceptance criterion.** Reproduce Li (2023) Table 2.4 (kernel, Heston market: kappa 1.5768, theta 0.0484, xi 0.5751, rho -0.7, v0 0.1024; N = 1e5, M = 1000) at bandwidth h0: average absolute IV error 1.44% (simple LSVM) and 1.18% (complex LSVM), within the run-to-run band; his h0/3 and h0/10 rows (0.71 to 0.75%) pin the bandwidth-sensitivity curve.
 
 ## Card 2: Exact conditional-Gaussian method (Muguruza 2019)
 
