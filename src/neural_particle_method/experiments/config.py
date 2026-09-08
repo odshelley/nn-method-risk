@@ -21,6 +21,7 @@ class WarmConfig:
     seq_len: int = 6
     xover_scales: tuple = (0.5, 1.0, 2.0, 4.0)
     norm_iters: int = 4
+    fit_v_floor: bool = True   # explicit warm starts fit max(v, 0); False reproduces the paper runs
 
     def as_params(self):
         return _flat(asdict(self))
@@ -48,7 +49,7 @@ class BumpConfig:
     sub: int = 30_000
     n_iters: int = 6
     fit_steps: int = 300
-    fit_v_floor: bool = False   # fit explicit estimators on max(v, 0); False reproduces the paper runs
+    fit_v_floor: bool = True   # False reproduces the paper runs
     explicit_est: str = "nw"    # estimator for the explicit-overnight strategies
 
     def as_params(self):

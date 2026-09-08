@@ -1,4 +1,5 @@
-"""Frozen configurations. Defaults are the pre-refactor defaults; do not change them."""
+"""Frozen configurations. Defaults are the pre-refactor defaults except fit_v_floor (True since the
+variance-target fix of 8 Sept 2026)."""
 from dataclasses import asdict, dataclass
 
 
@@ -16,7 +17,7 @@ class ExplicitConfig:
     later_steps: int = 120
     snapshot_times: tuple = ()
     grid: str = "quantile"  # "quantile": per-slice cloud quantiles (paper); "fixed": DEFAULT_GRID
-    fit_v_floor: bool = False  # fit the estimator on max(v, 0) (what the dynamics use) instead of the raw Euler v
+    fit_v_floor: bool = True  # fit the estimator on max(v, 0), the variance the dynamics use; False = pre-fix paper behaviour
 
     def as_params(self):
         return _flat(asdict(self))

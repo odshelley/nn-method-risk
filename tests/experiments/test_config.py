@@ -21,3 +21,4 @@ def test_derived_configs():
     r = BumpConfig().reprice
     assert (r.n_particles, r.n_steps) == (300_000, 200)
     assert WarmConfig().as_params()["xover_scales"] == "(0.5, 1.0, 2.0, 4.0)"
+    assert BumpConfig().fit_v_floor is True

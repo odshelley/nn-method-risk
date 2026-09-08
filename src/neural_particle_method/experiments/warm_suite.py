@@ -62,7 +62,8 @@ def overnight(store, sc, seed, cfg):
     with store.run(OVERNIGHT_EXPERIMENT, {**key, "git_hash": git_hash()}) as h:
         t0 = time.perf_counter()
         w = calibrate_explicit(lvS, dyn, make_estimator("nn", seed=seed),
-                               ExplicitConfig(n_steps=cfg.n_steps, n_particles=cfg.N), s0=s0, T=T, seed=seed)
+                               ExplicitConfig(n_steps=cfg.n_steps, n_particles=cfg.N, fit_v_floor=cfg.fit_v_floor),
+                               s0=s0, T=T, seed=seed)
         r = calibrate_implicit(lvS, dyn, cfg.implicit, s0=s0, T=T, seed=seed, L0=w.field)
         net = r.net
         rng = np.random.default_rng(seed + 50)
@@ -115,7 +116,7 @@ def arm_dyn(store, sc, seed, cfg):
             res[f"{name}/kalman_{i}"] = score(records_from_head(head, bk, lvS, T, cfg.n_steps, s0, v0),
                                               dynB, s0, mats, kq, sc.ssvi, seed + 930 + i, cfg.reprice)
 
-        recsR, dt_s = full_resolve(lvS, dynB, s0, T, cfg.implicit, seed + 40)
+        recsR, dt_s = full_resolve(lvS, dynB, s0, T, cfg.implicit, seed + 40, fit_v_floor=cfg.fit_v_floor)
         times[f"{name}/full_resolve"] = round(dt_s, 2)
         res[f"{name}/full_resolve"] = score(recsR, dynB, s0, mats, kq, sc.ssvi, seed + 940, cfg.reprice)
     return {"rmse_bp": res, "build_s": times}
@@ -166,14 +167,15 @@ def arm_seq(store, sc, seed, cfg):
                                      dyn, s0, mats, kq, pj, seed + 830 + j, cfg.reprice)
 
         recsW, dt_s = full_resolve(lvj, dyn, s0, T, cfg.implicit, seed + 400 + j,
-                                   L0=recsW, n_iters=3)
+                                   L0=recsW, n_iters=3, fit_v_floor=cfg.fit_v_floor)
         trow["resolve_warm"] = round(dt_s, 2)
         row["resolve_warm"] = score(recsW, dyn, s0, mats, kq, pj, seed + 840 + j, cfg.reprice)
 
         res["steps"].append(row)
         times[f"step_{j}"] = trow
 
-    recsC, dt_s = full_resolve(SSVILocalVol(path[-1], s0, T_max=T), dyn, s0, T, cfg.implicit, seed + 500)
+    recsC, dt_s = full_resolve(SSVILocalVol(path[-1], s0, T_max=T), dyn, s0, T, cfg.implicit, seed + 500,
+                               fit_v_floor=cfg.fit_v_floor)
     times["resolve_cold_final"] = round(dt_s, 2)
     res["resolve_cold_final"] = score(recsC, dyn, s0, mats, kq, path[-1], seed + 850, cfg.reprice)
     res["path"] = [dataclasses.asdict(pj) for pj in path]
@@ -204,7 +206,7 @@ def arm_xover(store, sc, seed, cfg):
         res[f"{tag}/ridge_1"] = score(records_from_betas(net, b, lvB, T, cfg.n_steps, s0, v0),
                                       dyn, s0, mats, kq, pB, seed + 620, cfg.reprice)
 
-        recsR, dt_s = full_resolve(lvB, dyn, s0, T, cfg.implicit, seed + 630)
+        recsR, dt_s = full_resolve(lvB, dyn, s0, T, cfg.implicit, seed + 630, fit_v_floor=cfg.fit_v_floor)
         times[f"{tag}/full_resolve"] = round(dt_s, 2)
         res[f"{tag}/full_resolve"] = score(recsR, dyn, s0, mats, kq, pB, seed + 640, cfg.reprice)
     return {"rmse_bp": res, "build_s": times}

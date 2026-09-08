@@ -1,4 +1,5 @@
-"""Bit-for-bit replay of four archived paper runs. Slow: run with `uv run pytest -m golden`."""
+"""Bit-for-bit replay of four archived paper runs. Slow: run with `uv run pytest -m golden`.
+Pinned to fit_v_floor=False: these archives predate the variance-target fix."""
 import json
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 
 from neural_particle_method.bench.algos import run_algo
 from neural_particle_method.bench.scenarios import make_registry, quote_k_grid
+from neural_particle_method.calibrate.config import ExplicitConfig
 from neural_particle_method.pricing.metrics import iv_metrics, target_ivs
 from neural_particle_method.pricing.reprice import RepriceConfig, reprice_iv
 
@@ -18,7 +20,7 @@ def replay(algo, n_particles=50_000, seed=0, sid="s01"):
     sc = make_registry()[sid]
     k = quote_k_grid()
     mats = list(sc.maturities)
-    res = run_algo(algo, sc, n_particles, seed)
+    res = run_algo(algo, sc, n_particles, seed, explicit=ExplicitConfig(fit_v_floor=False))
     ivs = reprice_iv(res.field.to_records(), sc.dynamics, sc.s0, mats, k,
                      cfg=RepriceConfig(500_000, 200), seed=seed + 10_000)
     tgt = target_ivs(sc.ssvi, k, mats, 200)
