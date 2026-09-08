@@ -86,8 +86,8 @@ def table_ssvi(out):
     sc = make_registry()["s01"]
     lv, mats = SSVILocalVol(sc.ssvi), list(sc.maturities)
     out("\n## 3. SSVI scenario s01 (analytic Dupire local vol), T = 2, per snapped maturity (rms | max, vol bp)\n")
-    out("| n_x | n_v | n_steps | T=0.25 | T=0.5 | T=1 | T=2 | runtime s |")
-    out("|---|---|---|---|---|---|---|---|")
+    out("| n_x | n_v | n_steps | " + " | ".join(f"T={m:g} rms | max" for m in mats) + " | runtime s |")
+    out("|---|---|---|" + "---|---|" * len(mats) + "---|")
     for nx, nv, nst in ((401, 100, 50), (801, 200, 50), (801, 200, 200), (801, 200, 800)):
         ts = snap_times(mats, nst, sc.T)
         res = solve_leverage_pde(lv, sc.dynamics, T=sc.T, n_steps=nst, x_grid=default_x_grid(nx),
