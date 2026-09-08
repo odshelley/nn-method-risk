@@ -149,7 +149,7 @@ so the sweep is `calibrate_explicit` with the estimator replaced by "stale plus 
 Heads (`correction(t, lnx, resid, grid) -> ndarray`):
 
 - `RKHSHead(n_centres=100, lam=1e-6, variance=0.1)`: `RKHSRidge.fit_predict(t, lnx, resid, grid)`. Same kernel family as the cold RKHS row; `lam=1e-6` is the better of the two published values in the knob sweep, recorded as a parameter.
-- `RidgeHead` on features: `RidgeHead(features_fn, lam=1e-3, residual=True)` from `estimators/ridge.py`, fitted on the online target `max(v,0)` directly (not the residual), with `w_prev` initialised each slice from the offline readout of that slice (explicit: the slice's `head` layer; implicit: the global `head` layer plus bias) so shrinkage is toward the offline solution. Its `correction` returns `prediction - f_stale(t, grid)` so it plugs into the same sweep.
+- `FeatureRidgeHead(lam=1e-3)`: a per-slice ridge refit of the body's last layer on its frozen features (64 body features plus a constant). The body's output is `softplus(A w) * V_SCALE`, so the head is linear in the pre-activation: the online target `max(v,0)` is mapped to `z = softplus^{-1}(v / V_SCALE)` (clipped at `v / V_SCALE >= 1e-3`), the ridge solves `(A'A + lam n I) w = A'z + lam n w0` with `w0` the offline readout of that slice (explicit: the slice network's `head` weight and bias; implicit: the global network's), and the prediction is `softplus(A_grid w) * V_SCALE`. When the online target equals the body's own `f` the solution is `w0` and the correction vanishes. Its `correction` returns `prediction - f_stale(t, grid)` so it plugs into the same sweep.
 
 Online methods, registry `ONLINE_METHODS` in `suite/online.py`:
 
