@@ -86,11 +86,13 @@ weights by ridge-regularised normal equations w = (A^T A - lambda id)^(-1) A^T y
 
 **Positioning note (use in section 8).** Hakala rules out MLPs because "the training is much more involved in the MLP case", and writes "We could envision to use a pretrained MLP to get the solution without training. We postpone this approach for potential future use." The warm-started frozen-body head is exactly that postponed approach; the PURBF comparison closes his loop.
 
-**Tuning knob and protocol.** Number of centres C and the nearest-neighbour count for local widths; primary run with his 5-NN local widths.
+**His best configuration (section 4, verified against the typeset PDF).** C = 40 units ("sufficiently versatile for the number of particles we want to use (2,048)"), lambda = 0.2, pruning on, local widths from the 5 nearest neighbours (a 3-NN variant also appears in Fig. 7), vol-of-variance mixing 66%. The pruning constant is the symbol Theta in min_i(|c_i - c_j| / h_j) <= Theta and its value is never stated; treat it as a free knob. The printed solution w = (A^T A - lambda id)^(-1) A^T y has a minus sign inconsistent with his ridge loss LSR = (1/2N) sum (y_i - RBF(x_i))^2 + lambda sum w_j^2; implement the standard +lambda.
+
+**Tuning knob and protocol.** Number of centres C, nearest-neighbour count for local widths, pruning constant Theta; primary run at his best configuration above.
 
 **Documented failure modes to probe.** Centre placement sensitivity in thin wings; pruning-constant sensitivity.
 
-**Acceptance criterion.** Qualitative: match his EUR/USD-style finding that PURBF with 5-NN widths dominates plain and local-linear kernel regression on the same cloud (his Figs. 7 and 9), reproduced on our Heston market.
+**Acceptance criterion.** Necessarily qualitative: the paper contains no numeric error tables; all comparisons are figures on proprietary Leonteq FX snapshots (EUR/USD 6M/5Y, USD/JPY 5Y, EUR/BRL 3Y). Criterion: at his configuration on our Heston market with N = 2,048, PURBF with 5-NN widths visibly dominates plain and local-linear kernel regression in the wings without oscillation in the bulk (his Figs. 6, 7, 9 pattern); freeze our first accepted run as the numeric regression target thereafter.
 
 ## Card 6: PDE / Fokker-Planck reference (anchor, not competitor)
 
