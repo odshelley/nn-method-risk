@@ -31,12 +31,15 @@ class NNRegressor:
     """
     supports_weights = True
 
-    def __init__(self, seed=0, first_steps=400, later_steps=120, hidden=64):
+    def __init__(self, seed=0, first_steps=400, later_steps=120, hidden=64,
+                 keep_slice_weights=False):
         torch.manual_seed(seed)
         self.net = SliceNet(hidden)
         self.opt = torch.optim.Adam(self.net.parameters(), lr=1e-2)
         self.first_steps, self.later_steps = first_steps, later_steps
         self._n_fits = 0
+        self.keep_slice_weights = keep_slice_weights
+        self.slice_weights = []   # [(t, state_dict copy)] per fitted slice when keep_slice_weights
 
     def reset(self):
         """Zero the fit counter so the next `fit_predict` call again uses `first_steps`."""
@@ -63,4 +66,7 @@ class NNRegressor:
         steps = self.first_steps if self._n_fits == 0 else self.later_steps
         self._n_fits += 1
         self.fit(lnx, v, steps=steps, weights=weights)
+        if self.keep_slice_weights:
+            snap = {k: v.detach().clone() for k, v in self.net.state_dict().items()}
+            self.slice_weights.append((float(t), snap))
         return self.predict(grid)

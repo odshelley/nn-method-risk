@@ -16,6 +16,8 @@ class CalibResult:
     field: LeverageField
     timings: dict
     diagnostics: dict
+    # trained object when there is one (estimator instance or GlobalNet); ignored by bench
+    model: object = None
 
 
 def _explicit(sc, n, seed, ecfg, method, mixture=None, estimator=None, knobs=None):
@@ -28,7 +30,7 @@ def _explicit(sc, n, seed, ecfg, method, mixture=None, estimator=None, knobs=Non
     r = calibrate_explicit(lv, sc.dynamics, est, cfg, s0=sc.s0, T=sc.T, seed=seed, mixture=mixture)
     total = time.perf_counter() - t0
     diag = {"is_diag": r.is_diag} if r.is_diag is not None else {}
-    return CalibResult(r.field, {"total_s": total, "fit_s": r.fit_s}, diag)
+    return CalibResult(r.field, {"total_s": total, "fit_s": r.fit_s}, diag, model=est)
 
 
 def _nw(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "nw", knobs=knobs)
@@ -54,7 +56,7 @@ def _implicit_core(sc, n, seed, e, i):
 def _implicit(sc, n, seed, e, i, knobs=None):
     _, warm, r, total = _implicit_core(sc, n, seed, e, i)
     return CalibResult(r.field, {"total_s": total, "fit_s": r.fit_s + warm.timings["fit_s"]},
-                       {"deltas": r.deltas, "deltas_rms": r.deltas_rms})
+                       {"deltas": r.deltas, "deltas_rms": r.deltas_rms}, model=r.net)
 
 
 def _implicit_ridge(sc, n, seed, e, i, knobs=None):
