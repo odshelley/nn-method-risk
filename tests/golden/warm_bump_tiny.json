@@ -1,0 +1,27 @@
+{
+ "params": {
+  "sid": "s01",
+  "seed": 0,
+  "N": 2000,
+  "n_steps": 6,
+  "sub": 1000,
+  "n_iters": 2,
+  "fit_steps": 40
+ },
+ "rmse_bp": {
+  "anchor_unbumped_implicit": 368.491198056,
+  "anchor_unbumped_distilled": 608.266713402,
+  "stale_L": 336.36981269,
+  "stale_f_fresh_sigma": 526.58583355,
+  "causal_sweep": 254.987248065,
+  "beta_corr_1": 555.588647173,
+  "beta_corr_2": 562.870601046,
+  "full_resolve": 392.901111745
+ },
+ "bumped": {
+  "sigma0": 0.2708968335710887,
+  "eta": 0.49737316664397235,
+  "gamma": 0.33753791537638594,
+  "rho": -0.17658245159415628
+ }
+}

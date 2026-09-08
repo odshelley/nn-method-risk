@@ -1,0 +1,42 @@
+{
+ "params": {
+  "sid": "s01",
+  "seed": 0,
+  "N": 2000,
+  "n_steps": 6,
+  "sub": 1000,
+  "n_iters": 2,
+  "fit_steps": 40,
+  "reprice_N": 20000,
+  "reprice_steps": 20,
+  "seq_len": 6,
+  "xover_scales": [
+   0.5,
+   1.0,
+   2.0,
+   4.0
+  ],
+  "norm_iters": 4
+ },
+ "rmse_bp": {
+  "anchor_unbumped": 368.114245365,
+  "xi_up/do_nothing": 508.942238114,
+  "xi_up/ridge_1": 465.003471701,
+  "xi_up/ridge_2": 276.348254344,
+  "xi_up/kalman_1": 670.421085421,
+  "xi_up/kalman_2": 501.943635825,
+  "xi_up/full_resolve": 325.635707908,
+  "rho_dn/do_nothing": 503.912684594,
+  "rho_dn/ridge_1": 477.883439036,
+  "rho_dn/ridge_2": 297.836534358,
+  "rho_dn/kalman_1": 646.115512681,
+  "rho_dn/kalman_2": 494.12701434,
+  "rho_dn/full_resolve": 297.216801559,
+  "kappa_dn/do_nothing": 463.542433836,
+  "kappa_dn/ridge_1": 424.95521437,
+  "kappa_dn/ridge_2": 225.128858345,
+  "kappa_dn/kalman_1": 629.281574066,
+  "kappa_dn/kalman_2": 445.476207894,
+  "kappa_dn/full_resolve": 290.895835173
+ }
+}
