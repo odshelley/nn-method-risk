@@ -20,6 +20,7 @@ def _global_net():
 def _all():
     return [make_estimator("nn", seed=0, first_steps=40, later_steps=20),
             make_estimator("nw"),
+            make_estimator("nw_ghl"),
             make_estimator("ridge", seed=0, first_steps=40),
             make_estimator("spline"),
             make_estimator("bins"),

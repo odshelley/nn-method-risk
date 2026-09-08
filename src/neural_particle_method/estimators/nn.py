@@ -31,9 +31,9 @@ class NNRegressor:
     """
     supports_weights = True
 
-    def __init__(self, seed=0, first_steps=400, later_steps=120):
+    def __init__(self, seed=0, first_steps=400, later_steps=120, hidden=64):
         torch.manual_seed(seed)
-        self.net = SliceNet()
+        self.net = SliceNet(hidden)
         self.opt = torch.optim.Adam(self.net.parameters(), lr=1e-2)
         self.first_steps, self.later_steps = first_steps, later_steps
         self._n_fits = 0
