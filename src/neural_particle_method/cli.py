@@ -1,7 +1,10 @@
 """nparticle: benchmark, experiments, aggregation, figures, and legacy import over the MLflow store."""
 import argparse
+import json
 from dataclasses import replace
 from pathlib import Path
+
+import torch
 
 from .bench.acceptance import run_acceptance
 from .bench.aggregate import aggregate
@@ -17,6 +20,10 @@ from .experiments.config import BUMP_FULL, BUMP_SMOKE, FULL, SMOKE
 from .experiments.warm_suite import ARMS, DEFAULT_SIDS, run_warm, summarise
 from .figures import ALL as FIGURES
 from .pricing.reprice import RepriceConfig
+from .suite.artifacts import load_run
+from .suite.config import FULL as SUITE_FULL
+from .suite.config import SMOKE as SUITE_SMOKE
+from .suite.grid import STAGES, run_stage
 from .tracking.importer import import_all
 from .tracking.store import Store
 
@@ -52,6 +59,14 @@ def _parser():
     p.add_argument("--arms", nargs="*", default=list(ARMS)); p.add_argument("--sids", nargs="*", default=list(DEFAULT_SIDS))
     sub.add_parser("warm-summary")
     p = sub.add_parser("import-legacy"); p.add_argument("--root", default="results")
+    p = sub.add_parser("suite")
+    ss = p.add_subparsers(dest="suite_cmd", required=True)
+    q = ss.add_parser("run")
+    q.add_argument("--stage", required=True, choices=list(STAGES) + ["all"])
+    q.add_argument("--jobs", type=int, default=1); q.add_argument("--sids", nargs="*", default=None)
+    q.add_argument("--smoke", action="store_true")
+    q = ss.add_parser("load"); q.add_argument("run_id"); q.add_argument("--out", default=None)
+    q = ss.add_parser("tables"); q.add_argument("--out", default="paper/tables")
     return ap
 
 
@@ -128,4 +143,34 @@ def main(argv=None):
     if args.cmd == "import-legacy":
         print(import_all(store, args.root))
         return 0
+    if args.cmd == "suite":
+        if args.suite_cmd == "run":
+            settings = SUITE_SMOKE if args.smoke else SUITE_FULL
+            stages = list(STAGES) if args.stage == "all" else [args.stage]
+            total_failed = 0
+            for stage in stages:
+                done, failed = run_stage(store, stage, settings, n_jobs=args.jobs, sids=args.sids)
+                print(f"{stage}: {done} done, {failed} failed", flush=True)
+                total_failed += failed
+            return 1 if total_failed else 0
+        if args.suite_cmd == "load":
+            lr = load_run(store, args.run_id)
+            out = Path(args.out or f"results/suite/{args.run_id}")
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "leverage.json").write_text(json.dumps(lr.field.to_json()))
+            (out / "params.json").write_text(json.dumps(lr.params, indent=1))
+            (out / "metrics.json").write_text(json.dumps(lr.metrics, indent=1))
+            if lr.model is not None:
+                blob = {"kind": lr.meta.get("kind"), "state": lr.model.state()}
+                torch.save(blob, out / "model.pt")
+            print(f"{args.run_id}: {lr.meta.get('kind', 'field_only')} -> {out}")
+            for k in ("pooled_mae_bp", "pooled_rmse_bp", "wings_mae_bp", "fit_s", "online_s"):
+                if k in lr.metrics:
+                    print(f"  {k} = {lr.metrics[k]:.3f}")
+            return 0
+        if args.suite_cmd == "tables":
+            from .suite.tables import section4_tables
+            for pth in section4_tables(store, args.out):
+                print("wrote", pth)
+            return 0
     return 1

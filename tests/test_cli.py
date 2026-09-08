@@ -24,3 +24,15 @@ def test_import_legacy_on_empty_root(tmp_path):
     uri = ["--tracking-uri", f"sqlite:///{tmp_path / 'db'}", "--artifact-root", str(tmp_path / "art")]
     (tmp_path / "results").mkdir()
     assert main(uri + ["import-legacy", "--root", str(tmp_path / "results")]) == 0
+
+
+def test_suite_load_writes_artifacts(tmp_path):
+    from neural_particle_method.suite.cold import run_cold
+    from neural_particle_method.suite.config import SuiteSettings
+    from neural_particle_method.tracking.store import Store
+    uri, root = f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art")
+    rid = run_cold(Store(uri, root), "s01", "explicit_nn", 0, SuiteSettings.tiny())
+    out = tmp_path / "out"
+    assert main(["--tracking-uri", uri, "--artifact-root", root,
+                "suite", "load", rid, "--out", str(out)]) == 0
+    assert (out / "leverage.json").exists() and (out / "model.pt").exists()
