@@ -49,3 +49,14 @@ def test_aggregate_empty(store, tmp_path):
     df = aggregate(store, tmp_path / "s.csv", tmp_path / "d.md")
     assert len(df) == 0 and list(df.columns) == list(COLUMNS)
     assert "0 runs, 0 failed" in (tmp_path / "d.md").read_text()
+
+
+def test_aggregate_running_run_is_not_counted_as_failed(store, tmp_path):
+    _fake_run(store, "nw", 12.0)
+    # a run left RUNNING (e.g. an interrupted sweep), never terminated
+    store.client.create_run(store.experiment_id("bench"), tags={})
+    df = aggregate(store, tmp_path / "s.csv", tmp_path / "d.md")
+    assert "running" in set(df.status)
+    assert (df.status == "failed").sum() == 0
+    md = (tmp_path / "d.md").read_text()
+    assert "0 failed" in md

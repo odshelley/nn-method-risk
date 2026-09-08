@@ -50,6 +50,7 @@ def run_pair(store, sc, seed, cfg):
         res["anchor_unbumped_implicit"] = score(r.field, dyn, s0, mats, kq, sc.ssvi, seed + 900, cfg.reprice)
         res["anchor_unbumped_distilled"] = score(recs_b0, dyn, s0, mats, kq, sc.ssvi, seed + 900, cfg.reprice)
 
+        # kept verbatim from the legacy script; the first t0 is unused
         t0 = time.perf_counter()
         res["stale_L"] = score(r.field, dyn, s0, mats, kq, pB, seed + 901, cfg.reprice)
         times["stale_L"] = 0.0

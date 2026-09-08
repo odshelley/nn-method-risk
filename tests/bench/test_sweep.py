@@ -20,6 +20,6 @@ def test_paper_grid_size():
 def test_sweep_skips_finished_runs(tmp_path, n_jobs):
     store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     run_one(store, "s01", "nw", TINY_N, 0, TINY_EXPLICIT, TINY_IMPLICIT, TINY_REPRICE)
-    jobs = [("s01", "nw", TINY_N, 0), ("s01", "nw", TINY_N, 1)]
+    jobs = [("s01", "nw", TINY_N, 0), ("s01", "nw", TINY_N, 1), ("s01", "nw", TINY_N, 2)]
     done = sweep(store, jobs, n_jobs=n_jobs, explicit=TINY_EXPLICIT, implicit=TINY_IMPLICIT, reprice=TINY_REPRICE)
-    assert done == 1 and len(store.search("bench")) == 2
+    assert done == 2 and len(store.search("bench")) == 3

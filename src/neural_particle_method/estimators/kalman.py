@@ -42,8 +42,6 @@ class KalmanHead:
             blocks.append(bspline_basis(lnx, self.x_lo, self.x_hi, self.n_spline))
         return np.concatenate(blocks, axis=1)
 
-    _features = features
-
     def init_from(self, betas):
         for k, b in betas.items():
             beta = np.concatenate([b, np.zeros(self.n_spline)]) if self.n_spline else b.copy()

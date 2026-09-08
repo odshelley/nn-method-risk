@@ -10,7 +10,7 @@ def const_records(L0, T=1.0, n=4):
     return LeverageField.from_records(
         [(i * T / n, g, np.full(5, L0), np.full(5, 0.04)) for i in range(n)])
 
-def test_L_lookup_piecewise():
+def test_leverage_field_at_is_piecewise():
     field = const_records(1.5)
     assert np.allclose(field.at(0.3, np.array([0.0, 0.2])), 1.5)
 

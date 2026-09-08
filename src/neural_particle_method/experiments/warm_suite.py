@@ -88,6 +88,7 @@ def arm_dyn(store, sc, seed, cfg):
     recs0 = records_from_betas(net, betas0, lvS, T, cfg.n_steps, s0, v0)
     res["anchor_unbumped"] = score(recs0, dyn, s0, mats, kq, sc.ssvi, seed + 900, cfg.reprice)
     for name, dynB in dyn_variants(dyn).items():
+        # kept verbatim from the legacy script; the first t0 is unused
         t0 = time.perf_counter()
         res[f"{name}/do_nothing"] = score(recs0, dynB, s0, mats, kq, sc.ssvi, seed + 910, cfg.reprice)
         times[f"{name}/do_nothing"] = 0.0
@@ -270,7 +271,7 @@ def job_list(arms, sids, dyn_seeds=(0, 1), other_seeds=(0,)):
     return jobs
 
 
-def _log_doc(h, arm, doc):
+def log_warm_doc(h, arm, doc):
     if arm == "norm":
         m = {"A_norm": doc["A_norm"], "eps": doc["eps"]}
         if doc.get("error_fraction_pred") is not None:
@@ -303,7 +304,7 @@ def run_warm(store, arms, sids, cfg):
             t0 = time.perf_counter()
             doc = ARMS[arm](store, reg[sid], seed, cfg)
             doc.update({"arm": arm, "sid": sid, "seed": seed, "wall_s": round(time.perf_counter() - t0, 1)})
-            _log_doc(h, arm, to_jsonable(doc))
+            log_warm_doc(h, arm, to_jsonable(doc))
         n += 1
         print(f"{arm} {sid} s{seed}: done in {doc['wall_s']}s", flush=True)
     return n

@@ -25,12 +25,20 @@ logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
 logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
 
 
+def repo_root():
+    """Directory holding pyproject.toml above this package (editable install), else the cwd."""
+    for p in Path(__file__).resolve().parents:
+        if (p / "pyproject.toml").exists():
+            return p
+    return Path.cwd()
+
+
 def default_tracking_uri():
-    return os.environ.get("MLFLOW_TRACKING_URI") or f"sqlite:///{Path.cwd() / 'mlruns.db'}"
+    return os.environ.get("MLFLOW_TRACKING_URI") or f"sqlite:///{repo_root() / 'mlruns.db'}"
 
 
 def default_artifact_root():
-    return os.environ.get("NPARTICLE_ARTIFACT_ROOT") or str(Path.cwd() / "mlartifacts")
+    return os.environ.get("NPARTICLE_ARTIFACT_ROOT") or str(repo_root() / "mlartifacts")
 
 
 def git_hash():

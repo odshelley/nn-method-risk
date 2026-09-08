@@ -55,6 +55,7 @@ class LeverageField:
         return np.stack([s.L for s in self.slices])
 
     def to_records(self):
+        """Records reference the slices' own arrays; do not mutate them in place."""
         return [(s.t, s.grid, s.L, s.f) for s in self.slices]
 
     @classmethod

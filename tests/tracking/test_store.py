@@ -3,7 +3,17 @@ import json
 import numpy as np
 import pytest
 
-from neural_particle_method.tracking.store import RunHandle, Store, flatten_metrics, to_jsonable
+from neural_particle_method.tracking.store import (
+    RunHandle,
+    Store,
+    flatten_metrics,
+    repo_root,
+    to_jsonable,
+)
+
+
+def test_repo_root_contains_pyproject():
+    assert (repo_root() / "pyproject.toml").exists()
 
 
 @pytest.fixture

@@ -20,7 +20,15 @@ class SliceNet(nn.Module):
 
 
 class NNRegressor:
-    """Warm-startable per-slice regressor for E[V | ln X = .]."""
+    """Warm-startable per-slice regressor for E[V | ln X = .].
+
+    An instance is meant for exactly one `calibrate_explicit` pass: the step budget is chosen
+    per instance (`first_steps` on the first `fit_predict` call, `later_steps` on every call
+    after), not per calibration. Every caller constructs a fresh regressor, so this is
+    equivalent to the pre-refactor per-calibration choice; reusing one instance across two
+    passes gives the SECOND pass's first slice `later_steps` instead of `first_steps`. Call
+    `reset()` before a new pass if you must reuse an instance.
+    """
     supports_weights = True
 
     def __init__(self, seed=0, first_steps=400, later_steps=120):
@@ -28,6 +36,10 @@ class NNRegressor:
         self.net = SliceNet()
         self.opt = torch.optim.Adam(self.net.parameters(), lr=1e-2)
         self.first_steps, self.later_steps = first_steps, later_steps
+        self._n_fits = 0
+
+    def reset(self):
+        """Zero the fit counter so the next `fit_predict` call again uses `first_steps`."""
         self._n_fits = 0
 
     def fit(self, lnx, v, steps=120, weights=None):

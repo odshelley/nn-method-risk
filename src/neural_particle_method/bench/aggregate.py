@@ -17,7 +17,7 @@ def aggregate(store, out_csv="results/summary.csv", out_md="results/digest.md"):
         row = {"sid": r.get("params.sid"), "algo": r.get("params.algo"),
                "n_particles": int(r["params.n_particles"]) if pd.notna(r.get("params.n_particles")) else None,
                "seed": int(r["params.seed"]) if pd.notna(r.get("params.seed")) else None,
-               "status": "ok" if r["status"] == "FINISHED" else "failed"}
+               "status": {"FINISHED": "ok", "FAILED": "failed"}.get(r["status"], r["status"].lower())}
         for c in METRIC_COLS + ("total_s", "fit_s", "intraday_s"):
             row[c] = r.get(f"metrics.{c}")
         row["git_hash"] = r.get("params.git_hash")

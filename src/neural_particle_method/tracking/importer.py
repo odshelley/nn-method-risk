@@ -7,8 +7,8 @@ from pathlib import Path
 
 import torch
 
-from ..experiments.warm_suite import _log_doc
-from .store import flatten_metrics, to_jsonable
+from ..experiments.warm_suite import log_warm_doc
+from .store import flatten_metrics, repo_root, to_jsonable
 
 TAGS = {"source": "legacy_json"}
 
@@ -16,7 +16,7 @@ TAGS = {"source": "legacy_json"}
 def _rel(path):
     p = Path(path).resolve()
     try:
-        return p.relative_to(Path.cwd()).as_posix()
+        return p.relative_to(repo_root()).as_posix()
     except ValueError:
         return p.as_posix()
 
@@ -105,7 +105,7 @@ def import_warm(store, warm_dir="results/warm"):
         params = {"arm": d["arm"], "sid": d["sid"], "seed": d["seed"], "legacy_path": _rel(p)}
         tags = {**TAGS, "smoke": "true"} if is_smoke else TAGS
         with store.run(experiment, params, tags) as h:
-            _log_doc(h, d["arm"], to_jsonable(d))
+            log_warm_doc(h, d["arm"], to_jsonable(d))
         n += 1
     return n
 

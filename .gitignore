@@ -29,3 +29,6 @@ results/runs/
 mlruns.db
 mlruns/
 mlartifacts/
+
+# Coverage
+.coverage

@@ -4,13 +4,16 @@ Neural L2 calibration of LSV models (Risk paper workspace).
 
 ## Layout
 
-- `src/neural_particle_method/market` — Black-Scholes, Heston, SSVI, Dupire local vol
-- `simulate` — Heston-plus-leverage Euler step and the `LeverageField`
-- `estimators` — conditional-expectation estimators behind one `fit_predict` interface
-- `calibrate` — explicit and implicit schemes, mixture importance sampling, warm-start helpers
-- `pricing` — fresh-seed repricing and IV metrics
-- `tracking` — MLflow store wrapper and the legacy importer
-- `bench`, `experiments`, `figures` — the paper's benchmark, the bump and warm-start suites, figures 1-4
+- `src/neural_particle_method/` — the package; `cli.py` exposes the `nparticle` console script
+  - `market` — Black-Scholes, Heston, SSVI, Dupire local vol
+  - `simulate` — Heston-plus-leverage Euler step and the `LeverageField`
+  - `estimators` — conditional-expectation estimators behind one `fit_predict` interface
+  - `calibrate` — explicit and implicit schemes, mixture importance sampling, warm-start helpers
+  - `pricing` — fresh-seed repricing and IV metrics
+  - `tracking` — MLflow store wrapper and the legacy importer
+  - `bench` — the paper's benchmark sweep
+  - `experiments` — the bump-and-correct and warm-start suites
+  - `figures` — figures 1-4
 - Paper notes: `paper/`; specs and plans under `docs/superpowers/`.
 
 ## Tracking

@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from neural_particle_method.tracking.importer import import_all, import_bench, import_warm
-from neural_particle_method.tracking.store import Store
+from neural_particle_method.tracking.importer import _rel, import_all, import_bench, import_warm
+from neural_particle_method.tracking.store import Store, repo_root
 
 OK = {"schema": 1, "sid": "s01", "algo": "nw", "n_particles": 1000, "seed": 0, "git_hash": "abc",
       "scenario": {"ssvi": {"sigma0": 0.2, "eta": 1.0, "gamma": 0.4, "rho": -0.6},
@@ -79,3 +79,10 @@ def test_import_warm_routes_smoke_files_to_separate_experiment(store, tmp_path):
     assert smoke.loc[0, "tags.smoke"] == "true"
 
     assert import_warm(store, d) == 0
+
+
+def test_rel_is_independent_of_cwd(monkeypatch, tmp_path):
+    p = repo_root() / "results" / "runs" / "s01" / "nw" / "n1000_s0.json"
+    expected = _rel(p)
+    monkeypatch.chdir(tmp_path)
+    assert _rel(p) == expected
