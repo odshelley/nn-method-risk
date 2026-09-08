@@ -15,7 +15,7 @@ Neural L2 calibration of LSV models (Risk paper workspace).
     `bench/acceptance.py` (BASELINES.md card criteria); scenarios include the `HestonMarketSpec`
     family (`li_simple`, `li_complex`, `bayer`)
   - `experiments` — the bump-and-correct and warm-start suites
-  - `figures` — figures 1-4
+  - `figures` — figures 1-5 plus the baseline variants
   - `reference` — Fokker-Planck reference leverage solver, the accuracy anchor; see `docs/pde_reference.md`
 - Paper notes: `paper/`; specs and plans under `docs/superpowers/`.
 
@@ -33,13 +33,18 @@ All runs go to MLflow. Default store: `sqlite:///mlruns.db` and `mlartifacts/` i
 - `uv run nparticle sensitivity --jobs 4` — one knob per method around its published default on `s01` and `li_simple`
 - `uv run nparticle acceptance` — the BASELINES.md card criteria on the Heston market family
 - `uv run nparticle aggregate` -> `results/summary.csv`, `results/digest.md` (committed snapshots)
-- `uv run nparticle figures` -> `figures/out/`; now also writes `fig1_baselines.pdf`, `fig3_baselines.pdf`, `fig5_sensitivity.pdf`
+- `uv run nparticle aggregate --experiment baselines` — aggregate a non-default experiment (e.g. `baselines`, `sensitivity`, `acceptance`) instead of `bench`
+- `uv run nparticle figures` -> `figures/out/`; now also writes `fig1_baselines.pdf`, `fig3_baselines.pdf`, `fig5_sensitivity.pdf`.
+  `fig3_baselines.pdf` and `fig5_sensitivity.pdf` are committed as empty placeholders (no `baselines`/`sensitivity`
+  runs in a fresh store yet) and are regenerated with real data once `uv run nparticle sweep --preset baselines`
+  and `uv run nparticle sensitivity` have been run.
+- `uv run nparticle reference --sids li_simple [--n-steps 50] [--n-x 801] [--n-v 200]` — populates the `pde_reference` experiment (the Fokker-Planck accuracy anchor) so `lev_rmse` gets logged by later bench/acceptance/sensitivity runs on that scenario
 - `uv run nparticle experiment bump|warm [--smoke]`; `uv run nparticle warm-summary`
 - `uv run nparticle import-legacy` (one-shot import of the archived JSON results under `results/`)
 
 ## Tests
 
-- `uv run pytest` — fast suite (about 30 s)
+- `uv run pytest` — fast suite (about 35 s)
 - `uv run pytest -m golden` — bit-for-bit replay of four archived runs (minutes)
 - `uv run pytest -m slow` — smoke runs of every experiment arm
 - `uv run pytest -m slow tests/acceptance` — full acceptance-card runs for BASELINES.md

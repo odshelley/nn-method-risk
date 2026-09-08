@@ -1,6 +1,8 @@
 """Semi-analytic Heston call pricing via the trap-free characteristic function (r = q = 0)."""
 import numpy as np
 
+from .bs import implied_vol
+
 
 def heston_cf(u, T, v0, kappa, theta, xi, rho, s0=1.0):
     """Characteristic function of ln S_T. Trap-free (Albrecher) formulation, vectorised in u."""
@@ -38,8 +40,6 @@ def heston_call(K, T, v0, kappa, theta, xi, rho, s0=1.0, n_quad=256, u_max=200.0
 
 def heston_iv(k_grid, T, params, s0=1.0):
     """Implied vol of the semi-analytic Heston call at log-moneyness k_grid and maturity T."""
-    from .bs import implied_vol
-
     K = s0 * np.exp(np.asarray(k_grid, dtype=float))
     prices = np.atleast_1d(heston_call(K, T, params.v0, params.kappa, params.theta, params.xi, params.rho, s0))
     return np.array([implied_vol(float(p), s0, float(kk), T) for p, kk in zip(prices, K)])

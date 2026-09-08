@@ -36,7 +36,12 @@ def quartic_kernel(u):
 class GHLKernel:
     """Nadaraya-Watson in spot with the GHL rule-of-thumb bandwidth as stated by Cozma et al. (2019):
     h(t) = c * 1.5 * S0 * sigma_LV(S0, t) * sqrt(max(t, 0.25)) * N^(-1/5). Quartic kernel by default.
-    Without a local-vol object the ATM vol is proxied by sqrt(mean(v)) of the cloud."""
+    Without a local-vol object the ATM vol is proxied by sqrt(mean(v)) of the cloud.
+
+    N in the bandwidth rule is `len(lnx)` as delivered by the harness: the fitted sample size
+    (`ExplicitConfig.fit_subsample`, 30 000 by default), not the full particle count. So at a
+    budget of 1e5 particles the bandwidth is (1e5/3e4)^(1/5) ~ 1.27x wider than the published rule
+    would give if it were evaluated on the full cloud."""
     supports_weights = True
 
     def __init__(self, c=1.0, kernel="quartic", local_vol=None, s0=1.0, fixed_scale=None):

@@ -24,6 +24,8 @@ paper/*.blg
 papers/pdf/
 
 results/runs/
+results/summary_partial.csv
+results/sweep_log.txt
 
 # MLflow local store
 mlruns.db
@@ -32,3 +34,11 @@ mlartifacts/
 
 # Coverage
 .coverage
+
+# Claude Code / superpowers session state
+.claude/
+.superpowers/
+
+# Paper build products (not the tracked paper/main.pdf; add other paper PDFs by name, not by glob)
+paper/notes.pdf
+paper/notes_convergence.pdf
