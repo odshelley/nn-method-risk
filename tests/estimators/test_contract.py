@@ -25,6 +25,7 @@ def _all():
             make_estimator("spline"),
             make_estimator("bins"),
             make_estimator("rkhs"),
+            make_estimator("purbf"),
             GlobalRidge(_global_net(), T=1.0)]
 
 

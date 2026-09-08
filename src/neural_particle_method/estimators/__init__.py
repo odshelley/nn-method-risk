@@ -5,11 +5,12 @@ from .kalman import KalmanHead
 from .muguruza import ConditionalMC
 from .nadaraya_watson import GHLKernel, NadarayaWatson
 from .nn import NNRegressor
+from .purbf import PURBF
 from .ridge import GlobalRidge, RidgeHead, SliceRidge
 from .rkhs import RKHSRidge
 from .spline import PSpline
 
-NAMES = ("nn", "nw", "nw_ghl", "ridge", "spline", "bins", "rkhs", "muguruza")
+NAMES = ("nn", "nw", "nw_ghl", "ridge", "spline", "bins", "rkhs", "muguruza", "purbf")
 
 
 def make_estimator(name, seed=0, first_steps=400, later_steps=120, local_vol=None, s0=1.0, **knobs):
@@ -31,11 +32,14 @@ def make_estimator(name, seed=0, first_steps=400, later_steps=120, local_vol=Non
         return RKHSRidge(**knobs)
     if name == "muguruza":
         return ConditionalMC(**knobs)
+    if name == "purbf":
+        return PURBF(**knobs)
     raise KeyError(f"unknown estimator {name!r}; choose from {NAMES}")
 
 
 __all__ = [
     "NAMES",
+    "PURBF",
     "Bins",
     "ConditionalMC",
     "Estimator",
