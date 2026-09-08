@@ -152,7 +152,7 @@ This section specifies the clean benchmark agreed on 8 September 2026, to be run
 \subsection{Common setup}\label{sec:suite-setup}
 
 \begin{itemize}
-\item \textbf{Scenarios.} The $20$ SSVI scenarios of \cref{tab:scen} and the three Heston-market scenarios used in the literature comparisons (\code{li\_simple}, \code{li\_complex}, \code{bayer}; a Heston market surface, a different Heston variance process as the calibrated model, one-year maturity, log-strikes on $[-0.9,0.9]$). The Heston block is reported separately because it scores a single maturity on a wider strike range.
+\item \textbf{Scenarios.} The $20$ SSVI scenarios of \cref{tab:scen} and the three Heston-market scenarios used in the literature comparisons (\code{li\_simple}, \code{li\_complex}, \code{bayer}; a Heston market surface, a different Heston variance process as the calibrated model, one-year maturity, log-strikes on $[-0.9,0.9]$). The Heston block is reported separately because it scores a single one-year maturity (the same $13$ quoted strikes).
 \item \textbf{Time grid.} $200$ Euler steps for calibration and $200$ for repricing, $\Delta=0.01$ on $[0,2]$, so that every method sits at its step-count plateau (the step-count diagnostics of 8 September 2026, MLflow experiment \code{mechanism}) and the comparison is about the estimator alone.
 \item \textbf{Particles.} $100\,000$ particles for every cold row and for every online stage. Offline bodies at $200\,000$ and $500\,000$ particles.
 \item \textbf{Seeds.} Two seeds ($0$, $1$) for every cold row and every online stage; one seed for each offline body. The reprice seed is $10\,000$ plus the calibration seed.
@@ -178,27 +178,13 @@ One calibration from scratch per method, scenario and seed at $100\,000$ particl
 
 \begin{table}[h]\centering\footnotesize
 \caption{Cold suite, SSVI scenarios: mean and median over the $20$ scenarios and two seeds. TBD.}\label{tab:suite-cold}
-\begin{tabular}{l rr rr rr r r}
-\toprule
- & \multicolumn{2}{c}{pooled MAE (bp)} & \multicolumn{2}{c}{pooled RMSE (bp)} & \multicolumn{2}{c}{wings MAE (bp)} & lev.\ RMSE & latency (s)\\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
-method & mean & median & mean & median & mean & median & median & median\\
-\midrule
-NW & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-Explicit NN & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-Implicit NN & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-RKHS & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-Spline & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-GHL kernel & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-Bins & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-Muguruza & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-PU-RBF & TBD & TBD & TBD & TBD & TBD & TBD & TBD & TBD\\
-PDE (attainable floor) & TBD & TBD & TBD & TBD & TBD & TBD & 0 & --\\
-\bottomrule
-\end{tabular}
+\input{tables/suite_cold_ssvi.tex}
 \end{table}
 
-The same table is repeated for the three Heston-market scenarios (one maturity, no wings split), and the per-scenario numbers behind both go in an appendix table.
+\begin{table}[h]\centering\footnotesize
+\caption{Cold suite, Heston-market scenarios (one-year maturity, same $13$ quotes): mean and median over the three scenarios and two seeds. TBD.}\label{tab:suite-cold-heston}
+\input{tables/suite_cold_heston.tex}
+\end{table}
 
 \subsection{What a lag is}\label{sec:suite-lag}
 
@@ -225,25 +211,13 @@ The online reference rows are NW re-solved from scratch on $S_1$ at $100\,000$ p
 
 \begin{table}[h]\centering\footnotesize
 \caption{Lagged suite, SSVI scenarios: mean over the $20$ scenarios and two online seeds; latency is the online stage only. One block per lag type. TBD.}\label{tab:suite-lagged}
-\resizebox{\textwidth}{!}{\begin{tabular}{l l rr rr r}
-\toprule
-method & offline $N$ & pooled MAE & pooled RMSE & wings MAE & $T=0.25$ MAE & online latency (s)\\
-\midrule
-\multicolumn{7}{l}{\emph{Surface lag}}\\
-Stale leverage, no action & -- & TBD & TBD & TBD & TBD & 0\\
-NW re-solve on $S_1$ & -- & TBD & TBD & TBD & TBD & TBD\\
-Explicit NN, stale $f$, fresh Dupire & 200k / 500k & TBD & TBD & TBD & TBD & 0\\
-Implicit NN, stale $f$, fresh Dupire & 200k / 500k & TBD & TBD & TBD & TBD & 0\\
-Explicit NN + RKHS head & 200k / 500k & TBD & TBD & TBD & TBD & TBD\\
-Implicit NN + RKHS head & 200k / 500k & TBD & TBD & TBD & TBD & TBD\\
-Explicit NN + ridge head & 200k / 500k & TBD & TBD & TBD & TBD & TBD\\
-Implicit NN + ridge head & 200k / 500k & TBD & TBD & TBD & TBD & TBD\\
-\midrule
-\multicolumn{7}{l}{\emph{Surface plus $2\%$ sticky-strike spot lag}}\\
-(same rows) & & TBD & TBD & TBD & TBD & TBD\\
-\bottomrule
-\end{tabular}
-}\end{table}
+\resizebox{\textwidth}{!}{\input{tables/suite_lagged_ssvi.tex}}\end{table}
+
+\begin{table}[h]\centering\footnotesize
+\caption{Lagged suite, Heston-market scenarios. TBD.}\label{tab:suite-lagged-heston}
+\resizebox{\textwidth}{!}{\input{tables/suite_lagged_heston.tex}}\end{table}
+
+\paragraph{Per-scenario numbers.} \input{tables/suite_appendix.tex}
 
 \subsection{Reproducibility}\label{sec:suite-repro}
 
