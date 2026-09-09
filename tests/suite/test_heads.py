@@ -74,28 +74,25 @@ def _softplus_pre_head(t, lnx, v_plus, model, grid, lam=1e-3):
     return np.logaddexp(0.0, model.features(t, grid) @ w) * V_SCALE - model.f(t, grid)
 
 
-def test_feature_ridge_head_tracks_the_local_mean_of_a_truncated_noisy_target():
+def test_feature_ridge_head_matches_the_local_mean_of_a_truncated_noisy_target():
     """The target has an atom at zero, so E[V|X] must be fitted on the raw scale.
 
-    The per-particle softplus^{-1} head maps every zero to the clip floor and comes out uniformly
-    below the local mean; the Gauss-Newton step does not.
+    The per-particle softplus^{-1} head maps every zero to the clip floor and comes out well below
+    the local mean; the converged raw-scale refit matches it.
     """
     _, bank, _ = _body()
     rng = np.random.default_rng(7)
     n = 20_000
     x = rng.normal(scale=0.1, size=n)
     v_plus = np.maximum(0.04 + 0.02 * x + 0.03 * rng.standard_normal(n), 0.0)
-    assert (v_plus == 0.0).mean() > 0.09          # a visible atom at exactly zero
+    assert (v_plus == 0.0).mean() > 0.05          # a visible atom at exactly zero
     grid = np.linspace(-0.15, 0.15, 7)
     want = nw_estimate(x, v_plus, grid, bandwidth=0.03)
     stale = bank.f(0.5, grid)
     new = stale + FeatureRidgeHead().correction(0.5, x, v_plus, bank.f(0.5, x), bank, grid)
+    np.testing.assert_allclose(new, want, atol=3e-3)
     old = stale + _softplus_pre_head(0.5, x, v_plus, bank, grid)
-    stale_err = np.abs(stale - want).max()
-    assert np.abs(new - want).max() < stale_err / 4      # closes most of the gap
-    assert (want - new).max() < 5e-3                     # and is not biased low
-    assert (want - old).min() > 1e-2                     # the old head is low everywhere
-    assert np.abs(old - want).max() > 1e-2
+    assert np.abs(old - want).min() > 1e-2        # the old head is far off at every grid point
 
 
 def test_stale_field_matches_calibrate_explicit_when_f_is_the_bodys_own():

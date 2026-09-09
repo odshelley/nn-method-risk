@@ -31,27 +31,41 @@ class RKHSHead:
 class FeatureRidgeHead:
     """Per-slice refit of the body's last layer, shrunk toward the offline readout.
 
-    One Gauss-Newton step of the raw-scale least squares from the offline last layer w0,
-    ridge-shrunk toward w0: with B the Jacobian of softplus(A w) * V_SCALE at w0, the step solves
-    (B'B + lam n I) d = B'(v+ - f0). When the online target equals the body's own f the step is
-    zero and the correction vanishes.
+    Gauss-Newton to convergence on the raw variance scale from the offline last layer w0, with a
+    penalty expressed as a fraction of the data curvature. When the online target equals the
+    body's own f the first step is zero and the correction vanishes.
     """
 
-    def __init__(self, lam=1e-3):
-        self.lam = lam
-        self.params = {"head": "ridge", "lam": lam}
+    def __init__(self, lam=1e-3, max_iter=20, tol=1e-9):
+        self.lam, self.max_iter, self.tol = lam, max_iter, tol
+        self.params = {"head": "ridge", "lam": lam, "max_iter": max_iter}
 
     def correction(self, t, lnx, v_plus, f_stale, model, grid):
+        """Ridge refit of the body's last layer on the raw variance scale.
+
+        Minimises sum (softplus(A w) V_SCALE - v+)^2 + lam_eff ||w - w0||^2 by Gauss-Newton from
+        the offline readout w0, where lam_eff = lam * mean diagonal of the Gauss-Newton curvature
+        at w0 (so `lam` is a fraction of the data curvature, independent of V_SCALE and n).
+        """
         A = model.features(t, lnx)
         w0 = model.readout(t)
-        z0 = A @ w0
-        s = 1.0 / (1.0 + np.exp(-z0))              # softplus'(z0)
-        f0 = np.logaddexp(0.0, z0) * V_SCALE       # the body's own f at the particles
-        B = (V_SCALE * s)[:, None] * A
-        lam = self.lam * len(lnx)
-        d = np.linalg.solve(B.T @ B + lam * np.eye(A.shape[1]), B.T @ (v_plus - f0))
+        w = w0.copy()
+        eye = np.eye(A.shape[1])
+        lam_eff = None
+        for _ in range(self.max_iter):
+            z = A @ w
+            s = 1.0 / (1.0 + np.exp(-z))
+            f = np.logaddexp(0.0, z) * V_SCALE
+            B = (V_SCALE * s)[:, None] * A
+            H = B.T @ B
+            if lam_eff is None:
+                lam_eff = self.lam * np.trace(H) / A.shape[1]
+            d = np.linalg.solve(H + lam_eff * eye, B.T @ (v_plus - f) - lam_eff * (w - w0))
+            w = w + d
+            if np.abs(d).max() < self.tol:
+                break
         Ag = model.features(t, grid)
-        return np.logaddexp(0.0, Ag @ (w0 + d)) * V_SCALE - model.f(t, grid)
+        return np.logaddexp(0.0, Ag @ w) * V_SCALE - model.f(t, grid)
 
 
 def stale_field(model_f, local_vol, s0, T, n_steps, L_max=4.0, grid=DEFAULT_GRID):
