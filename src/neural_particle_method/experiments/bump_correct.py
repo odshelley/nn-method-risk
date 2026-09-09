@@ -20,8 +20,8 @@ BUMP_EXPERIMENT = "bump"
 
 def run_pair(store, sc, seed, cfg, experiment=BUMP_EXPERIMENT):
     """Bump-and-correct strategies on the overnight body for one scenario/seed. Returns the run id,
-    skipping recomputation if a FINISHED run for {"sid", "seed"} already exists."""
-    key = {"sid": sc.sid, "seed": seed}
+    skipping recomputation if a FINISHED run for the key already exists."""
+    key = {"sid": sc.sid, "seed": seed, "fit_v_floor": cfg.fit_v_floor}
     rid = store.find_finished(experiment, key)
     if rid is not None:
         return rid

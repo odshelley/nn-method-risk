@@ -44,7 +44,8 @@ def score(field, params, s0, mats, kq, ssvi_p, seed, reprice_cfg):
 
 
 def overnight_key(sc, seed, cfg):
-    return {"sid": sc.sid, "seed": seed, "N": cfg.N, "n_steps": cfg.n_steps}
+    return {"sid": sc.sid, "seed": seed, "N": cfg.N, "n_steps": cfg.n_steps,
+            "fit_v_floor": cfg.fit_v_floor}
 
 
 def overnight(store, sc, seed, cfg):
@@ -176,7 +177,8 @@ def arm_seq(store, sc, seed, cfg):
         res["steps"].append(row)
         times[f"step_{j}"] = trow
 
-    recsC, dt_s = full_resolve(SSVILocalVol(path[-1], s0, T_max=T), dyn, s0, T, cfg.implicit, seed + 500,
+    recsC, dt_s = full_resolve(SSVILocalVol(path[-1], s0, T_max=T), dyn, s0, T,
+                               cfg.implicit, seed + 500,
                                fit_v_floor=cfg.fit_v_floor)
     times["resolve_cold_final"] = round(dt_s, 2)
     res["resolve_cold_final"] = score(recsC, dyn, s0, mats, kq, path[-1], seed + 850, cfg.reprice)

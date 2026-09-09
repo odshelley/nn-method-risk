@@ -2,8 +2,14 @@ import pytest
 
 from neural_particle_method.bench.scenarios import make_registry
 from neural_particle_method.experiments.bump_correct import run_pair
-from neural_particle_method.experiments.config import BUMP_SMOKE, SMOKE
-from neural_particle_method.experiments.warm_suite import ARMS, job_list, run_warm, summarise
+from neural_particle_method.experiments.config import BUMP_SMOKE, SMOKE, WarmConfig
+from neural_particle_method.experiments.warm_suite import (
+    ARMS,
+    job_list,
+    overnight_key,
+    run_warm,
+    summarise,
+)
 from neural_particle_method.tracking.store import Store
 
 
@@ -12,6 +18,13 @@ def test_job_list_enumerates_expected_jobs():
     assert jobs == [("dyn", "s01", 0), ("dyn", "s01", 1), ("dyn", "s02", 0), ("dyn", "s02", 1),
                     ("norm", "s01", 0), ("norm", "s02", 0)]
     assert set(ARMS) == {"dyn", "seq", "xover", "norm"}
+
+
+def test_overnight_key_carries_the_floor_flag():
+    """A pre-flip cached overnight run must never be reused for a post-flip config."""
+    sc = make_registry()["s01"]
+    assert overnight_key(sc, 0, WarmConfig())["fit_v_floor"] is True
+    assert overnight_key(sc, 0, WarmConfig(fit_v_floor=False))["fit_v_floor"] is False
 
 
 @pytest.mark.slow
