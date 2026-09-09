@@ -29,35 +29,29 @@ class RKHSHead:
 
 
 class FeatureRidgeHead:
-    """Per-slice ridge refit of the body's last layer, shrunk toward the offline readout.
+    """Per-slice refit of the body's last layer, shrunk toward the offline readout.
 
-    The body's output is softplus(A w) * V_SCALE, so the head is linear in the pre-activation
-    z = softplus^{-1}(v / V_SCALE). Ridge on z against the frozen features A with the offline
-    readout w0 as the shrinkage centre: when the online target equals the body's own f the
-    solution is w0 and the correction vanishes.
+    One Gauss-Newton step of the raw-scale least squares from the offline last layer w0,
+    ridge-shrunk toward w0: with B the Jacobian of softplus(A w) * V_SCALE at w0, the step solves
+    (B'B + lam n I) d = B'(v+ - f0). When the online target equals the body's own f the step is
+    zero and the correction vanishes.
     """
 
     def __init__(self, lam=1e-3):
         self.lam = lam
         self.params = {"head": "ridge", "lam": lam}
 
-    @staticmethod
-    def _pre(v):
-        y = np.clip(np.asarray(v, dtype=float) / V_SCALE, 1e-3, None)
-        return np.log(np.expm1(y))
-
-    @staticmethod
-    def _post(z):
-        return np.logaddexp(0.0, z) * V_SCALE
-
     def correction(self, t, lnx, v_plus, f_stale, model, grid):
         A = model.features(t, lnx)
         w0 = model.readout(t)
+        z0 = A @ w0
+        s = 1.0 / (1.0 + np.exp(-z0))              # softplus'(z0)
+        f0 = np.logaddexp(0.0, z0) * V_SCALE       # the body's own f at the particles
+        B = (V_SCALE * s)[:, None] * A
         lam = self.lam * len(lnx)
-        lhs = A.T @ A + lam * np.eye(A.shape[1])
-        rhs = A.T @ self._pre(v_plus) + lam * w0
-        w = np.linalg.solve(lhs, rhs)
-        return self._post(model.features(t, grid) @ w) - model.f(t, grid)
+        d = np.linalg.solve(B.T @ B + lam * np.eye(A.shape[1]), B.T @ (v_plus - f0))
+        Ag = model.features(t, grid)
+        return np.logaddexp(0.0, Ag @ (w0 + d)) * V_SCALE - model.f(t, grid)
 
 
 def stale_field(model_f, local_vol, s0, T, n_steps, L_max=4.0, grid=DEFAULT_GRID):
