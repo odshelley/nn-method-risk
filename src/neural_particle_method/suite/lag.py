@@ -2,10 +2,13 @@
 
 The particle cloud lives in absolute log-spot (`lnx` starts at log(s0)) and
 `local_vol.sigma(t, x, s0)` takes moneyness relative to the `s0` it is passed. Under
-sticky-strike the implied vol at each absolute strike is unchanged when spot moves, so
-the Dupire surface in absolute spot is unchanged and only the particles' starting point
-moves: `ShiftedLocalVol` pins moneyness to the overnight spot `s0_ref` whatever `s0`
-the harness passes, and `LaggedScenario.s0` is the new spot.
+sticky-strike the implied vol at each absolute strike is unchanged, but call prices at that
+fixed strike change with the spot, so the Dupire local volatility is that of the translated
+surface, `w~(k) = w(k + delta)` with `k` measured from the new forward; the particles also
+start at the new spot. `TranslatedSSVILocalVol` (analytic SSVI surface) and the translated
+`DupireSurface` construction below (grid-based Heston surface) both build this; `delta = 0`
+reproduces the un-lagged surface exactly, so the surface-lag rows already in the store are
+unaffected.
 """
 import dataclasses
 import math
@@ -17,8 +20,8 @@ from ..bench.scenarios import HestonMarketSpec, ScenarioSpec
 from ..calibrate.warm import scaled_bump
 from ..market.dupire import DupireSurface
 from ..market.heston import heston_call, heston_iv
-from ..market.local_vol import SSVILocalVol
-from ..market.ssvi import implied_vol_ssvi
+from ..market.local_vol import SSVILocalVol, dupire_local_vol
+from ..market.ssvi import implied_vol_ssvi, w_and_derivs
 from ..simulate.dynamics import HestonParams
 
 
@@ -39,19 +42,23 @@ def bump_heston(m):
     return b
 
 
-class ShiftedLocalVol:
-    """Local vol whose moneyness is always taken relative to `s0_ref`, ignoring the passed s0."""
+class TranslatedSSVILocalVol:
+    """Dupire local vol of the sticky-strike-translated SSVI surface w~(k) = w(k + delta),
+    with moneyness k measured from the new spot. delta = 0 reproduces SSVILocalVol exactly."""
 
-    def __init__(self, inner, s0_ref):
-        self.inner, self.s0_ref = inner, float(s0_ref)
-        self.T_grid = inner.T_grid
+    def __init__(self, p, s0_new, delta, t_min=0.004, T_max=2.0):
+        self.p, self.s0_new, self.delta = p, float(s0_new), float(delta)
+        self.T_grid = np.array([t_min, T_max])
 
     @property
     def t_min(self):
-        return self.inner.t_min
+        return float(self.T_grid[0])
 
     def sigma(self, t, x, s0=1.0):
-        return self.inner.sigma(t, x, self.s0_ref)
+        t = float(np.clip(t, self.T_grid[0], self.T_grid[-1]))
+        k = np.log(np.asarray(x, dtype=float) / self.s0_new)
+        w, dwdk, d2wdk2, dwdT = w_and_derivs(self.p, k + self.delta, T=t)
+        return dupire_local_vol(w, dwdk, d2wdk2, dwdT, k)
 
 
 @dataclass(frozen=True)
@@ -69,6 +76,7 @@ class LaggedScenario:
     market: object = None    # bumped HestonParams for family "heston"
 
     def _inner_local_vol(self):
+        """The un-lagged (delta=0) surface, referenced to the old spot s0_ref."""
         if self.family == "ssvi":
             return SSVILocalVol(self.ssvi, self.s0_ref, T_max=self.T)
         b = self.base
@@ -82,7 +90,24 @@ class LaggedScenario:
         return DupireSurface.from_price_fn(price_fn, self.s0_ref, T_grid, k_grid)
 
     def local_vol(self):
-        return ShiftedLocalVol(self._inner_local_vol(), self.s0_ref)
+        d = self.lag.spot_move
+        if d == 0.0:
+            return self._inner_local_vol()
+        if self.family == "ssvi":
+            return TranslatedSSVILocalVol(self.ssvi, self.s0, d, T_max=self.T)
+        b = self.base
+        m = self.market
+        T_grid = np.linspace(b.t_lo, b.T, b.n_t)
+        k_grid = np.linspace(b.k_lo, b.k_hi, b.n_k)
+        w = np.stack([heston_iv(k_grid + d, T, m, self.s0_ref) ** 2 * T for T in T_grid])
+        # fill any failed inversions by nearest neighbour along strike, as from_price_fn does
+        for i in range(w.shape[0]):
+            row = w[i]
+            if np.isnan(row).any():
+                idx = np.arange(len(row))
+                good = ~np.isnan(row)
+                w[i] = np.interp(idx, idx[good], row[good])
+        return DupireSurface(T_grid, k_grid, w)
 
     def target_ivs(self, k_grid, maturities):
         k = np.asarray(k_grid, dtype=float) + self.lag.spot_move
