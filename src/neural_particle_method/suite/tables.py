@@ -25,6 +25,11 @@ LAG_TITLES = {
     "surface": "Surface lag",
     "surface_spot": "Surface plus $2\\%$ sticky-strike spot lag",
 }
+APPENDIX_LAG_TITLES = {
+    "surface": "surface lag",
+    "surface_spot": "surface plus $2\\%$ spot lag",
+}
+FAMILY_TITLES = {"ssvi": "SSVI", "heston": "Heston"}
 
 
 def _sids(family):
@@ -53,7 +58,7 @@ def _agg(g):
         "rmse_mean": per_sid.rmse.mean(), "rmse_median": per_sid.rmse.median(),
         "wings_mean": per_sid.wings.mean(), "wings_median": per_sid.wings.median(),
         "t025_mean": per_sid.t025.mean(), "lev_median": per_sid.lev.median(),
-        "lat_median": per_sid.lat.median(), "n_sids": len(per_sid),
+        "lat_median": per_sid.lat.median(),
     })
 
 
@@ -74,7 +79,7 @@ def _prep(df):
 
 EMPTY = pd.Series({k: np.nan for k in (
     "mae_mean", "mae_median", "rmse_mean", "rmse_median", "wings_mean",
-    "wings_median", "t025_mean", "lev_median", "lat_median", "n_sids",
+    "wings_median", "t025_mean", "lev_median", "lat_median",
 )})
 
 
@@ -144,22 +149,26 @@ def _cold_tex(df):
     return "\n".join(lines) + "\n"
 
 
-def _lagged_tex(df):
+def _lagged_tex(df, family="ssvi"):
+    """The lagged block for one family; the Heston scenarios have no $T=0.25$ quotes."""
+    t025 = family != "heston"
+    n_cols = 7 if t025 else 6
+    header = "method & offline $N$ & pooled MAE & pooled RMSE & wings MAE & "
+    header += "$T=0.25$ MAE & " if t025 else ""
     lines = [
-        "\\begin{tabular}{l l rr rr r}", "\\toprule",
-        ("method & offline $N$ & pooled MAE & pooled RMSE & wings MAE & $T=0.25$ MAE & "
-         "online latency (s)\\\\"),
+        "\\begin{tabular}{l l rr " + ("rr r" if t025 else "r r") + "}", "\\toprule",
+        header + "online latency (s)\\\\",
         "\\midrule",
     ]
     for lag in ("surface", "surface_spot"):
-        lines.append(f"\\multicolumn{{7}}{{l}}{{\\emph{{{LAG_TITLES[lag]}}}}}\\\\")
+        lines.append(f"\\multicolumn{{{n_cols}}}{{l}}{{\\emph{{{LAG_TITLES[lag]}}}}}\\\\")
         for (lg, label, size), r in df.iterrows():
             if lg != lag:
                 continue
-            cells = [
-                _cell(r.mae_mean), _cell(r.rmse_mean), _cell(r.wings_mean), _cell(r.t025_mean),
-                _cell(r.lat_median, "{:.1f}"),
-            ]
+            cells = [_cell(r.mae_mean), _cell(r.rmse_mean), _cell(r.wings_mean)]
+            if t025:
+                cells.append(_cell(r.t025_mean))
+            cells.append(_cell(r.lat_median, "{:.1f}"))
             lines.append(f"{label} & {size} & " + " & ".join(cells) + "\\\\")
         if lag == "surface":
             lines.append("\\midrule")
@@ -167,45 +176,57 @@ def _lagged_tex(df):
     return "\n".join(lines) + "\n"
 
 
+def _tex(x):
+    return str(x).replace("_", "\\_")
+
+
+def _appendix_block(title, col_labels, rows):
+    """One titled, width-fitted block: scenarios as rows, `col_labels` as columns."""
+    lines = [
+        "\\begin{tabular}{l " + "r" * len(col_labels) + "}", "\\toprule",
+        "sid & " + " & ".join(col_labels) + "\\\\", "\\midrule",
+    ]
+    for sid, values in rows:
+        lines.append(_tex(sid) + " & " + " & ".join(_cell(v) for v in values) + "\\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    return (f"\\paragraph{{{title}}}\n\\resizebox{{\\textwidth}}{{!}}{{%\n"
+            + "\n".join(lines) + "}\n")
+
+
 def _appendix_tex(store, settings):
-    """Per-scenario pooled MAE (seeds averaged): one block per experiment, scenarios as rows."""
+    """Per-scenario pooled MAE (seeds averaged), one block per experiment, family and lag."""
     blocks = []
     cold = _finished(store, settings.experiment("suite_cold"))
-    if len(cold):
-        p = _prep(cold)
-        p["algo"] = cold["params.algo"]
+    for family, fam in FAMILY_TITLES.items():
+        sel = cold[cold["params.sid"].isin(_sids(family))] if len(cold) else cold
+        if not len(sel):
+            continue
+        p = _prep(sel)
+        p["algo"] = sel["params.algo"]
         piv = p.groupby(["params.sid", "algo"]).mae.mean().unstack("algo")
         cols = [a for a, _ in COLD_ROWS if a in piv.columns]
         piv = piv.reindex(columns=cols)
-        head = " & ".join(dict(COLD_ROWS)[a] for a in cols)
-        lines = [
-            "\\begin{tabular}{l " + "r" * len(cols) + "}", "\\toprule", f"sid & {head}\\\\",
-            "\\midrule",
-        ]
-        for sid, r in piv.iterrows():
-            row_sid = str(sid).replace("_", "\\_")
-            lines.append(f"{row_sid} & " + " & ".join(_cell(v) for v in r.values) + "\\\\")
-        lines += ["\\bottomrule", "\\end{tabular}"]
-        blocks.append("% cold suite, pooled MAE bp\n" + "\n".join(lines))
+        blocks.append(_appendix_block(
+            f"Cold suite, {fam} scenarios, pooled MAE (bp)",
+            [dict(COLD_ROWS)[a] for a in cols],
+            [(sid, r.values) for sid, r in piv.iterrows()]))
     lagged = _finished(store, settings.experiment("suite_lagged"))
-    if len(lagged):
-        p = _prep(lagged)
-        p["col"] = (
-            lagged["params.method"] + "/" + lagged["params.offline_n"].astype(str)
-            + "/" + lagged["params.lag"]
-        )
-        piv = p.groupby(["params.sid", "col"]).mae.mean().unstack("col")
-        lines = [
-            "\\begin{tabular}{l " + "r" * len(piv.columns) + "}", "\\toprule",
-            "sid & " + " & ".join(c.replace("_", "\\_") for c in piv.columns) + "\\\\",
-            "\\midrule",
-        ]
-        for sid, r in piv.iterrows():
-            row_sid = str(sid).replace("_", "\\_")
-            lines.append(f"{row_sid} & " + " & ".join(_cell(v) for v in r.values) + "\\\\")
-        lines += ["\\bottomrule", "\\end{tabular}"]
-        blocks.append("% lagged suite, pooled MAE bp\n" + "\n".join(lines))
-    return "\n\n".join(blocks) + "\n" if blocks else "% no finished suite runs\n"
+    for family, fam in FAMILY_TITLES.items():
+        for lag, lag_title in APPENDIX_LAG_TITLES.items():
+            if not len(lagged):
+                continue
+            sel = lagged[lagged["params.sid"].isin(_sids(family))
+                         & (lagged["params.lag"] == lag)]
+            if not len(sel):
+                continue
+            p = _prep(sel)
+            p["col"] = sel["params.method"] + "/" + sel["params.offline_n"].astype(str)
+            piv = p.groupby(["params.sid", "col"]).mae.mean().unstack("col")
+            blocks.append(_appendix_block(
+                f"Lagged suite, {lag_title}, {fam} scenarios, pooled MAE (bp)",
+                [_tex(c) for c in piv.columns],
+                [(sid, r.values) for sid, r in piv.iterrows()]))
+    return "\n".join(blocks) + "\n" if blocks else "% no finished suite runs\n"
 
 
 def section4_tables(store, out_dir="paper/tables", settings=FULL):
@@ -214,8 +235,10 @@ def section4_tables(store, out_dir="paper/tables", settings=FULL):
     files = {
         "suite_cold_ssvi.tex": _cold_tex(cold_frame(store, settings, "ssvi")),
         "suite_cold_heston.tex": _cold_tex(cold_frame(store, settings, "heston")),
-        "suite_lagged_ssvi.tex": _lagged_tex(lagged_frame(store, settings, "ssvi")),
-        "suite_lagged_heston.tex": _lagged_tex(lagged_frame(store, settings, "heston")),
+        "suite_lagged_ssvi.tex": _lagged_tex(lagged_frame(store, settings, "ssvi"),
+                                            "ssvi"),
+        "suite_lagged_heston.tex": _lagged_tex(
+            lagged_frame(store, settings, "heston"), "heston"),
         "suite_appendix.tex": _appendix_tex(store, settings),
     }
     paths = []

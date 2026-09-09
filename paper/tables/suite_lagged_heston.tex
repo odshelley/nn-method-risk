@@ -1,37 +1,37 @@
-\begin{tabular}{l l rr rr r}
+\begin{tabular}{l l rr r r}
 \toprule
-method & offline $N$ & pooled MAE & pooled RMSE & wings MAE & $T=0.25$ MAE & online latency (s)\\
+method & offline $N$ & pooled MAE & pooled RMSE & wings MAE & online latency (s)\\
 \midrule
-\multicolumn{7}{l}{\emph{Surface lag}}\\
-Stale leverage, no action & -- & -- & -- & -- & -- & --\\
-NW re-solve on $S_1$ & -- & -- & -- & -- & -- & --\\
-Explicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & -- & --\\
-Explicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & -- & --\\
-Implicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & -- & --\\
-Implicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & -- & --\\
-Explicit NN + RKHS head & 200k & -- & -- & -- & -- & --\\
-Explicit NN + RKHS head & 500k & -- & -- & -- & -- & --\\
-Implicit NN + RKHS head & 200k & -- & -- & -- & -- & --\\
-Implicit NN + RKHS head & 500k & -- & -- & -- & -- & --\\
-Explicit NN + ridge head & 200k & -- & -- & -- & -- & --\\
-Explicit NN + ridge head & 500k & -- & -- & -- & -- & --\\
-Implicit NN + ridge head & 200k & -- & -- & -- & -- & --\\
-Implicit NN + ridge head & 500k & -- & -- & -- & -- & --\\
+\multicolumn{6}{l}{\emph{Surface lag}}\\
+Stale leverage, no action & -- & -- & -- & -- & --\\
+NW re-solve on $S_1$ & -- & -- & -- & -- & --\\
+Explicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & --\\
+Explicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & --\\
+Implicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & --\\
+Implicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & --\\
+Explicit NN + RKHS head & 200k & -- & -- & -- & --\\
+Explicit NN + RKHS head & 500k & -- & -- & -- & --\\
+Implicit NN + RKHS head & 200k & -- & -- & -- & --\\
+Implicit NN + RKHS head & 500k & -- & -- & -- & --\\
+Explicit NN + ridge head & 200k & -- & -- & -- & --\\
+Explicit NN + ridge head & 500k & -- & -- & -- & --\\
+Implicit NN + ridge head & 200k & -- & -- & -- & --\\
+Implicit NN + ridge head & 500k & -- & -- & -- & --\\
 \midrule
-\multicolumn{7}{l}{\emph{Surface plus $2\%$ sticky-strike spot lag}}\\
-Stale leverage, no action & -- & -- & -- & -- & -- & --\\
-NW re-solve on $S_1$ & -- & -- & -- & -- & -- & --\\
-Explicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & -- & --\\
-Explicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & -- & --\\
-Implicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & -- & --\\
-Implicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & -- & --\\
-Explicit NN + RKHS head & 200k & -- & -- & -- & -- & --\\
-Explicit NN + RKHS head & 500k & -- & -- & -- & -- & --\\
-Implicit NN + RKHS head & 200k & -- & -- & -- & -- & --\\
-Implicit NN + RKHS head & 500k & -- & -- & -- & -- & --\\
-Explicit NN + ridge head & 200k & -- & -- & -- & -- & --\\
-Explicit NN + ridge head & 500k & -- & -- & -- & -- & --\\
-Implicit NN + ridge head & 200k & -- & -- & -- & -- & --\\
-Implicit NN + ridge head & 500k & -- & -- & -- & -- & --\\
+\multicolumn{6}{l}{\emph{Surface plus $2\%$ sticky-strike spot lag}}\\
+Stale leverage, no action & -- & -- & -- & -- & --\\
+NW re-solve on $S_1$ & -- & -- & -- & -- & --\\
+Explicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & --\\
+Explicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & --\\
+Implicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & --\\
+Implicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & --\\
+Explicit NN + RKHS head & 200k & -- & -- & -- & --\\
+Explicit NN + RKHS head & 500k & -- & -- & -- & --\\
+Implicit NN + RKHS head & 200k & -- & -- & -- & --\\
+Implicit NN + RKHS head & 500k & -- & -- & -- & --\\
+Explicit NN + ridge head & 200k & -- & -- & -- & --\\
+Explicit NN + ridge head & 500k & -- & -- & -- & --\\
+Implicit NN + ridge head & 200k & -- & -- & -- & --\\
+Implicit NN + ridge head & 500k & -- & -- & -- & --\\
 \bottomrule
 \end{tabular}
