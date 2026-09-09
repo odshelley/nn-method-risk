@@ -1,7 +1,7 @@
 \documentclass[11pt,a4paper]{article}
 
 % Working notes for the Neural Particle Method project.
-% Synthetic-data setup, machinery, and the planned benchmark suite.
+% Synthetic-data setup, machinery, and the benchmark suite of 9 September 2026.
 
 \usepackage{amsmath, amssymb, amsthm, mathtools}
 \usepackage{booktabs}
@@ -34,7 +34,7 @@
 \maketitle
 
 \begin{abstract}
-This note records, in one place, the synthetic markets and dynamics used throughout the project, the simulation, estimation and scoring machinery, and the specification of the clean benchmark suite agreed on 8 September 2026 (\cref{sec:suite}), whose tables are to be filled from the MLflow store when the runs complete. The suite follows the discovery, in the diagnostics of 8 September, that all one-pass schemes were fitting the conditional expectation of the raw Euler variance rather than of its positive part, which the dynamics actually use (\cref{sec:floor}); the diagnostic runs themselves live in the MLflow experiments \code{mechanism}, \code{bump\_floor} and \code{bump\_floor\_nn}.
+This note records, in one place, the synthetic markets and dynamics used throughout the project, the simulation, estimation and scoring machinery, and the specification of the clean benchmark suite agreed on 8 September 2026 (\cref{sec:suite}), run on 9 September 2026; its tables are generated from the MLflow store. The suite follows the discovery, in the diagnostics of 8 September, that all one-pass schemes were fitting the conditional expectation of the raw Euler variance rather than of its positive part, which the dynamics actually use (\cref{sec:floor}); the diagnostic runs themselves live in the MLflow experiments \code{mechanism}, \code{bump\_floor} and \code{bump\_floor\_nn}.
 \end{abstract}
 
 \tableofcontents
@@ -145,9 +145,9 @@ A single network $f_\theta(t,x)$, $2\to64\to64\to1$ SiLU with softplus output sc
 
 The one-pass schemes hand the estimator the raw Euler $v$; the implicit loop hands it $v^+$. Since only $v^+$ drives the dynamics \cref{eq:euler}, the quantity the leverage must divide by is $\E[V^+\mid X]$. Under Feller violation a sizeable fraction of particles has $v<0$ after a coarse step (on s11, $v_0=0.02$, $\xi=1$, $\Delta=0.04$: the one-step standard deviation of $v$ is $0.028$), so $\E[v\mid X]<\E[v^+\mid X]$ by the mean negative excursion, the denominator is too small, and the leverage too large. The effect is independent of the particle count and shrinks with the step size. ``Floor on'' below means the estimator is given $v^+$ (\code{ExplicitConfig.fit\_v\_floor}); the default remains off so that the golden replays of the paper's runs are unchanged.
 
-\section{Benchmark suite (planned)}\label{sec:suite}
+\section{Benchmark suite}\label{sec:suite}
 
-This section specifies the clean benchmark agreed on 8 September 2026, to be run once the variance floor of \cref{sec:floor} is the package default. Every cell of the tables below is one MLflow run, keyed by method, scenario, seed and (for the lagged suite) lag type and offline particle count, in experiments \code{suite\_cold}, \code{suite\_offline}, \code{suite\_lagged} and \code{pde\_reference}. Every trained object is stored as a run artifact (network weights as a \code{torch} state dictionary, per-slice estimators and leverage fields as pickles and JSON) and can be reloaded by run id. The tables are marked TBD and will be filled from the store when the runs complete.
+This section specifies the clean benchmark agreed on 8 September 2026 and run on 9 September 2026 with the variance floor of \cref{sec:floor} as the package default. Every cell of the tables below is one MLflow run, keyed by method, scenario, seed and (for the lagged suite) lag type and offline particle count, in experiments \code{suite\_cold}, \code{suite\_offline}, \code{suite\_lagged} and \code{pde\_reference}. Every trained object is stored as a run artifact (network weights as a \code{torch} state dictionary, per-slice estimators and leverage fields as pickles and JSON) and can be reloaded by run id. The tables are generated from the store by \code{nparticle suite tables}.
 
 \subsection{Common setup}\label{sec:suite-setup}
 
@@ -177,12 +177,12 @@ One calibration from scratch per method, scenario and seed at $100\,000$ particl
 \end{enumerate}
 
 \begin{table}[h]\centering\footnotesize
-\caption{Cold suite, SSVI scenarios: mean and median over the $20$ scenarios and two seeds. TBD.}\label{tab:suite-cold}
+\caption{Cold suite, SSVI scenarios: mean and median over the $20$ scenarios and two seeds. The PDE row is the attainable floor of the scoring; its seed-to-seed spread (median over scenarios of the absolute difference in pooled MAE between the two reprice seeds) is $6.6\bp$, the Monte Carlo noise floor of the score.}\label{tab:suite-cold}
 \input{tables/suite_cold_ssvi.tex}
 \end{table}
 
 \begin{table}[h]\centering\footnotesize
-\caption{Cold suite, Heston-market scenarios (one-year maturity, same $13$ quotes): mean and median over the three scenarios and two seeds. TBD.}\label{tab:suite-cold-heston}
+\caption{Cold suite, Heston-market scenarios (one-year maturity, same $13$ quotes): mean and median over the three scenarios and two seeds..}\label{tab:suite-cold-heston}
 \input{tables/suite_cold_heston.tex}
 \end{table}
 
@@ -210,11 +210,11 @@ An overnight calibration is done on surface $S_0$; the intraday market is $S_1$,
 The online reference rows are NW re-solved from scratch on $S_1$ at $100\,000$ particles and $200$ steps (the best intraday strategy in the floor-corrected bump runs, experiment \code{bump\_floor}), and the stale leverage with no action.
 
 \begin{table}[h]\centering\footnotesize
-\caption{Lagged suite, SSVI scenarios: mean over the $20$ scenarios and two online seeds; latency is the online stage only. One block per lag type. TBD.}\label{tab:suite-lagged}
+\caption{Lagged suite, SSVI scenarios: mean over the $20$ scenarios and two online seeds; latency is the online stage only. One block per lag type..}\label{tab:suite-lagged}
 \resizebox{\textwidth}{!}{\input{tables/suite_lagged_ssvi.tex}}\end{table}
 
 \begin{table}[h]\centering\footnotesize
-\caption{Lagged suite, Heston-market scenarios. TBD.}\label{tab:suite-lagged-heston}
+\caption{Lagged suite, Heston-market scenarios..}\label{tab:suite-lagged-heston}
 \resizebox{\textwidth}{!}{\input{tables/suite_lagged_heston.tex}}\end{table}
 
 \subsection{Per-scenario numbers}\label{sec:suite-appendix}
