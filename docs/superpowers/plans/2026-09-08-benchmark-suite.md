@@ -2337,7 +2337,7 @@ Run (background, from repo root):
 uv run nparticle suite run --stage pde --jobs 4 > results/suite_pde.log 2>&1
 uv run nparticle suite run --stage cold --jobs 4 > results/suite_cold.log 2>&1
 ```
-Expected: `pde: 46 done, 0 failed`; `cold: 414 done, 0 failed` (about 2.5 h). Any `FAILED:` line is investigated from the run's `traceback.txt` artifact before moving on.
+Expected: `pde: 92 done, 0 failed` (46 floors and 46 lagged references; each lagged reference at the FULL grid takes about 2.5 minutes, so 46 of them at 4 workers is about half an hour); `cold: 414 done, 0 failed` (about 2.5 h). Any `FAILED:` line is investigated from the run's `traceback.txt` artifact before moving on.
 
 - [ ] **Step 2: Offline bodies, 4 workers, overnight**
 
@@ -2351,7 +2351,7 @@ Expected: `offline: 92 done, 0 failed` (about 12 h).
 ```bash
 uv run nparticle suite run --stage online --jobs 4 > results/suite_online.log 2>&1
 ```
-Expected: `online: 1288 done, 0 failed` (under 1 h; the count is 23 scenarios x 14 rows x 2 lags x 2 seeds).
+Expected: `online: 1288 done, 0 failed` (several hours at 4 workers; each run reprices 500k paths and the head methods also sweep 100k particles; the count is 23 scenarios x 14 rows x 2 lags x 2 seeds).
 
 - [ ] **Step 4: Tables and notes**
 
