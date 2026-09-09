@@ -189,7 +189,8 @@ def _appendix_block(title, col_labels, rows):
     for sid, values in rows:
         lines.append(_tex(sid) + " & " + " & ".join(_cell(v) for v in values) + "\\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
-    return (f"\\paragraph{{{title}}}\n\\resizebox{{\\textwidth}}{{!}}{{%\n"
+    # \mbox{} ends the run-in heading, so the full-width box starts its own paragraph
+    return (f"\\paragraph{{{title}}}\\mbox{{}}\n\n\\resizebox{{\\textwidth}}{{!}}{{%\n"
             + "\n".join(lines) + "}\n")
 
 
