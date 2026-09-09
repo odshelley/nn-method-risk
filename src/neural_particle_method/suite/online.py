@@ -65,8 +65,11 @@ def run_online(store, sid, method, offline_n, lag, seed, settings=FULL):
     with store.run(exp, params) as h:
         t0 = time.perf_counter()
         if head_kind == "nw_resolve":
-            est = make_estimator("nw", seed=seed, local_vol=lv, s0=lsc.s0)
-            r = calibrate_explicit(lv, lsc.dynamics, est, ecfg, s0=lsc.s0, T=lsc.T, seed=seed)
+            # seed + 1 is the head sweeps' cloud stream: no method shares a stream with
+            # another method at a different seed.
+            est = make_estimator("nw", seed=seed + 1, local_vol=lv, s0=lsc.s0)
+            r = calibrate_explicit(lv, lsc.dynamics, est, ecfg, s0=lsc.s0, T=lsc.T,
+                                   seed=seed + 1)
             field, online_s = r.field, time.perf_counter() - t0
         elif head_kind == "stale_L":
             field, online_s = offline.field, 0.0

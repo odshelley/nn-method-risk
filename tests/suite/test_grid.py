@@ -15,7 +15,7 @@ TINY = SuiteSettings.tiny()
 
 
 def test_full_job_counts():
-    assert len(pde_jobs(FULL)) == 23 * 2
+    assert len(pde_jobs(FULL)) == 23 * 2 + 23 * 2   # floors (2 seeds) + lagged references (2 lags)
     assert len(cold_jobs(FULL)) == 23 * 9 * 2
     assert len(offline_jobs(FULL)) == 23 * 2 * 2
     # 6 head/stale methods x 2 sizes, stale_L, nw_resolve; 2 lags; 2 seeds
@@ -34,5 +34,5 @@ def test_run_stage_runs_and_skips_finished(tmp_path):
     store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     small = SuiteSettings(**{**TINY.__dict__, "sids": ("s01",)})
     done, failed = run_stage(store, "pde", small)
-    assert (done, failed) == (1, 0)
+    assert (done, failed) == (3, 0)      # one floor plus the two lagged references
     assert run_stage(store, "pde", small) == (0, 0)

@@ -1,5 +1,7 @@
 """Job lists and the multiprocess driver for the four suite stages."""
+import os
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 
 from ..bench.runner import run_key
 from ..tracking.store import Store
@@ -7,7 +9,7 @@ from .cold import COLD_ALGOS, run_cold
 from .config import FULL
 from .lag import LAGS
 from .offline import BODIES, run_offline
-from .online import ONLINE_METHODS, run_online
+from .online import ONLINE_METHODS, ensure_lagged_reference, run_online
 from .reference import run_pde_floor
 
 STAGES = ("pde", "cold", "offline", "online")
@@ -26,7 +28,11 @@ def _sids(settings, sids):
 
 
 def pde_jobs(settings=FULL, sids=None):
-    return [("pde", sid, seed) for sid in _sids(settings, sids) for seed in settings.seeds]
+    """PDE floors for the registry scenarios, then one reference per (scenario, lag)."""
+    sids = _sids(settings, sids)
+    jobs = [("pde", sid, seed) for sid in sids for seed in settings.seeds]
+    jobs += [("pde_lag", sid, lag.kind) for sid in sids for lag in LAGS]
+    return jobs
 
 
 def cold_jobs(settings=FULL, sids=None):
@@ -62,6 +68,9 @@ def run_job(store, job, settings=FULL):
         return run_cold(store, job[1], job[2], job[3], settings)
     if kind == "offline":
         return run_offline(store, job[1], job[2], job[3], settings)
+    if kind == "pde_lag":
+        lag = {l.kind: l for l in LAGS}[job[2]]
+        return ensure_lagged_reference(store, job[1], lag, settings)
     if kind == "online":
         lag = {l.kind: l for l in LAGS}[job[4]]
         return run_online(store, job[1], job[2], job[3], lag, job[5], settings)
@@ -69,7 +78,12 @@ def run_job(store, job, settings=FULL):
 
 
 def _worker(args):
-    uri, root, job, settings = args
+    uri, root, job, settings, n_jobs = args
+    if n_jobs > 1:
+        import torch
+        k = max(1, (os.cpu_count() or n_jobs) // n_jobs)
+        os.environ.setdefault("OMP_NUM_THREADS", str(k))
+        torch.set_num_threads(k)
     try:
         run_job(Store(uri, root), job, settings)
         return job, None
@@ -87,6 +101,10 @@ def _is_finished(store, job, settings):
         _, sid, seed = job
         key = {"sid": sid, "seed": seed, "n_steps": n_steps}
         return store.find_finished(settings.experiment("suite_pde_floor"), key) is not None
+    if kind == "pde_lag":
+        _, sid, lag_kind = job
+        key = {"sid": sid, "n_steps": n_steps, "lag": lag_kind}
+        return store.find_finished("pde_reference", key) is not None
     if kind == "cold":
         _, sid, algo, seed = job
         key = run_key(sid, algo, settings.n_online, seed)
@@ -102,6 +120,23 @@ def _is_finished(store, job, settings):
                "lag": lag_kind, "seed": int(seed), "n_steps": n_steps}
         return store.find_finished(settings.experiment("suite_lagged"), key) is not None
     raise KeyError(kind)
+
+
+def _drain(results):
+    """Count results as they arrive; a broken pool ends the stage with one extra failure."""
+    done = failed = 0
+    try:
+        for job, err in results:
+            if err is None:
+                done += 1
+                print("done:", *job, flush=True)
+            else:
+                failed += 1
+                print("FAILED:", *job, err, flush=True)
+    except BrokenProcessPool as e:
+        print(f"FAILED: pool broken: {e}", flush=True)
+        failed += 1
+    return done, failed
 
 
 def run_stage(store, stage, settings=FULL, n_jobs=1, sids=None):
@@ -123,17 +158,8 @@ def run_stage(store, stage, settings=FULL, n_jobs=1, sids=None):
     jobs = JOBS[stage](settings, sids)
     jobs = [j for j in jobs if not _is_finished(store, j, settings)]
     print(f"{stage}: {len(jobs)} jobs listed", flush=True)
-    args = [(store.tracking_uri, store.artifact_root, j, settings) for j in jobs]
-    done = failed = 0
+    args = [(store.tracking_uri, store.artifact_root, j, settings, n_jobs) for j in jobs]
     if n_jobs > 1:
-        results = ProcessPoolExecutor(max_workers=n_jobs).map(_worker, args)
-    else:
-        results = map(_worker, args)
-    for job, err in results:
-        if err is None:
-            done += 1
-            print("done:", *job, flush=True)
-        else:
-            failed += 1
-            print("FAILED:", *job, err, flush=True)
-    return done, failed
+        with ProcessPoolExecutor(max_workers=n_jobs) as pool:
+            return _drain(pool.map(_worker, args))
+    return _drain(map(_worker, args))
