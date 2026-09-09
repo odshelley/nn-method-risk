@@ -1,10 +1,11 @@
 """What a lag is: a no-arbitrage surface bump, optionally with a sticky-strike spot move.
 
-The particle cloud lives in absolute log-spot (`lnx` starts at log(s0)) and `local_vol.sigma(t, x, s0)`
-takes moneyness relative to the `s0` it is passed. Under sticky-strike the implied vol at each
-absolute strike is unchanged when spot moves, so the Dupire surface in absolute spot is unchanged
-and only the particles' starting point moves: `ShiftedLocalVol` pins moneyness to the overnight
-spot `s0_ref` whatever `s0` the harness passes, and `LaggedScenario.s0` is the new spot.
+The particle cloud lives in absolute log-spot (`lnx` starts at log(s0)) and
+`local_vol.sigma(t, x, s0)` takes moneyness relative to the `s0` it is passed. Under
+sticky-strike the implied vol at each absolute strike is unchanged when spot moves, so
+the Dupire surface in absolute spot is unchanged and only the particles' starting point
+moves: `ShiftedLocalVol` pins moneyness to the overnight spot `s0_ref` whatever `s0`
+the harness passes, and `LaggedScenario.s0` is the new spot.
 """
 import dataclasses
 import math
@@ -94,7 +95,8 @@ class LaggedScenario:
         p["scenario.s0"] = self.s0
         bumped = dataclasses.asdict(self.ssvi) if self.family == "ssvi" else self.market.to_dict()
         p.update({f"bumped.{k}": v for k, v in bumped.items()})
-        p.update({"lag.kind": self.lag.kind, "lag.spot_move": self.lag.spot_move, "s0_ref": self.s0_ref})
+        p.update({"lag.kind": self.lag.kind, "lag.spot_move": self.lag.spot_move,
+                  "s0_ref": self.s0_ref})
         return p
 
 

@@ -16,7 +16,8 @@ def test_run_reference_populates_store_and_is_idempotent(tmp_path):
     rid = run_reference(store, "li_simple", n_steps=6, n_x=41, n_v=20)
     assert rid
 
-    field = LeverageField.from_json(json.loads(store.download(rid, "leverage.json", tmp_path / "d").read_text()))
+    raw = store.download(rid, "leverage.json", tmp_path / "d").read_text()
+    field = LeverageField.from_json(json.loads(raw))
     assert len(field) == 6
 
     rid2 = run_reference(store, "li_simple", n_steps=6, n_x=41, n_v=20)
@@ -52,7 +53,8 @@ def test_reference_accepts_an_explicit_scenario(tmp_path):
     from neural_particle_method.bench.scenarios import full_registry
     store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     sc = dc_replace(full_registry()["li_simple"], s0=1.02)
-    rid = run_reference(store, "li_simple", n_steps=6, n_x=41, n_v=20, scenario=sc, lag="surface_spot")
+    rid = run_reference(store, "li_simple", n_steps=6, n_x=41, n_v=20, scenario=sc,
+                        lag="surface_spot")
     p = store.get_params(rid)
     assert p["lag"] == "surface_spot" and p["s0"] == "1.02"
     assert run_reference(store, "li_simple", n_steps=6, n_x=41, n_v=20) != rid
