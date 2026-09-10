@@ -7,7 +7,7 @@ pd.set_option("display.width", 240)
 s = Store()
 SIDS = ["s01", "s02", "s05", "s09", "s11", "s16"]
 ORDER = ["stale_L", "nw_resolve", "explicit_stale", "implicit_stale", "explicit_rkhs", "implicit_rkhs",
-         "explicit_ridge", "implicit_ridge"]
+         "explicit_ridge", "implicit_ridge", "explicit_spline", "implicit_spline"]
 
 
 def num(df, c):
