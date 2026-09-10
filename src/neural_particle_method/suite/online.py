@@ -10,7 +10,7 @@ from ..estimators import make_estimator
 from ..tracking.store import git_hash, to_jsonable
 from .artifacts import load_run
 from .config import FULL
-from .heads import FeatureRidgeHead, RKHSHead, online_sweep
+from .heads import FeatureRidgeHead, RKHSHead, SplineHead, online_sweep
 from .lag import lagged_scenario
 from .offline import run_offline
 from .reference import score_field
@@ -19,12 +19,13 @@ ONLINE_METHODS = {
     "explicit_stale": ("explicit", None), "implicit_stale": ("implicit", None),
     "explicit_rkhs": ("explicit", "rkhs"), "implicit_rkhs": ("implicit", "rkhs"),
     "explicit_ridge": ("explicit", "ridge"), "implicit_ridge": ("implicit", "ridge"),
+    "explicit_spline": ("explicit", "spline"), "implicit_spline": ("implicit", "spline"),
     "stale_L": ("explicit", "stale_L"), "nw_resolve": (None, "nw_resolve"),
 }
 
 
 def _head(kind):
-    return {"rkhs": RKHSHead(), "ridge": FeatureRidgeHead()}[kind]
+    return {"rkhs": RKHSHead(), "ridge": FeatureRidgeHead(), "spline": SplineHead()}[kind]
 
 
 def ensure_lagged_reference(store, sid, lag, settings):
@@ -59,7 +60,7 @@ def run_online(store, sid, method, offline_n, lag, seed, settings=FULL):
               "offline_run": offline.run_id if offline else "",
               **{f"explicit.{k}": v for k, v in ecfg.as_params().items()},
               **{f"reprice.{k}": v for k, v in settings.reprice.as_params().items()}}
-    head = _head(head_kind) if head_kind in ("rkhs", "ridge") else None
+    head = _head(head_kind) if head_kind in ("rkhs", "ridge", "spline") else None
     if head is not None:
         params.update({f"head.{k}": v for k, v in head.params.items()})
     with store.run(exp, params) as h:

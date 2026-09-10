@@ -15,8 +15,8 @@ def store(tmp_path):
 
 def test_method_table_is_the_agreed_one():
     assert list(ONLINE_METHODS) == ["explicit_stale", "implicit_stale", "explicit_rkhs",
-                                    "implicit_rkhs", "explicit_ridge", "implicit_ridge", "stale_L",
-                                    "nw_resolve"]
+                                    "implicit_rkhs", "explicit_ridge", "implicit_ridge",
+                                    "explicit_spline", "implicit_spline", "stale_L", "nw_resolve"]
 
 
 @pytest.mark.parametrize("method", list(ONLINE_METHODS))

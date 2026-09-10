@@ -7,7 +7,13 @@ from neural_particle_method.estimators.nadaraya_watson import nw_estimate
 from neural_particle_method.estimators.nn import V_SCALE, NNRegressor
 from neural_particle_method.simulate.leverage import DEFAULT_GRID
 from neural_particle_method.suite.artifacts import SliceBank
-from neural_particle_method.suite.heads import FeatureRidgeHead, RKHSHead, online_sweep, stale_field
+from neural_particle_method.suite.heads import (
+    FeatureRidgeHead,
+    RKHSHead,
+    SplineHead,
+    online_sweep,
+    stale_field,
+)
 
 E = ExplicitConfig(n_steps=4, n_particles=600, fit_subsample=300, first_steps=5, later_steps=2)
 
@@ -40,7 +46,50 @@ def test_rkhs_head_recovers_a_smooth_residual():
     f = bank.f(0.5, x)
     grid = np.linspace(-0.15, 0.15, 7)
     corr = RKHSHead().correction(0.5, x, f + 0.01 * x, f, bank, grid)
-    np.testing.assert_allclose(corr, 0.01 * grid, atol=2e-3)
+    np.testing.assert_allclose(corr, 0.01 * grid, atol=3e-3)
+
+
+def test_rkhs_head_guard_floors_the_denominator():
+    """A residual that drags the denominator to zero is clipped at floor_frac * f_stale."""
+    _, bank, _ = _body()
+    rng = np.random.default_rng(3)
+    x = rng.normal(scale=0.1, size=300)
+    f = bank.f(0.5, x)
+    grid = np.linspace(-0.2, 0.2, 9)
+    corr = RKHSHead().correction(0.5, x, 0.0 * f, f, bank, grid)
+    f_grid = bank.f(0.5, grid)
+    denom = f_grid + corr
+    assert np.all(denom >= 0.25 * f_grid - 1e-12)
+    assert np.any(np.isclose(denom, 0.25 * f_grid, atol=1e-12))
+
+
+def test_spline_head_zero_residual_and_smooth_residual():
+    _, bank, _ = _body()
+    rng = np.random.default_rng(0)
+    x = rng.normal(scale=0.1, size=300)
+    f = bank.f(0.5, x)
+    corr = SplineHead().correction(0.5, x, f, f, bank, np.linspace(-0.2, 0.2, 9))
+    assert np.abs(corr).max() < 1e-8
+
+    rng = np.random.default_rng(1)
+    x = rng.normal(scale=0.1, size=2000)
+    f = bank.f(0.5, x)
+    grid = np.linspace(-0.15, 0.15, 7)
+    corr = SplineHead().correction(0.5, x, f + 0.01 * x, f, bank, grid)
+    np.testing.assert_allclose(corr, 0.01 * grid, atol=3e-3)
+
+
+def test_spline_head_guard_floors_the_denominator():
+    _, bank, _ = _body()
+    rng = np.random.default_rng(3)
+    x = rng.normal(scale=0.1, size=300)
+    f = bank.f(0.5, x)
+    grid = np.linspace(-0.2, 0.2, 9)
+    corr = SplineHead().correction(0.5, x, 0.0 * f, f, bank, grid)
+    f_grid = bank.f(0.5, grid)
+    denom = f_grid + corr
+    assert np.all(denom >= 0.25 * f_grid - 1e-12)
+    assert np.any(np.isclose(denom, 0.25 * f_grid, atol=1e-12))
 
 
 def test_feature_ridge_head_reproduces_offline_when_target_is_offline():

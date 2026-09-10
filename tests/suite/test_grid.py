@@ -19,7 +19,7 @@ def test_full_job_counts():
     assert len(cold_jobs(FULL)) == 23 * 9 * 2
     assert len(offline_jobs(FULL)) == 23 * 2 * 2
     # 6 head/stale methods x 2 sizes, stale_L, nw_resolve; 2 lags; 2 seeds
-    assert len(online_jobs(FULL)) == 23 * (6 * 2 + 1 + 1) * 2 * 2
+    assert len(online_jobs(FULL)) == 23 * (8 * 2 + 1 + 1) * 2 * 2
     assert STAGES == ("pde", "cold", "offline", "online")
 
 

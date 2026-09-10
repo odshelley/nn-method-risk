@@ -11,21 +11,52 @@ import numpy as np
 from ..calibrate.config import ExplicitConfig
 from ..estimators.nn import V_SCALE
 from ..estimators.rkhs import RKHSRidge
+from ..estimators.spline import PSpline
 from ..simulate.dynamics import HestonParams
 from ..simulate.leverage import DEFAULT_GRID, LeverageField, Slice
 from ..simulate.stepper import heston_step
 
 
-class RKHSHead:
-    """Gaussian kernel ridge on the residual v+ - f_stale (Bayer et al.'s estimator, smaller
-    lambda)."""
+def _guarded(f_grid, corr, floor_frac):
+    """Additive correction clipped so the corrected denominator stays >= floor_frac * f_grid."""
+    return np.maximum(f_grid + corr, floor_frac * f_grid) - f_grid
 
-    def __init__(self, n_centres=100, lam=1e-6, variance=0.1):
-        self.est = RKHSRidge(n_centres=n_centres, lam=lam, variance=variance)
-        self.params = {"head": "rkhs", "n_centres": n_centres, "lam": lam, "variance": variance}
+
+class RKHSHead:
+    """Gaussian kernel ridge on the residual v+ - f_stale, kernel width scaled to the cloud,
+    guarded.
+
+    variance = (width_scale * std(lnx))^2 unless a fixed `variance` is given (legacy behaviour);
+    the corrected denominator is floored at floor_frac * f_stale so the head can never push the
+    leverage to its cap.
+    """
+
+    def __init__(self, n_centres=100, lam=1e-3, width_scale=0.5, variance=None, floor_frac=0.25):
+        self.n_centres, self.lam, self.width_scale = n_centres, lam, width_scale
+        self.variance, self.floor_frac = variance, floor_frac
+        self.params = {"head": "rkhs", "n_centres": n_centres, "lam": lam,
+                       "width_scale": width_scale, "variance": variance, "floor_frac": floor_frac}
 
     def correction(self, t, lnx, v_plus, f_stale, model, grid):
-        return self.est.fit_predict(t, lnx, v_plus - f_stale, grid)
+        var = self.variance if self.variance is not None else (
+            self.width_scale * max(float(np.std(lnx)), 1e-3)) ** 2
+        est = RKHSRidge(n_centres=self.n_centres, lam=self.lam, variance=var)
+        corr = est.fit_predict(t, lnx, v_plus - f_stale, grid)
+        return _guarded(model.f(t, grid), corr, self.floor_frac)
+
+
+class SplineHead:
+    """Penalised cubic B-spline on the residual v+ - f_stale (same P-spline as the cold estimator),
+    guarded."""
+
+    def __init__(self, n_knots=25, lam=1.0, floor_frac=0.25):
+        self.n_knots, self.lam, self.floor_frac = n_knots, lam, floor_frac
+        self.params = {"head": "spline", "n_knots": n_knots, "lam": lam, "floor_frac": floor_frac}
+
+    def correction(self, t, lnx, v_plus, f_stale, model, grid):
+        est = PSpline(n_knots=self.n_knots, lam=self.lam)
+        corr = est.fit_predict(t, lnx, v_plus - f_stale, grid)
+        return _guarded(model.f(t, grid), corr, self.floor_frac)
 
 
 class FeatureRidgeHead:

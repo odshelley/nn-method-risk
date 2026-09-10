@@ -2351,7 +2351,7 @@ Expected: `offline: 92 done, 0 failed` (about 12 h).
 ```bash
 uv run nparticle suite run --stage online --jobs 4 > results/suite_online.log 2>&1
 ```
-Expected: `online: 1288 done, 0 failed` (several hours at 4 workers; each run reprices 500k paths and the head methods also sweep 100k particles; the count is 23 scenarios x 14 rows x 2 lags x 2 seeds).
+Expected: `online: 1656 done, 0 failed` (several hours at 4 workers; each run reprices 500k paths and the head methods also sweep 100k particles; the count is 23 scenarios x 18 rows x 2 lags x 2 seeds).
 
 - [ ] **Step 4: Tables and notes**
 

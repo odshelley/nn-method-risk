@@ -81,7 +81,7 @@ def test_lagged_frame_and_files(store, tmp_path):
     row = df.loc[("surface", "Explicit NN + RKHS head", "200k")]
     assert row["mae_mean"] == 20.0 and row["t025_mean"] == 35.0 and row["lat_median"] == 2.5
     assert ("surface_spot", "NW re-solve on $S_1$", "--") in df.index
-    assert len(LAGGED_ROWS) == 8
+    assert len(LAGGED_ROWS) == 10
     paths = section4_tables(store, tmp_path / "tables", FULL)
     names = sorted(p.name for p in paths)
     assert names == [

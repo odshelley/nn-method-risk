@@ -20,6 +20,8 @@ LAGGED_ROWS = (
     ("implicit_rkhs", "Implicit NN + RKHS head"),
     ("explicit_ridge", "Explicit NN + ridge head"),
     ("implicit_ridge", "Implicit NN + ridge head"),
+    ("explicit_spline", "Explicit NN + spline head"),
+    ("implicit_spline", "Implicit NN + spline head"),
 )
 LAG_TITLES = {
     "surface": "Surface lag",

@@ -149,7 +149,14 @@ so the sweep is `calibrate_explicit` with the estimator replaced by "stale plus 
 
 Heads (`correction(t, lnx, resid, grid) -> ndarray`):
 
-- `RKHSHead(n_centres=100, lam=1e-6, variance=0.1)`: `RKHSRidge.fit_predict(t, lnx, resid, grid)`. Same kernel family as the cold RKHS row; `lam=1e-6` is the better of the two published values in the knob sweep, recorded as a parameter.
+- `RKHSHead(n_centres=100, lam=1e-3, width_scale=0.5, variance=None, floor_frac=0.25)`: Gaussian
+  kernel ridge on the residual, kernel `variance = (width_scale * std(lnx))^2` unless a fixed
+  `variance` is given; `RKHSRidge.fit_predict(t, lnx, resid, grid)`. The corrected denominator
+  `f_stale + correction` is guarded to stay >= `floor_frac * f_stale` (`_guarded` helper), so the
+  head can never drive the leverage to its cap on Feller-violating scenarios.
+- `SplineHead(n_knots=25, lam=1.0, floor_frac=0.25)`: the same residual correction fitted with the
+  penalised cubic B-spline (`estimators/spline.py::PSpline`, same knobs as the cold spline row),
+  guarded with the same `_guarded` helper and floor.
 - `FeatureRidgeHead(lam=1e-3)`: a per-slice refit of the body's last layer on its frozen features (64 body features plus a constant). The head minimises `sum (softplus(A w) V_SCALE - v+)^2 + lam_eff ||w - w0||^2` by Gauss-Newton to convergence (at most 20 steps) from the offline last layer `w0` (explicit: the slice network's `head` weight and bias; implicit: the global network's), with `lam_eff = lam` times the mean diagonal of the Gauss-Newton curvature at `w0`, so `lam = 1e-3` is a fraction of the data curvature and is independent of `V_SCALE` and of the cloud size. The prediction is `softplus(A_grid w) * V_SCALE`. Fitting the raw target keeps the estimate of `E[V|X]` unbiased where the truncated target `max(v,0)` has an atom at zero. When the online target equals the body's own `f` the first step is zero and the correction vanishes. Its `correction` returns `prediction - f_stale(t, grid)` so it plugs into the same sweep.
 
 Online methods, registry `ONLINE_METHODS` in `suite/online.py`:
@@ -162,6 +169,8 @@ Online methods, registry `ONLINE_METHODS` in `suite/online.py`:
 | `implicit_rkhs` | implicit | RKHSHead |
 | `explicit_ridge` | explicit | RidgeHead on slice features |
 | `implicit_ridge` | implicit | RidgeHead on global features |
+| `explicit_spline` | explicit | SplineHead |
+| `implicit_spline` | implicit | SplineHead |
 | `stale_L` | either (explicit body) | none; the offline field repriced as-is on S1 |
 | `nw_resolve` | none | cold NW on the lagged scenario at 100k, 200 steps |
 
