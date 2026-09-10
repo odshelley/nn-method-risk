@@ -39,7 +39,7 @@ class SuiteSettings:
 
 
 FULL = SuiteSettings(
-    ExplicitConfig(n_steps=200, n_particles=100_000, fit_v_floor=True),
+    ExplicitConfig(n_steps=200, n_particles=100_000, fit_subsample=100_000, fit_v_floor=True),
     ImplicitConfig(n_steps=200, n_particles=100_000, n_iters=30, alpha=0.5),
     RepriceConfig(500_000, 200),
     n_online=100_000, offline_sizes=(200_000, 500_000), seeds=(0, 1), sids=SSVI_SIDS + HESTON_SIDS)

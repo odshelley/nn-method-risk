@@ -16,6 +16,7 @@ def store(tmp_path):
 def test_full_settings_match_the_spec():
     assert (FULL.explicit.n_steps, FULL.implicit.n_steps, FULL.reprice.n_steps) == (200, 200, 200)
     assert FULL.explicit.fit_v_floor is True and FULL.reprice.n_particles == 500_000
+    assert FULL.explicit.fit_subsample == 100_000   # every per-slice fit uses the full online cloud
     assert (FULL.implicit.n_iters, FULL.implicit.alpha) == (30, 0.5)
     assert (FULL.n_online == 100_000 and FULL.offline_sizes == (200_000, 500_000)
            and FULL.seeds == (0, 1))

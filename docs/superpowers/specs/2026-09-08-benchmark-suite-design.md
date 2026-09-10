@@ -40,7 +40,7 @@ MLflow experiments: `suite_cold`, `suite_offline`, `suite_lagged`, `suite_pde_fl
 
 Defined once in `suite/grid.py` as frozen dataclasses and used by every stage:
 
-- `SUITE_EXPLICIT = ExplicitConfig(n_steps=200, n_particles=100_000, fit_v_floor=True)`; offline bodies replace `n_particles`.
+- `SUITE_EXPLICIT = ExplicitConfig(n_steps=200, n_particles=100_000, fit_subsample=100_000, fit_v_floor=True)`; offline bodies replace `n_particles`. Every per-slice fit and every online head uses the full online cloud (decision of 10 September: the paper's 30k subsample is not used in the suite; the 30k results are kept in the store under the `*_sub30k` experiment names).
 - `SUITE_IMPLICIT = ImplicitConfig(n_steps=200, n_particles=100_000, n_iters=30, alpha=0.5)`; offline bodies replace `n_particles`. Warm start from the explicit NN field (`L0`), as `bench/algos.py::_implicit_core` already does.
 - `SUITE_REPRICE = RepriceConfig(n_particles=500_000, n_steps=200)`; reprice seed is `seed + 10_000`.
 - Scenario `T` is 2.0 for SSVI and 1.0 for Heston markets; steps are 200 in both, so dt differs (0.01 vs 0.005). This is recorded as a parameter and stated in the notes.

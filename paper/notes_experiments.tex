@@ -129,7 +129,7 @@ This is full truncation: the raw $v$ may be negative and is carried, but only $v
 
 \subsection{One-pass schemes and their estimators}\label{sec:onepass}
 
-At slice $k$, fit $f_k(x)\approx\E[V_{t_k}\mid X_{t_k}=x]$ on a subsample of $30\,000$ particles from the current cloud, set $\Lev_k=\operatorname{clip}(\sigDup(t_k,\cdot)/\sqrt{\max(f_k,10^{-4})},0,\Lmax)$, and advance the cloud. Slice $0$ uses $f_0\equiv v_0$. Estimators:
+At slice $k$, fit $f_k(x)\approx\E[V_{t_k}\mid X_{t_k}=x]$ on a subsample of $30\,000$ particles from the current cloud (the paper's setting; the benchmark suite of \cref{sec:suite} fits on the full cloud), set $\Lev_k=\operatorname{clip}(\sigDup(t_k,\cdot)/\sqrt{\max(f_k,10^{-4})},0,\Lmax)$, and advance the cloud. Slice $0$ uses $f_0\equiv v_0$. Estimators:
 \begin{itemize}
 \item \textbf{NW}: Gaussian Nadaraya--Watson with Silverman bandwidth $h=1.06\,\hat\sigma_x\,n^{-1/5}$ on the subsample.
 \item \textbf{Explicit (per-slice network)}: a $1\to64\to64\to1$ SiLU network with softplus output scaled by $0.04$, input scaled by $0.3$, trained by Adam at learning rate $10^{-2}$ on the unweighted squared loss; $400$ steps on the first fitted slice and $120$ steps on each later slice, warm-started from the previous slice's weights.
@@ -154,7 +154,7 @@ This section specifies the clean benchmark agreed on 8 September 2026 and run on
 \begin{itemize}
 \item \textbf{Scenarios.} The $20$ SSVI scenarios of \cref{tab:scen} and the three Heston-market scenarios used in the literature comparisons (\code{li\_simple}, \code{li\_complex}, \code{bayer}; a Heston market surface, a different Heston variance process as the calibrated model, one-year maturity, log-strikes on $[-0.9,0.9]$). The Heston block is reported separately because it scores a single one-year maturity (the same $13$ quoted strikes).
 \item \textbf{Time grid.} $200$ Euler steps for calibration and $200$ for repricing, $\Delta=0.01$ on $[0,2]$, so that every method sits at its step-count plateau (the step-count diagnostics of 8 September 2026, MLflow experiment \code{mechanism}) and the comparison is about the estimator alone.
-\item \textbf{Particles.} $100\,000$ particles for every cold row and for every online stage. Offline bodies at $200\,000$ and $500\,000$ particles.
+\item \textbf{Particles.} $100\,000$ particles for every cold row and for every online stage; every per-slice fit and every online head is fitted on the full cloud, not on the paper's $30\,000$ subsample. Offline bodies at $200\,000$ and $500\,000$ particles, fitted on $100\,000$-particle subsamples.
 \item \textbf{Seeds.} Two seeds ($0$, $1$) for every cold row and every online stage; one seed for each offline body. The reprice seed is $10\,000$ plus the calibration seed.
 \item \textbf{Floor.} All one-pass schemes fit $\E[V^+\mid X]$; \code{fit\_v\_floor} becomes the default in this work and the tiny golden replays are regenerated in the same commit.
 \item \textbf{Implicit configuration.} Warm start from the explicit network field, $30$ damped iterations at $\alpha=\tfrac12$ with fresh noise per iteration, persistent network and optimiser (the best practical setting found in the convergence diagnostics of 8 September 2026, experiment \code{mechanism}).
