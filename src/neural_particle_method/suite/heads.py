@@ -81,13 +81,18 @@ class FeatureRidgeHead:
         A = model.features(t, lnx)
         w0 = model.readout(t)
         w = w0.copy()
+        # `features` and `readout` expose the body and the head only, so a model carrying a
+        # post-hoc output scale (a mean-matched SliceBank) needs it applied here too; without it
+        # a converged refit would return f * (1 - scale) instead of zero. 1.0 for models with none.
+        sc = getattr(model, "scale", None)
+        sc = 1.0 if sc is None else float(sc(t))
         eye = np.eye(A.shape[1])
         lam_eff = None
         for _ in range(self.max_iter):
             z = A @ w
             s = 1.0 / (1.0 + np.exp(-z))
-            f = np.logaddexp(0.0, z) * V_SCALE
-            B = (V_SCALE * s)[:, None] * A
+            f = np.logaddexp(0.0, z) * V_SCALE * sc
+            B = (V_SCALE * sc * s)[:, None] * A
             H = B.T @ B
             if lam_eff is None:
                 lam_eff = self.lam * np.trace(H) / A.shape[1]
@@ -96,7 +101,7 @@ class FeatureRidgeHead:
             if np.abs(d).max() < self.tol:
                 break
         Ag = model.features(t, grid)
-        return np.logaddexp(0.0, Ag @ w) * V_SCALE - model.f(t, grid)
+        return np.logaddexp(0.0, Ag @ w) * V_SCALE * sc - model.f(t, grid)
 
 
 def stale_field(model_f, local_vol, s0, T, n_steps, L_max=4.0, grid=DEFAULT_GRID):

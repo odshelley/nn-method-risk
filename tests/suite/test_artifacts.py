@@ -44,6 +44,21 @@ def test_slice_bank_reproduces_the_regressor_slice_by_slice():
     assert model_kind(est) == "explicit_slices"
 
 
+def test_slice_bank_from_state_rejects_a_state_dict_missing_a_weight():
+    """`log_scale` may be absent (banks stored before it existed); nothing else may be."""
+    _sc, est, _r = _explicit()
+    bank = SliceBank.from_regressor(est)
+    st = bank.state()
+    ok = {k: v for k, v in st["state_dicts"][0].items() if k != "log_scale"}
+    SliceBank.from_state({**st, "state_dicts": [ok]})          # missing log_scale is fine
+    broken = {k: v for k, v in st["state_dicts"][0].items() if k != "head.weight"}
+    with pytest.raises(ValueError, match="head.weight"):
+        SliceBank.from_state({**st, "state_dicts": [broken]})
+    extra = {**st["state_dicts"][0], "head.nonsense": torch.zeros(1)}
+    with pytest.raises(ValueError, match="head.nonsense"):
+        SliceBank.from_state({**st, "state_dicts": [extra]})
+
+
 def test_slice_bank_time_rule_matches_leverage_field():
     sc, est, _r = _explicit()
     bank = SliceBank.from_regressor(est)

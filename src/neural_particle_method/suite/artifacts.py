@@ -59,6 +59,17 @@ class SliceBank:
         h = self._net(t).head
         return np.concatenate([h.weight.detach().numpy()[0], h.bias.detach().numpy()])
 
+    def scale(self, t):
+        """The slice's post-hoc output multiplier exp(log_scale), 1.0 for banks stored before it.
+
+        `f` goes through the net and so already carries this factor, but `features` and `readout`
+        expose only the body and the head. Any caller rebuilding the prediction from those two
+        (`FeatureRidgeHead`) must multiply by this, or a non-unit scale shows up as a spurious
+        correction.
+        """
+        ls = getattr(self._net(t), "log_scale", None)
+        return 1.0 if ls is None else float(torch.exp(ls))
+
     def state(self):
         return {"times": self.times.tolist(), "hidden": self.nets[0].body[0].out_features,
                 "depth": _body_depth(self.nets[0].body),
@@ -70,7 +81,13 @@ class SliceBank:
         depth = d.get("depth", 2)
         for sd in d["state_dicts"]:
             n = SliceNet(d["hidden"], depth)
-            n.load_state_dict(sd, strict=False)   # banks stored before `log_scale` existed
+            # non-strict only to admit banks stored before `log_scale` existed; anything else
+            # missing would silently leave a randomly initialised tensor in the net
+            res = n.load_state_dict(sd, strict=False)
+            missing = set(res.missing_keys) - {"log_scale"}
+            if missing or res.unexpected_keys:
+                raise ValueError(f"slice state dict does not match SliceNet: missing "
+                                 f"{sorted(missing)}, unexpected {sorted(res.unexpected_keys)}")
             nets.append(n)
         return cls(d["times"], nets)
 

@@ -103,6 +103,26 @@ def test_feature_ridge_head_reproduces_offline_when_target_is_offline():
     assert np.abs(corr).max() < 5e-4
 
 
+def test_feature_ridge_head_is_zero_on_a_mean_matched_body():
+    """`f` carries the mean-matching scale but `features`/`readout` do not.
+
+    A head that rebuilt the prediction from the body and the readout alone would return
+    f * (1 - scale) here, a ~20% spurious correction, instead of zero.
+    """
+    sc = make_registry()["s01"]
+    est = NNRegressor(seed=0, first_steps=5, later_steps=2, keep_slice_weights=True,
+                      mean_match=True)
+    calibrate_explicit(sc.local_vol(), sc.dynamics, est, E, s0=sc.s0, T=sc.T, seed=0)
+    bank = SliceBank.from_regressor(est)
+    assert abs(bank.scale(0.5) - 1.0) > 0.01           # mean matching really moved the scale
+    rng = np.random.default_rng(2)
+    x = rng.normal(scale=0.1, size=2000)
+    grid = np.linspace(-0.15, 0.15, 7)
+    f = bank.f(0.5, x)
+    corr = FeatureRidgeHead().correction(0.5, x, f, f, bank, grid)
+    assert np.abs(corr / bank.f(0.5, grid)).max() < 1e-6
+
+
 def test_feature_ridge_head_recovers_a_smooth_residual():
     _, bank, _ = _body()
     rng = np.random.default_rng(1)
