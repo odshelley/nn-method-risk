@@ -17,6 +17,7 @@ dependencies = [
     "quantlib>=1.43",
     "pandas>=3.0.5",
     "mlflow>=2.14",
+    "optuna>=5.0.0",
 ]
 
 [project.scripts]
