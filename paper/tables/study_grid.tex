@@ -1,0 +1,19 @@
+\begin{tabular}{l rr rr r r}
+\toprule
+ & \multicolumn{2}{c}{s02 wings} & \multicolumn{2}{c}{s11 wings} & s11 centre\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+estimator & $t=0.25$ & $t=1$ & $t=0.25$ & $t=1$ & mean & s / fit\\
+\midrule
+NW, 30k particles & 3.9 & 6.0 & 17.5 & 10.3 & 14.0 & 0\\
+NW, 100k & 2.8 & 3.5 & 14.6 & 9.5 & 15.0 & 0\\
+NW, 500k & 1.9 & 1.6 & 14.9 & 6.1 & 13.7 & 1\\
+Spline, 100k & 4.6 & 4.1 & 15.4 & 12.6 & 13.1 & 0\\
+RKHS, 100k & 4.1 & 9.6 & 29.8 & 12.7 & 34.7 & 0\\
+Net $64\times2$, 120 full-batch steps (paper) & 6.2 & 2.6 & 55.1 & 16.2 & 33.8 & 6\\
+Net $64\times2$, 1000 full-batch steps & 2.2 & 1.3 & 54.6 & 10.0 & 28.7 & 52\\
+Net $64\times2$, 20000 minibatch steps & 0.6 & 1.7 & 12.7 & 9.0 & 14.9 & 145\\
+Net $64\times3$, 120 full-batch steps & 1.9 & 1.6 & 55.3 & 22.5 & 30.0 & 9\\
+Net $64\times3$, 20000 minibatch steps & 0.7 & 1.8 & 10.4 & 9.7 & 15.2 & 230\\
+Net $256\times2$, 20000 minibatch steps & 1.0 & 1.5 & 8.0 & 10.5 & 15.3 & 520\\
+\bottomrule
+\end{tabular}

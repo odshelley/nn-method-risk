@@ -243,4 +243,50 @@ The online reference rows are NW re-solved from scratch on $S_1$ at $100\,000$ p
 
 Each run records the git hash, the full configuration as parameters, the leverage field, the implied-volatility error grid, and the trained objects. A loader (\code{nparticle suite load <run\_id>}) rebuilds the leverage field and, where present, the network or per-slice estimators from the artifacts alone, so any row of the tables can be re-scored or reused as an offline body without recomputation.
 
+\section{Follow-up studies: the estimator, the body, and the online budget}\label{sec:studies}
+
+Three studies run on 10--11 September 2026 after the suite, on the six scenarios s01, s02, s05, s09, s11 and s16 (Feller ratios $1.5$, $0.7$, $0.3$, $0.1$, $0.08$, $0.17$). Every fit in these studies, and in the suite tables of \cref{sec:suite}, uses the full online cloud; the suite's first pass, which fitted every per-slice estimator on the paper's $30\,000$-particle subsample, is kept in the store under the experiment names \code{suite\_*\_sub30k} and is quoted below only where the comparison is the point. Scripts: \code{scripts/estimator\_grid.py}, \code{scripts/conv\_study.py}, \code{scripts/budget\_sweep.py}; tables from \code{scripts/study\_tables.py}.
+
+\subsection{Estimator quality against the exact conditional expectation}\label{sec:study-grid}
+
+\emph{Setup.} For s02 (an easy surface) and s11 (Feller $0.08$), a cloud of $500\,000$ particles is simulated under the PDE reference leverage of \cref{sec:suite-setup}, and at the slices $t=0.25$ and $t=1$ each estimator is fitted on $(x, v^+)$ and compared with the reference's own conditional expectation $f_{\mathrm{ref}}$ on the resolved grid. The error is $|\hat f-f_{\mathrm{ref}}|/f_{\mathrm{ref}}$, averaged over the wings ($|x|>0.25$) or the centre. Networks are the per-slice architecture of \cref{sec:onepass} with the hidden width and depth varied, trained from a cold start on $100\,000$ particles; ``full batch'' is Adam on the whole sample at learning rate $10^{-2}$, ``minibatch'' is Adam on batches of $8192$ at $10^{-3}$. NW is fitted on $30\,000$, $100\,000$ and $500\,000$ particles of the same cloud.
+
+\begin{table}[h]\centering\footnotesize
+\caption{Relative error of the fitted denominator against the exact conditional expectation, in percent, and seconds per fit.}\label{tab:study-grid}
+\resizebox{\textwidth}{!}{\input{tables/study_grid.tex}}
+\end{table}
+
+\emph{Conclusions.} (i) The $30\,000$ subsample was costing real accuracy in the wings: NW's wing error halves from $30$k to $500$k particles. (ii) On the easy surface the lever is training, not architecture: width $256$ and depth $3$ gain nothing, while the same $64\times2$ network trained with $20\,000$ minibatch steps reaches $0.6$--$1.7\%$ in the wings, better than NW on five times the particles, in under two minutes per slice; the paper's $120$ full-batch steps leave it at $2.6$--$6\%$ from a cold start (the warm start across slices in the real pass softens this). (iii) On the Feller-violating scenario every estimator, NW on $500$k included, is $10$--$15\%$ off the reference even at the money, and more particles do not help: the Euler cloud with full truncation at $\Delta=0.01$ is not the continuous-time density, so the reference cannot judge estimators there. (iv) Every $2$-layer network collapses to $54\%$ wing error at $t=0.25$ on that scenario, at every budget, while the $3$-layer networks do not: depth buys robustness where the variance has an atom at zero, not accuracy on easy surfaces.
+
+\subsection{Training the body}\label{sec:study-body}
+
+\emph{Setup.} The offline bodies of \cref{sec:suite-lagged} at $500\,000$ particles were retrained on the six scenarios under two training budgets and refitted on the full online cloud: ``short'' is the paper's schedule ($400$ Adam steps on the first slice, $120$ on each later slice; $300$ steps per outer iteration for the implicit loop), ``long'' is $2000$ and $1000$ steps per slice ($1000$ per iteration on a $200\,000$-point pool for the implicit loop). \Cref{tab:study-bodies} scores each body as a cold calibrator on its own overnight surface; \cref{tab:study-arms} runs the lagged suite on it with every fit on the full $100\,000$-particle online cloud, alongside the first pass's $30$k-subsample rows.
+
+\begin{table}[h]\centering\footnotesize
+\caption{Offline bodies at $500\,000$ particles as cold calibrators, six scenarios, seed $0$: pooled and wings MAE (bp), the two-year slice, and training time.}\label{tab:study-bodies}
+\input{tables/study_bodies.tex}
+\end{table}
+
+\begin{table}[h]\centering\footnotesize
+\caption{Lagged suite on the $500\,000$-particle explicit body, six scenarios, two online seeds, pooled MAE (bp), by body training and fit sample. Heads are the guarded versions of \cref{sec:suite-lagged}.}\label{tab:study-arms}
+\resizebox{\textwidth}{!}{\input{tables/study_arms.tex}}
+\end{table}
+
+\emph{Conclusions.} (i) Training the explicit body ten times longer turns it from the weakest cold calibrator into the best one on these scenarios ($64\to50$ pooled against NW's $53$), at $2.5$ hours per body with full-batch training; the minibatch schedule of \cref{sec:study-grid} should reach the same quality in a fraction of that and is untested as a body. (ii) The implicit loop gets worse when trained harder ($66\to88$) and its bodies are unstable across retrains; it is not a usable offline source. (iii) On the long-trained body the heads sit on or just under the NW re-solve under both lags, the RKHS head best; the stale body alone remains useless after the spot move. (iv) The RKHS head of the first pass had no positivity guard and a fixed kernel width, and drove the denominator to its floor on the Feller-violating scenarios (s09: $858$ bp on the long-trained body); the guard and the adaptive width of \cref{sec:suite-lagged} were introduced here, and the suite's RKHS rows were recomputed with them.
+
+\subsection{The online budget}\label{sec:study-budget}
+
+\emph{Setup.} The long-trained explicit body at $500\,000$ particles with each head, against NW re-solved from scratch, at online budgets of $10\,000$, $30\,000$ and $80\,000$ particles (every fit on the whole cloud), both lags, six scenarios, two seeds; the $100\,000$ column is \cref{tab:study-arms}. Experiment \code{suite\_budget}.
+
+\begin{table}[h]\centering\footnotesize
+\caption{Pooled MAE (bp) by online particle budget, and the online time at $10\,000$ particles.}\label{tab:study-budget}
+\resizebox{\textwidth}{!}{\input{tables/study_budget.tex}}
+\end{table}
+
+\emph{Conclusions.} At $100\,000$ particles every method sits within a few basis points of the floor and the comparison cannot separate them. As the online cloud thins, NW degrades ($49\to57$ bp from $100$k to $10$k) and the body with a head does not ($47\to50$): at $10\,000$ particles the RKHS head is $7$ bp ahead under both lags, $9$ bp in the wings and $6$ bp at two years, and the body with either kernel head at $10$k matches NW at $80$k, with eight times fewer particles and a seventh of the online time. The head is doing the work, not the body: the stale body alone is flat at $61$ bp and useless after the spot move at every budget. The ridge head is the weakest at $10$k, where it refits $65$ features on the thinnest data.
+
+\subsection{What the studies say}\label{sec:study-summary}
+
+With the variance floor in place, the classical one-pass kernels are the best cold calibrators and sit a few basis points above the scheme's own floor, so at $100\,000$ particles no estimator can look better than ``a few basis points''. A per-slice network is only competitive once it is trained properly, and then it is the best cold calibrator. A frozen, properly trained body with an online head reprices today's vanillas at least as well as a fresh NW calibration at any online budget, and clearly better when the online budget is small, which is where the latency argument for the head lives. The implicit loop is not a useful offline source. The remaining distance to a $10$ bp tolerance on liquid quotes is the scheme's, not the estimator's.
+
 \end{document}
