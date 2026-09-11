@@ -199,31 +199,41 @@ PDE reference for lagged scenarios: `run_reference` gains an optional `scenario`
 
 `cold_jobs()`, `offline_jobs()`, `online_jobs()`, `pde_jobs()` return job lists; `run_stage(stage, jobs=4)` runs one stage with `ProcessPoolExecutor`, pre-creating every experiment id before the pool (the known MLflow race), skipping finished runs, logging failures as failed runs and continuing. Order: `pde` (references), `cold`, `offline`, `online`. `pde_jobs()` emits both the per-seed PDE floors and one lagged reference per (scenario, lag), so every reference the online stage scores against is solved once in the `pde` stage rather than lazily and concurrently inside the online jobs. `online` refuses to start if any offline job is unfinished.
 
-CLI: `nparticle suite run --stage {pde,cold,offline,online,all} --jobs N [--sids s01 s02] [--smoke]`. `--smoke` uses 2 scenarios, 1 seed, `n_particles=2_000`, `n_steps=10`, `n_iters=2`, reprice `20_000` paths, and separate experiment names suffixed `_smoke`, so a full pass of every stage runs in under two minutes and is the integration test.
+CLI: `nparticle suite run --stage {pde,cold,offline,online,all} --jobs N [--sids s01 s02] [--smoke]`. `--smoke` uses 2 scenarios, 1 seed, `n_particles=2_000`, `n_steps=10`, `n_iters=2`, reprice `20_000` paths, and separate experiment names suffixed `_smoke`, so a full pass of every stage runs in about three minutes and is the integration test.
 
 Budget at 4 workers on this machine, from stored timings scaled to 200 steps and particle count: pde minutes; cold about 2.5 h; offline about 12 h; online under 1 h.
 
 ## Online-budget sweep (`scripts/budget_sweep.py`)
 
-Outside the four stages: the frozen 500k body with its online heads against NW re-solved at the same budget, for online budgets of 10k, 30k and 80k particles, both lags, two seeds. `python scripts/budget_sweep.py [--jobs N] [--body explicit_tuned|explicit] [--sids s01 ...]`; the default body is `explicit_tuned` and its cells go to `suite_budget_tuned`, keyed `{sid, method, budget, lag, seed, n_steps: 200}`, with the body taken from (or trained by) the offline stage's `run_offline(store, sid, "explicit_tuned", 500_000)`. `--body explicit` is the legacy path kept for the runs already in the store: the short-trained body from `suite_offline_conv`, cells in `suite_budget`. Methods are `nw_resolve` plus `<body>_stale`, `<body>_rkhs`, `<body>_spline`, `<body>_ridge`; the head keys off the method suffix.
+Outside the four stages: the frozen 500k body with its online heads against NW re-solved at the same budget, for online budgets of 10k, 30k and 80k particles, both lags, two seeds; on all 20 SSVI scenarios that is 1200 cells. `python scripts/budget_sweep.py [--jobs N] [--body explicit_tuned|explicit] [--sids s01 ...]`; the default body is `explicit_tuned` and its cells go to `suite_budget_tuned`, keyed `{sid, method, budget, lag, seed, n_steps: 200}`, with the body taken from (or trained by) the offline stage's `run_offline(store, sid, "explicit_tuned", 500_000)`. `--body explicit` is the legacy path kept for the runs already in the store: the short-trained body from `suite_offline_conv`, cells in `suite_budget`. Methods are `nw_resolve` plus `<body>_stale`, `<body>_rkhs`, `<body>_spline`, `<body>_ridge`; the head keys off the method suffix.
 
 ## Stage 9: tables (`suite/tables.py`)
 
-`section4_tables(store, out_dir="paper/tables/")` writes:
+`section4_tables(store, out_dir="paper/tables/")` writes exactly three bare tabulars, SSVI scenarios
+only. Every cell aggregates in two stages: per scenario over seeds first, then over scenarios (mean
+or median as named; latencies always median).
 
-- `suite_cold_ssvi.tex`: rows in the order NW, Explicit NN, Implicit NN, RKHS, Spline, GHL kernel, Bins, Muguruza, PU-RBF, PDE (attainable floor); columns mean and median over the 20 SSVI scenarios and 2 seeds of pooled MAE, pooled RMSE, wings MAE; median `lev_rmse`; median `fit_s`. Integers in bp, `lev_rmse` to three decimals, seconds to one decimal. Caption states the PDE seed-to-seed noise floor.
-- `suite_cold_heston.tex`: same rows, the three Heston scenarios, no wings columns.
-- `suite_lagged_ssvi.tex` and `suite_lagged_heston.tex`: one block per lag kind; rows `stale_L`, `nw_resolve`, then the six methods each at 200k and 500k; columns mean pooled MAE, pooled RMSE, wings MAE, `mae_bp/T0.25`, median `online_s`.
-- `suite_appendix.tex`: per-scenario pooled MAE, one table per experiment, scenarios as rows and methods as columns, seeds averaged.
-- `suite_cold_ssvi_price.tex` and `suite_cold_heston_price.tex`: price-space companions to the cold
-  tables, same row order; columns pooled mean, pooled median, near-money, wings, `T=2` (dropped for
-  Heston, which has a single one-year maturity), worst quote, from `price_bp/pooled`,
-  `price_bp/wings`, `price_bp/near`, `price_bp/max`, `price_bp/T2`; one decimal, `--` when absent.
-- `suite_lagged_ssvi_price.tex` and `suite_lagged_heston_price.tex`: price-space companions to the
-  lagged tables, same rows and per-lag blocks; columns pooled, near-money, wings, worst quote; one
-  decimal, `--` when absent.
+- `suite_cold.tex`, from `cold_frame`: rows in the order NW, Explicit NN short training, Explicit NN
+  tuned, Implicit NN, RKHS, Spline, GHL kernel, Bins, Muguruza, PU-RBF, PDE (attainable floor);
+  columns pooled MAE mean, pooled MAE median, `liquid_mae_bp`, `wings_mae_bp`, `price_bp/pooled`,
+  latency. Vol and price columns from the 20 SSVI scenarios and 2 seeds; the PDE row's latency is
+  the Fokker-Planck solve time of `pde_reference`. Integers in bp, price and seconds to one decimal.
+  Caption states the PDE seed-to-seed noise floor.
+- `suite_bodies.tex`, from `bodies_frame` over `suite_offline`: one row per (body, offline size) for
+  bodies `explicit`, `explicit_tuned` and `implicit` at 200k and 500k particles, then a
+  `PDE (attainable floor)` row with size `--` taken from the cold frame; columns pooled MAE,
+  `liquid_mae_bp`, `wings_mae_bp`, `price_bp/pooled`, and training seconds (median `total_s`; the
+  solve time on the PDE row).
+- `suite_heads.tex`, from `heads_frame`: rows `nw_resolve`, `explicit_tuned_stale`,
+  `explicit_tuned_spline`, `explicit_tuned_rkhs`, `explicit_tuned_ridge`; pooled MAE at online
+  budgets 10k, 30k, 80k and 100k under each of the two lags, plus the liquid MAE at 100k per lag and
+  the median `online_s` at 10k and at 100k. The 100k column comes from `suite_lagged`
+  (`offline_n` 500000, or 0 for `nw_resolve`), the other budgets from `suite_budget_tuned`.
 
-The notes' section 4 replaces its inline TBD tabulars with `\input{tables/...}` once the tables exist; that edit is part of the table task. A method with no finished run in a cell prints `--`.
+The Heston block, the per-scenario appendix and the price-space companion tables are not generated:
+the Heston runs stay in the store but are out of this draft, and the price error is one column of
+each table instead of a table of its own. The notes' section 4 inputs the three files; a method with
+no finished run in a cell prints `--`.
 
 `nparticle suite tables [--out paper/tables]`.
 

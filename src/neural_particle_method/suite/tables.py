@@ -1,10 +1,14 @@
-"""Section-4 tables of paper/notes_experiments.tex from the suite experiments. Bare tabulars."""
+"""Section-4 tables of paper/notes_experiments.tex from the suite experiments. Bare tabulars.
+
+Three tables: the cold suite, the offline bodies, and the frozen tuned body with an online head
+across online particle budgets. SSVI scenarios only.
+"""
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from .config import FULL, HESTON_SIDS, SSVI_SIDS
+from .config import FULL, SSVI_SIDS
 
 COLD_ROWS = (
     ("nw", "NW"), ("explicit_nn", "Explicit NN, short training"),
@@ -12,31 +16,27 @@ COLD_ROWS = (
     ("spline", "Spline"), ("nw_ghl", "GHL kernel"), ("bins", "Bins"), ("muguruza", "Muguruza"),
     ("purbf", "PU-RBF"), ("pde", "PDE (attainable floor)"),
 )
-LAGGED_ROWS = (
-    ("stale_L", "Stale leverage, no action"),
-    ("nw_resolve", "NW re-solve on $S_1$"),
-    ("explicit_stale", "Explicit NN, stale $f$, fresh Dupire"),
-    ("implicit_stale", "Implicit NN, stale $f$, fresh Dupire"),
-    ("explicit_rkhs", "Explicit NN + RKHS head"),
-    ("implicit_rkhs", "Implicit NN + RKHS head"),
-    ("explicit_ridge", "Explicit NN + ridge head"),
-    ("implicit_ridge", "Implicit NN + ridge head"),
-    ("explicit_spline", "Explicit NN + spline head"),
-    ("implicit_spline", "Implicit NN + spline head"),
+BODY_ROWS = (
+    ("explicit", "Explicit NN, short training"),
+    ("explicit_tuned", "Explicit NN, tuned"),
+    ("implicit", "Implicit NN"),
 )
-LAG_TITLES = {
-    "surface": "Surface lag",
-    "surface_spot": "Surface plus $2\\%$ sticky-strike spot lag",
-}
-APPENDIX_LAG_TITLES = {
-    "surface": "surface lag",
-    "surface_spot": "surface plus $2\\%$ spot lag",
-}
-FAMILY_TITLES = {"ssvi": "SSVI", "heston": "Heston"}
+HEAD_ROWS = (
+    ("nw_resolve", "NW re-solve on $S_1$"),
+    ("explicit_tuned_stale", "Tuned body, stale $f$, fresh Dupire"),
+    ("explicit_tuned_spline", "Tuned body + spline head"),
+    ("explicit_tuned_rkhs", "Tuned body + RKHS head"),
+    ("explicit_tuned_ridge", "Tuned body + ridge head"),
+)
+LAGS = ("surface", "surface_spot")
+LAG_GROUPS = {"surface": "surface lag", "surface_spot": "surface plus $2\\%$ spot lag"}
+FLOOR_LABEL = "PDE (attainable floor)"
+BUDGET_EXPERIMENT = "suite_budget_tuned"
+BODY_OFFLINE_N = "500000"
 
 
-def _sids(family):
-    return set(SSVI_SIDS if family == "ssvi" else HESTON_SIDS)
+def _sids():
+    return set(SSVI_SIDS)
 
 
 def _finished(store, experiment):
@@ -53,20 +53,16 @@ def _num(df, col):
 def _agg(g):
     """Per-scenario means over seeds, then mean/median over scenarios."""
     per_sid = g.groupby("params.sid").agg(
-        mae=("mae", "mean"), rmse=("rmse", "mean"), wings=("wings", "mean"),
-        t025=("t025", "mean"), lev=("lev", "median"), lat=("lat", "median"),
-        p_pooled=("p_pooled", "mean"), p_wings=("p_wings", "mean"),
-        p_near=("p_near", "mean"), p_max=("p_max", "mean"), p_t2=("p_t2", "mean"),
+        mae=("mae", "mean"), wings=("wings", "mean"), liquid=("liquid", "mean"),
+        lev=("lev", "median"), lat=("lat", "median"), total=("total", "median"),
+        p_pooled=("p_pooled", "mean"),
     )
     return pd.Series({
         "mae_mean": per_sid.mae.mean(), "mae_median": per_sid.mae.median(),
-        "rmse_mean": per_sid.rmse.mean(), "rmse_median": per_sid.rmse.median(),
         "wings_mean": per_sid.wings.mean(), "wings_median": per_sid.wings.median(),
-        "t025_mean": per_sid.t025.mean(), "lev_median": per_sid.lev.median(),
-        "lat_median": per_sid.lat.median(),
+        "liquid_mean": per_sid.liquid.mean(), "lev_median": per_sid.lev.median(),
+        "lat_median": per_sid.lat.median(), "total_median": per_sid.total.median(),
         "p_pooled_mean": per_sid.p_pooled.mean(), "p_pooled_median": per_sid.p_pooled.median(),
-        "p_wings_mean": per_sid.p_wings.mean(), "p_near_mean": per_sid.p_near.mean(),
-        "p_max_mean": per_sid.p_max.mean(), "p_t2_mean": per_sid.p_t2.mean(),
     })
 
 
@@ -74,37 +70,31 @@ def _prep(df):
     out = pd.DataFrame(index=df.index)
     out["params.sid"] = df["params.sid"]
     out["mae"] = _num(df, "metrics.pooled_mae_bp")
-    out["rmse"] = _num(df, "metrics.pooled_rmse_bp")
     out["wings"] = _num(df, "metrics.wings_mae_bp")
-    out["t025"] = _num(df, "metrics.mae_bp/T0.25")
+    out["liquid"] = _num(df, "metrics.liquid_mae_bp")
     out["lev"] = _num(df, "metrics.lev_rmse")
     if "metrics.online_s" in df.columns:
         out["lat"] = _num(df, "metrics.online_s")
     else:
         out["lat"] = _num(df, "metrics.fit_s")
+    out["total"] = _num(df, "metrics.total_s")
     out["p_pooled"] = _num(df, "metrics.price_bp/pooled")
-    out["p_wings"] = _num(df, "metrics.price_bp/wings")
-    out["p_near"] = _num(df, "metrics.price_bp/near")
-    out["p_max"] = _num(df, "metrics.price_bp/max")
-    out["p_t2"] = _num(df, "metrics.price_bp/T2")
     return out
 
 
 EMPTY = pd.Series({k: np.nan for k in (
-    "mae_mean", "mae_median", "rmse_mean", "rmse_median", "wings_mean",
-    "wings_median", "t025_mean", "lev_median", "lat_median",
-    "p_pooled_mean", "p_pooled_median", "p_wings_mean", "p_near_mean",
-    "p_max_mean", "p_t2_mean",
+    "mae_mean", "mae_median", "wings_mean", "wings_median", "liquid_mean", "lev_median",
+    "lat_median", "total_median", "p_pooled_mean", "p_pooled_median",
 )})
 
 
-def _pde_solve_seconds(store, settings, family):
-    """Median, over the family's scenarios, of the Fokker-Planck solve time (`runtime_s` on the
+def _pde_solve_seconds(store, settings):
+    """Median, over the SSVI scenarios, of the Fokker-Planck solve time (`runtime_s` on the
     `pde_reference` run at the suite's step count, unlagged)."""
     df = _finished(store, "pde_reference")
     if len(df) == 0:
         return np.nan
-    sel = df[df["params.sid"].isin(_sids(family))
+    sel = df[df["params.sid"].isin(_sids())
              & (df["params.n_steps"] == str(settings.explicit.n_steps))
              & (df["params.lag"] == "none")]
     if len(sel) == 0:
@@ -113,7 +103,7 @@ def _pde_solve_seconds(store, settings, family):
     return per_sid.median()
 
 
-def cold_frame(store, settings=FULL, family="ssvi"):
+def cold_frame(store, settings=FULL):
     cold = _finished(store, settings.experiment("suite_cold"))
     pde = _finished(store, settings.experiment("suite_pde_floor"))
     rows = {}
@@ -122,42 +112,87 @@ def cold_frame(store, settings=FULL, family="ssvi"):
         if len(src) == 0:
             rows[label] = EMPTY.copy()
             continue
-        sel = src[src["params.sid"].isin(_sids(family))]
+        sel = src[src["params.sid"].isin(_sids())]
         if algo != "pde":
             sel = sel[sel["params.algo"] == algo]
         row = _agg(_prep(sel)) if len(sel) else EMPTY.copy()
         if algo == "pde":
             row = row.copy()
-            row["lat_median"] = _pde_solve_seconds(store, settings, family)
+            row["lat_median"] = _pde_solve_seconds(store, settings)
         rows[label] = row
     return pd.DataFrame(rows).T
 
 
-def lagged_frame(store, settings=FULL, family="ssvi"):
-    lagged = _finished(store, settings.experiment("suite_lagged"))
+def bodies_frame(store, settings=FULL):
+    """One row per (offline body, particle count), plus the PDE floor of the same scoring."""
+    off = _finished(store, settings.experiment("suite_offline"))
     rows = {}
-    for lag in ("surface", "surface_spot"):
-        for method, label in LAGGED_ROWS:
-            if method in ("stale_L", "nw_resolve"):
-                sizes = ("--",)
-            else:
-                sizes = tuple(f"{n // 1000}k" for n in settings.offline_sizes)
-            for size in sizes:
-                key = (lag, label, size)
-                if len(lagged) == 0:
-                    rows[key] = EMPTY.copy()
-                    continue
-                sel = lagged[
-                    (lagged["params.sid"].isin(_sids(family)))
-                    & (lagged["params.method"] == method)
-                    & (lagged["params.lag"] == lag)
-                ]
-                if size != "--":
-                    sel = sel[pd.to_numeric(sel["params.offline_n"]) == int(size[:-1]) * 1000]
-                rows[key] = _agg(_prep(sel)) if len(sel) else EMPTY.copy()
-    df = pd.DataFrame(rows).T
-    df.index = pd.MultiIndex.from_tuples(df.index, names=["lag", "method", "size"])
+    for body, label in BODY_ROWS:
+        for n in settings.offline_sizes:
+            key = (label, f"{n // 1000}k")
+            if len(off) == 0:
+                rows[key] = EMPTY.copy()
+                continue
+            sel = off[off["params.sid"].isin(_sids())
+                      & (off["params.body"] == body)
+                      & (_num(off, "params.n_particles") == n)]
+            rows[key] = _agg(_prep(sel)) if len(sel) else EMPTY.copy()
+    floor = EMPTY.copy()
+    pde = cold_frame(store, settings).loc[FLOOR_LABEL]
+    for k in ("mae_mean", "mae_median", "wings_mean", "liquid_mean", "p_pooled_mean"):
+        floor[k] = pde[k]
+    floor["total_median"] = pde["lat_median"]
+    rows[(FLOOR_LABEL, "--")] = floor
+    df = pd.DataFrame(rows).T.rename(columns={"total_median": "train_s"})
+    df.index = pd.MultiIndex.from_tuples(df.index, names=["body", "size"])
     return df
+
+
+def _label(budget):
+    return f"{budget // 1000}k"
+
+
+def _head_cells(store, settings, method, budget, lag=None):
+    """The finished runs for one head method at one online budget, optionally one lag.
+
+    The suite's own online budget lives in `suite_lagged` (keyed by offline body size); the
+    smaller budgets are the sweep of `scripts/budget_sweep.py` in `suite_budget_tuned`.
+    """
+    if budget == settings.n_online:
+        df = _finished(store, settings.experiment("suite_lagged"))
+        if len(df) == 0:
+            return df
+        offline_n = "0" if method == "nw_resolve" else BODY_OFFLINE_N
+        sel = df[(df["params.method"] == method) & (df["params.offline_n"] == offline_n)]
+    else:
+        df = _finished(store, BUDGET_EXPERIMENT)
+        if len(df) == 0:
+            return df
+        sel = df[(df["params.method"] == method)
+                 & (_num(df, "params.budget") == budget)]
+    sel = sel[sel["params.sid"].isin(_sids())]
+    return sel if lag is None else sel[sel["params.lag"] == lag]
+
+
+def heads_frame(store, settings=FULL, budgets=(10_000, 30_000, 80_000, 100_000)):
+    """Pooled MAE per (head method, lag, online budget), with the liquid error and the online
+    seconds at the extreme budgets."""
+    rows = {}
+    for method, label in HEAD_ROWS:
+        row = {}
+        for lag in LAGS:
+            for b in budgets:
+                sel = _head_cells(store, settings, method, b, lag)
+                agg = _agg(_prep(sel)) if len(sel) else EMPTY
+                row[f"mae_{lag}_{_label(b)}"] = agg["mae_mean"]
+                if b == budgets[-1]:
+                    row[f"liquid_{lag}_{_label(b)}"] = agg["liquid_mean"]
+        for b in (budgets[0], budgets[-1]):
+            sel = _head_cells(store, settings, method, b)
+            row[f"s_{_label(b)}"] = (_num(sel, "metrics.online_s").median() if len(sel)
+                                     else np.nan)
+        rows[label] = pd.Series(row)
+    return pd.DataFrame(rows).T
 
 
 def _cell(x, fmt="{:.0f}"):
@@ -166,169 +201,67 @@ def _cell(x, fmt="{:.0f}"):
 
 def _cold_tex(df):
     lines = [
-        "\\begin{tabular}{l rr rr rr r r}", "\\toprule",
-        (" & \\multicolumn{2}{c}{pooled MAE (bp)} & \\multicolumn{2}{c}{pooled RMSE (bp)} & "
-         "\\multicolumn{2}{c}{wings MAE (bp)} & lev.\\ RMSE & latency (s)\\\\"),
-        "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}",
-        "method & mean & median & mean & median & mean & median & median & median\\\\", "\\midrule",
+        "\\begin{tabular}{l rrrrr r}", "\\toprule",
+        "method & \\multicolumn{4}{c}{implied vol, bp} & price, bp & s\\\\",
+        "\\cmidrule(lr){2-5}",
+        "& mean & median & liquid & wings & pooled & median\\\\", "\\midrule",
     ]
     for label, r in df.iterrows():
         cells = [
-            _cell(r.mae_mean), _cell(r.mae_median), _cell(r.rmse_mean), _cell(r.rmse_median),
-            _cell(r.wings_mean), _cell(r.wings_median), _cell(r.lev_median, "{:.3f}"),
-            _cell(r.lat_median, "{:.1f}"),
+            _cell(r.mae_mean), _cell(r.mae_median), _cell(r.liquid_mean), _cell(r.wings_mean),
+            _cell(r.p_pooled_mean, "{:.1f}"), _cell(r.lat_median, "{:.1f}"),
         ]
         lines.append(f"{label} & " + " & ".join(cells) + "\\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
 
-def _lagged_tex(df, family="ssvi"):
-    """The lagged block for one family; the Heston scenarios have no $T=0.25$ quotes."""
-    t025 = family != "heston"
-    n_cols = 7 if t025 else 6
-    header = "method & offline $N$ & pooled MAE & pooled RMSE & wings MAE & "
-    header += "$T=0.25$ MAE & " if t025 else ""
+def _bodies_tex(df):
     lines = [
-        "\\begin{tabular}{l l rr " + ("rr r" if t025 else "r r") + "}", "\\toprule",
-        header + "online latency (s)\\\\",
-        "\\midrule",
+        "\\begin{tabular}{l l rrr r r}", "\\toprule",
+        "body & particles & pooled & liquid & wings & price, bp & s\\\\", "\\midrule",
     ]
-    for lag in ("surface", "surface_spot"):
-        lines.append(f"\\multicolumn{{{n_cols}}}{{l}}{{\\emph{{{LAG_TITLES[lag]}}}}}\\\\")
-        for (lg, label, size), r in df.iterrows():
-            if lg != lag:
-                continue
-            cells = [_cell(r.mae_mean), _cell(r.rmse_mean), _cell(r.wings_mean)]
-            if t025:
-                cells.append(_cell(r.t025_mean))
-            cells.append(_cell(r.lat_median, "{:.1f}"))
-            lines.append(f"{label} & {size} & " + " & ".join(cells) + "\\\\")
-        if lag == "surface":
-            lines.append("\\midrule")
+    for (label, size), r in df.iterrows():
+        cells = [
+            _cell(r.mae_mean), _cell(r.liquid_mean), _cell(r.wings_mean),
+            _cell(r.p_pooled_mean, "{:.1f}"), _cell(r.train_s, "{:.1f}"),
+        ]
+        lines.append(f"{label} & {size} & " + " & ".join(cells) + "\\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
 
-def _cold_price_tex(df, family="ssvi"):
-    """Price-space companion to `_cold_tex`: absolute option-price error in bp of spot."""
-    t2 = family != "heston"
-    cols = ["pooled mean", "pooled median", "near-money", "wings"]
-    if t2:
-        cols.append("$T=2$")
-    cols.append("worst quote")
+def _heads_tex(df, budgets=(10_000, 30_000, 80_000, 100_000)):
+    groups = " & ".join(f"\\multicolumn{{5}}{{c}}{{{LAG_GROUPS[lag]}}}" for lag in LAGS)
+    sub = []
+    for _ in LAGS:
+        sub += [_label(b) for b in budgets] + ["liquid"]
+    sub += [_label(budgets[0]), _label(budgets[-1])]
     lines = [
-        "\\begin{tabular}{l " + "r" * len(cols) + "}", "\\toprule",
-        "method & " + " & ".join(cols) + "\\\\", "\\midrule",
+        "\\begin{tabular}{l rrrrr rrrrr rr}", "\\toprule",
+        f"method & {groups} & \\multicolumn{{2}}{{c}}{{online s}}\\\\",
+        "\\cmidrule(lr){2-6}\\cmidrule(lr){7-11}\\cmidrule(lr){12-13}",
+        "& " + " & ".join(sub) + "\\\\", "\\midrule",
     ]
     for label, r in df.iterrows():
-        cells = [
-            _cell(r.p_pooled_mean, "{:.1f}"), _cell(r.p_pooled_median, "{:.1f}"),
-            _cell(r.p_near_mean, "{:.1f}"), _cell(r.p_wings_mean, "{:.1f}"),
-        ]
-        if t2:
-            cells.append(_cell(r.p_t2_mean, "{:.1f}"))
-        cells.append(_cell(r.p_max_mean, "{:.1f}"))
+        cells = []
+        for lag in LAGS:
+            cells += [_cell(r[f"mae_{lag}_{_label(b)}"]) for b in budgets]
+            cells.append(_cell(r[f"liquid_{lag}_{_label(budgets[-1])}"]))
+        cells += [_cell(r[f"s_{_label(b)}"], "{:.1f}") for b in (budgets[0], budgets[-1])]
         lines.append(f"{label} & " + " & ".join(cells) + "\\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
-
-
-def _lagged_price_tex(df, family="ssvi"):
-    """Price-space companion to `_lagged_tex`: absolute option-price error in bp of spot."""
-    del family  # same four columns for both families; kept for signature symmetry
-    lines = [
-        "\\begin{tabular}{l l rrrr}", "\\toprule",
-        "method & offline $N$ & pooled & near-money & wings & worst quote\\\\",
-        "\\midrule",
-    ]
-    for lag in ("surface", "surface_spot"):
-        lines.append(f"\\multicolumn{{6}}{{l}}{{\\emph{{{LAG_TITLES[lag]}}}}}\\\\")
-        for (lg, label, size), r in df.iterrows():
-            if lg != lag:
-                continue
-            cells = [
-                _cell(r.p_pooled_mean, "{:.1f}"), _cell(r.p_near_mean, "{:.1f}"),
-                _cell(r.p_wings_mean, "{:.1f}"), _cell(r.p_max_mean, "{:.1f}"),
-            ]
-            lines.append(f"{label} & {size} & " + " & ".join(cells) + "\\\\")
-        if lag == "surface":
-            lines.append("\\midrule")
-    lines += ["\\bottomrule", "\\end{tabular}"]
-    return "\n".join(lines) + "\n"
-
-
-def _tex(x):
-    return str(x).replace("_", "\\_")
-
-
-def _appendix_block(title, col_labels, rows):
-    """One titled, width-fitted block: scenarios as rows, `col_labels` as columns."""
-    lines = [
-        "\\begin{tabular}{l " + "r" * len(col_labels) + "}", "\\toprule",
-        "sid & " + " & ".join(col_labels) + "\\\\", "\\midrule",
-    ]
-    for sid, values in rows:
-        lines.append(_tex(sid) + " & " + " & ".join(_cell(v) for v in values) + "\\\\")
-    lines += ["\\bottomrule", "\\end{tabular}"]
-    # \mbox{} ends the run-in heading, so the full-width box starts its own paragraph
-    return (f"\\paragraph{{{title}}}\\mbox{{}}\n\n\\resizebox{{\\textwidth}}{{!}}{{%\n"
-            + "\n".join(lines) + "}\n")
-
-
-def _appendix_tex(store, settings):
-    """Per-scenario pooled MAE (seeds averaged), one block per experiment, family and lag."""
-    blocks = []
-    cold = _finished(store, settings.experiment("suite_cold"))
-    for family, fam in FAMILY_TITLES.items():
-        sel = cold[cold["params.sid"].isin(_sids(family))] if len(cold) else cold
-        if not len(sel):
-            continue
-        p = _prep(sel)
-        p["algo"] = sel["params.algo"]
-        piv = p.groupby(["params.sid", "algo"]).mae.mean().unstack("algo")
-        cols = [a for a, _ in COLD_ROWS if a in piv.columns]
-        piv = piv.reindex(columns=cols)
-        blocks.append(_appendix_block(
-            f"Cold suite, {fam} scenarios, pooled MAE (bp)",
-            [dict(COLD_ROWS)[a] for a in cols],
-            [(sid, r.values) for sid, r in piv.iterrows()]))
-    lagged = _finished(store, settings.experiment("suite_lagged"))
-    for family, fam in FAMILY_TITLES.items():
-        for lag, lag_title in APPENDIX_LAG_TITLES.items():
-            if not len(lagged):
-                continue
-            sel = lagged[lagged["params.sid"].isin(_sids(family))
-                         & (lagged["params.lag"] == lag)]
-            if not len(sel):
-                continue
-            p = _prep(sel)
-            p["col"] = sel["params.method"] + "/" + sel["params.offline_n"].astype(str)
-            piv = p.groupby(["params.sid", "col"]).mae.mean().unstack("col")
-            blocks.append(_appendix_block(
-                f"Lagged suite, {lag_title}, {fam} scenarios, pooled MAE (bp)",
-                [_tex(c) for c in piv.columns],
-                [(sid, r.values) for sid, r in piv.iterrows()]))
-    return "\n".join(blocks) + "\n" if blocks else "% no finished suite runs\n"
 
 
 def section4_tables(store, out_dir="paper/tables", settings=FULL):
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    cold_ssvi = cold_frame(store, settings, "ssvi")
-    cold_heston = cold_frame(store, settings, "heston")
-    lagged_ssvi = lagged_frame(store, settings, "ssvi")
-    lagged_heston = lagged_frame(store, settings, "heston")
+    budgets = (10_000, 30_000, 80_000, settings.n_online)
     files = {
-        "suite_cold_ssvi.tex": _cold_tex(cold_ssvi),
-        "suite_cold_heston.tex": _cold_tex(cold_heston),
-        "suite_lagged_ssvi.tex": _lagged_tex(lagged_ssvi, "ssvi"),
-        "suite_lagged_heston.tex": _lagged_tex(lagged_heston, "heston"),
-        "suite_appendix.tex": _appendix_tex(store, settings),
-        "suite_cold_ssvi_price.tex": _cold_price_tex(cold_ssvi, "ssvi"),
-        "suite_cold_heston_price.tex": _cold_price_tex(cold_heston, "heston"),
-        "suite_lagged_ssvi_price.tex": _lagged_price_tex(lagged_ssvi, "ssvi"),
-        "suite_lagged_heston_price.tex": _lagged_price_tex(lagged_heston, "heston"),
+        "suite_cold.tex": _cold_tex(cold_frame(store, settings)),
+        "suite_bodies.tex": _bodies_tex(bodies_frame(store, settings)),
+        "suite_heads.tex": _heads_tex(heads_frame(store, settings, budgets), budgets),
     }
     paths = []
     for name, text in files.items():

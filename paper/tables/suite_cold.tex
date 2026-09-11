@@ -1,0 +1,19 @@
+\begin{tabular}{l rrrrr r}
+\toprule
+method & \multicolumn{4}{c}{implied vol, bp} & price, bp & s\\
+\cmidrule(lr){2-5}
+& mean & median & liquid & wings & pooled & median\\
+\midrule
+NW & 46 & 33 & -- & 70 & 2.7 & 8.0\\
+Explicit NN, short training & 57 & 36 & -- & 86 & 2.6 & 1042.7\\
+Explicit NN, tuned & 62 & 48 & -- & 93 & -- & 567.4\\
+Implicit NN & 58 & 37 & -- & 88 & 3.3 & 1298.6\\
+RKHS & 81 & 70 & -- & 113 & 8.5 & 12.4\\
+Spline & 47 & 34 & -- & 73 & 2.5 & 2.7\\
+GHL kernel & 45 & 32 & -- & 70 & 2.5 & 8.5\\
+Bins & 66 & 61 & -- & 105 & 2.7 & 1.5\\
+Muguruza & 154 & 139 & -- & 147 & 29.1 & 10.6\\
+PU-RBF & 57 & 40 & -- & 90 & 2.8 & 2.5\\
+PDE (attainable floor) & 42 & 27 & -- & 62 & 2.2 & 207.3\\
+\bottomrule
+\end{tabular}

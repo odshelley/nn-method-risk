@@ -1,7 +1,9 @@
-"""Section-5 tables for paper/notes_experiments.tex: the estimator grid, the body-training
-comparison and the small-budget sweep. Reads results/estimator_grid.csv and the study
-experiments in the store, writes paper/tables/study_grid.tex, study_bodies.tex,
-study_arms.tex, study_budget.tex (bare tabulars).
+"""Study tables: the estimator grid, the body-training comparison and the small-budget sweep.
+Reads results/estimator_grid.csv and the study experiments in the store, writes
+paper/tables/study_grid.tex, study_bodies.tex, study_arms.tex, study_budget.tex (bare tabulars).
+
+Section 5 of paper/notes_experiments.tex quotes these numbers in prose and no longer inputs the
+files; run this script when the studies are rerun and the prose has to be checked against them.
 """
 from pathlib import Path
 

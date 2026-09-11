@@ -1,0 +1,13 @@
+\begin{tabular}{l rrrrr rrrrr rr}
+\toprule
+method & \multicolumn{5}{c}{surface lag} & \multicolumn{5}{c}{surface plus $2\%$ spot lag} & \multicolumn{2}{c}{online s}\\
+\cmidrule(lr){2-6}\cmidrule(lr){7-11}\cmidrule(lr){12-13}
+& 10k & 30k & 80k & 100k & liquid & 10k & 30k & 80k & 100k & liquid & 10k & 100k\\
+\midrule
+NW re-solve on $S_1$ & -- & -- & -- & 44 & -- & -- & -- & -- & 44 & -- & -- & 8.5\\
+Tuned body, stale $f$, fresh Dupire & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & --\\
+Tuned body + spline head & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & --\\
+Tuned body + RKHS head & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & --\\
+Tuned body + ridge head & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & --\\
+\bottomrule
+\end{tabular}

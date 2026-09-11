@@ -1,153 +1,176 @@
+import numpy as np
 import pytest
 
 from neural_particle_method.suite.config import FULL
 from neural_particle_method.suite.tables import (
+    BODY_ROWS,
     COLD_ROWS,
-    LAGGED_ROWS,
+    HEAD_ROWS,
+    bodies_frame,
     cold_frame,
-    lagged_frame,
+    heads_frame,
     section4_tables,
 )
 from neural_particle_method.tracking.store import Store
+
+COLD = {  # (sid, seed): pooled, liquid, wings, price
+    ("s01", 0): (10.0, 4.0, 20.0, 2.0),
+    ("s01", 1): (11.0, 6.0, 22.0, 2.2),
+    ("s02", 0): (30.0, 13.0, 61.0, 3.1),
+}
+PDE_FLOOR = (3.0, 1.5, 5.0, 1.0)
+PDE_SOLVE_S = 150.0
+BODIES = {  # (body, n_particles): pooled, liquid, wings, price, total_s
+    ("explicit_tuned", 200_000): (55.0, 20.0, 80.0, 5.0, 3000.0),
+    ("explicit_tuned", 500_000): (50.0, 18.0, 72.0, 4.5, 9000.0),
+    ("explicit", 500_000): (64.0, 25.0, 93.0, 6.0, 346.0),
+}
+LAGGED = {  # (method, seed): pooled, liquid, online_s
+    ("explicit_tuned_spline", 0): (48.0, 15.0, 0.9),
+    ("explicit_tuned_spline", 1): (50.0, 17.0, 1.1),
+    ("nw_resolve", 0): (49.0, 16.0, 1.0),
+    ("nw_resolve", 1): (49.0, 16.0, 1.0),
+}
+BUDGET = {"explicit_tuned_spline": (51.0, 0.4), "nw_resolve": (57.0, 0.5)}
 
 
 @pytest.fixture
 def store(tmp_path):
     s = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
-    common = {"n_particles": 100_000}
-    for sid, mae, rmse, p_pooled in (("s01", 10.0, 12.0, 2.0), ("s02", 30.0, 40.0, 3.0)):
-        for seed in (0, 1):
-            params = {"sid": sid, "algo": "nw", "seed": seed, **common}
-            with s.run("suite_cold", params) as h:
-                h.log_metrics({
-                    "pooled_mae_bp": mae + seed, "pooled_rmse_bp": rmse, "wings_mae_bp": mae * 2,
-                    "lev_rmse": 0.05, "fit_s": 1.0, "mae_bp/T0.25": mae,
-                    "price_bp/pooled": p_pooled + seed * 0.2, "price_bp/wings": p_pooled * 2,
-                    "price_bp/near": p_pooled * 0.5, "price_bp/max": p_pooled * 3,
-                    "price_bp/T2": p_pooled * 1.5,
-                })
-    # an unbalanced design: s02 has a third seed, so a pooled mean would differ from the
-    # two-stage (per-scenario then across-scenario) mean the tables report.
-    with s.run("suite_cold", {"sid": "s02", "algo": "nw", "seed": 2, **common}) as h:
-        h.log_metrics({
-            "pooled_mae_bp": 60.0, "pooled_rmse_bp": 40.0, "wings_mae_bp": 60.0,
-            "lev_rmse": 0.05, "fit_s": 1.0, "mae_bp/T0.25": 30.0,
-            "price_bp/pooled": 6.0, "price_bp/wings": 6.0, "price_bp/near": 1.5,
-            "price_bp/max": 9.0, "price_bp/T2": 4.5,
-        })
+    for (sid, seed), (mae, liquid, wings, price) in COLD.items():
+        params = {"sid": sid, "algo": "nw", "seed": seed, "n_particles": 100_000}
+        with s.run("suite_cold", params) as h:
+            h.log_metrics({"pooled_mae_bp": mae, "liquid_mae_bp": liquid, "wings_mae_bp": wings,
+                           "price_bp/pooled": price, "fit_s": 1.0})
+    mae, liquid, wings, price = PDE_FLOOR
     with s.run("suite_pde_floor", {"sid": "s01", "seed": 0, "n_steps": 200}) as h:
-        h.log_metrics({
-            "pooled_mae_bp": 3.0, "pooled_rmse_bp": 4.0, "wings_mae_bp": 5.0, "fit_s": 0.0,
-            "lev_rmse": 0.0, "price_bp/pooled": 1.0, "price_bp/wings": 1.5, "price_bp/near": 0.5,
-            "price_bp/max": 2.0, "price_bp/T2": 0.8,
-        })
+        h.log_metrics({"pooled_mae_bp": mae, "liquid_mae_bp": liquid, "wings_mae_bp": wings,
+                       "price_bp/pooled": price, "fit_s": 0.0})
     with s.run("pde_reference", {"sid": "s01", "n_steps": 200, "lag": "none"}) as h:
-        h.log_metrics({"runtime_s": 150.0, "mass": 1.0, "forward": 1.0})
-    lagged_params = {
-        "sid": "s01", "method": "explicit_rkhs", "offline_n": 200_000, "lag": "surface",
-        "seed": 0, "n_steps": 200,
-    }
-    with s.run("suite_lagged", lagged_params) as h:
-        h.log_metrics({
-            "pooled_mae_bp": 20.0, "pooled_rmse_bp": 25.0, "wings_mae_bp": 30.0,
-            "mae_bp/T0.25": 35.0, "online_s": 2.5,
-        })
-    heston_cold_params = {"sid": "li_simple", "algo": "nw", "seed": 0, **common}
-    with s.run("suite_cold", heston_cold_params) as h:
-        h.log_metrics({
-            "pooled_mae_bp": 15.0, "pooled_rmse_bp": 18.0, "wings_mae_bp": 22.0,
-            "lev_rmse": 0.05, "fit_s": 1.0, "mae_bp/T0.25": 15.0,
-        })
-    heston_lagged_params = {
-        "sid": "li_simple", "method": "explicit_rkhs", "offline_n": 200_000, "lag": "surface",
-        "seed": 0, "n_steps": 200,
-    }
-    with s.run("suite_lagged", heston_lagged_params) as h:
-        h.log_metrics({
-            "pooled_mae_bp": 22.0, "pooled_rmse_bp": 27.0, "wings_mae_bp": 33.0,
-            "mae_bp/T0.25": 37.0, "online_s": 2.7,
-        })
+        h.log_metrics({"runtime_s": PDE_SOLVE_S, "mass": 1.0, "forward": 1.0})
+    for (body, n), (mae, liquid, wings, price, total_s) in BODIES.items():
+        params = {"sid": "s01", "body": body, "n_particles": n, "seed": 0, "n_steps": 200}
+        with s.run("suite_offline", params) as h:
+            h.log_metrics({"pooled_mae_bp": mae, "liquid_mae_bp": liquid, "wings_mae_bp": wings,
+                           "price_bp/pooled": price, "total_s": total_s, "fit_s": total_s})
+    for (method, seed), (mae, liquid, online_s) in LAGGED.items():
+        offline_n = 0 if method == "nw_resolve" else 500_000
+        params = {"sid": "s01", "method": method, "offline_n": offline_n, "lag": "surface",
+                  "seed": seed, "n_steps": 200}
+        with s.run("suite_lagged", params) as h:
+            h.log_metrics({"pooled_mae_bp": mae, "liquid_mae_bp": liquid, "online_s": online_s})
+    for method, (mae, online_s) in BUDGET.items():
+        params = {"sid": "s01", "method": method, "budget": 10_000, "lag": "surface", "seed": 0,
+                  "n_steps": 200}
+        with s.run("suite_budget_tuned", params) as h:
+            h.log_metrics({"pooled_mae_bp": mae, "online_s": online_s})
     return s
 
 
+def _two_stage(index):
+    """Per-scenario mean over seeds, then mean over scenarios, of one COLD column."""
+    s01 = (COLD[("s01", 0)][index] + COLD[("s01", 1)][index]) / 2
+    return (s01 + COLD[("s02", 0)][index]) / 2
+
+
+def _cells(text, label):
+    """The cells of the row with this label, `\\\\` stripped."""
+    line = next(ln for ln in text.splitlines() if ln.startswith(label + " &"))
+    return [c.strip() for c in line.removesuffix("\\\\").split("&")]
+
+
 def test_cold_frame_aggregates_mean_and_median_over_scenarios_and_seeds(store):
-    df = cold_frame(store, FULL, family="ssvi")
+    df = cold_frame(store, FULL)
     nw = df.loc["NW"]
-    # per-sid first: s01 = 10.5, s02 = (30 + 31 + 60) / 3; a pooled mean would be 28.4
-    two_stage = (10.5 + (30 + 31 + 60) / 3) / 2
-    assert nw["mae_mean"] == pytest.approx(two_stage)
-    assert nw["mae_median"] == pytest.approx(two_stage)
-    assert nw["mae_mean"] != pytest.approx((10 + 11 + 30 + 31 + 60) / 5)
-    assert nw["lat_median"] == 1.0 and nw["lev_median"] == 0.05
-    assert df.loc["PDE (attainable floor)"]["mae_mean"] == 3.0
-    assert df.loc["PDE (attainable floor)"]["lat_median"] == pytest.approx(150.0)
+    assert nw["mae_mean"] == pytest.approx(_two_stage(0))
+    assert nw["mae_mean"] != pytest.approx(sum(v[0] for v in COLD.values()) / len(COLD))
+    assert nw["mae_median"] == pytest.approx(_two_stage(0))
+    assert nw["liquid_mean"] == pytest.approx(_two_stage(1))
+    assert nw["wings_mean"] == pytest.approx(_two_stage(2))
+    assert nw["p_pooled_mean"] == pytest.approx(_two_stage(3))
+    assert nw["lat_median"] == 1.0
+    pde = df.loc["PDE (attainable floor)"]
+    assert pde["mae_mean"] == PDE_FLOOR[0] and pde["liquid_mean"] == PDE_FLOOR[1]
+    assert pde["lat_median"] == pytest.approx(PDE_SOLVE_S)
     assert df.loc["Explicit NN, short training"].isna().all()
     assert list(df.index) == [r[1] for r in COLD_ROWS]
 
 
-def test_cold_frame_price_two_stage_aggregate(store):
-    df = cold_frame(store, FULL, family="ssvi")
-    nw = df.loc["NW"]
-    # per-sid first: s01 = (2.0 + 2.2) / 2 = 2.1, s02 = (3.0 + 3.2 + 6.0) / 3
-    two_stage_p = (2.1 + (3.0 + 3.2 + 6.0) / 3) / 2
-    assert nw["p_pooled_mean"] == pytest.approx(two_stage_p)
-    assert df.loc["PDE (attainable floor)"]["p_pooled_mean"] == pytest.approx(1.0)
+def test_bodies_frame_rows_per_body_and_size_with_the_pde_floor(store):
+    df = bodies_frame(store, FULL)
+    assert ("Explicit NN, tuned", "200k") in df.index
+    assert ("Explicit NN, tuned", "500k") in df.index
+    assert ("Explicit NN, short training", "500k") in df.index
+    tuned = df.loc[("Explicit NN, tuned", "500k")]
+    mae, liquid, wings, price, total_s = BODIES[("explicit_tuned", 500_000)]
+    assert tuned["mae_mean"] == mae and tuned["liquid_mean"] == liquid
+    assert tuned["wings_mean"] == wings and tuned["p_pooled_mean"] == price
+    assert tuned["train_s"] == pytest.approx(total_s)
+    short = df.loc[("Explicit NN, short training", "500k")]
+    assert short["mae_mean"] == BODIES[("explicit", 500_000)][0]
+    for size in ("200k", "500k"):
+        assert df.loc[("Implicit NN", size)].isna().all()
+    floor = df.loc[("PDE (attainable floor)", "--")]
+    assert floor["mae_mean"] == PDE_FLOOR[0]
+    assert floor["train_s"] == pytest.approx(PDE_SOLVE_S)
+    assert len(BODY_ROWS) == 3
 
 
-def test_section4_tables_price_table_contents(store, tmp_path):
-    section4_tables(store, tmp_path / "tables", FULL)
-    two_stage_p = (2.1 + (3.0 + 3.2 + 6.0) / 3) / 2
-    cold_price = (tmp_path / "tables" / "suite_cold_ssvi_price.tex").read_text()
-    assert f"NW & {two_stage_p:.1f} &" in cold_price
-    assert "PDE (attainable floor) & 1.0 &" in cold_price
-    lagged_price = (tmp_path / "tables" / "suite_lagged_ssvi_price.tex").read_text()
-    assert "Explicit NN + RKHS head & 200k & -- & -- & -- & --" in lagged_price
+def test_heads_frame_joins_the_budget_sweep_to_the_lagged_suite(store):
+    df = heads_frame(store, FULL)
+    spline = df.loc["Tuned body + spline head"]
+    seed_mean = (LAGGED[("explicit_tuned_spline", 0)][0]
+                 + LAGGED[("explicit_tuned_spline", 1)][0]) / 2
+    assert spline["mae_surface_100k"] == pytest.approx(seed_mean)
+    assert spline["mae_surface_10k"] == pytest.approx(BUDGET["explicit_tuned_spline"][0])
+    assert np.isnan(spline["mae_surface_spot_10k"])
+    assert np.isnan(spline["mae_surface_30k"]) and np.isnan(spline["mae_surface_80k"])
+    liquid_mean = (LAGGED[("explicit_tuned_spline", 0)][1]
+                   + LAGGED[("explicit_tuned_spline", 1)][1]) / 2
+    assert spline["liquid_surface_100k"] == pytest.approx(liquid_mean)
+    assert spline["s_10k"] == pytest.approx(BUDGET["explicit_tuned_spline"][1])
+    assert spline["s_100k"] == pytest.approx(1.0)
+    nw = df.loc["NW re-solve on $S_1$"]
+    assert nw["mae_surface_10k"] == pytest.approx(BUDGET["nw_resolve"][0])
+    assert list(df.index) == [r[1] for r in HEAD_ROWS]
 
 
-def test_lagged_frame_and_files(store, tmp_path):
-    df = lagged_frame(store, FULL, family="ssvi")
-    row = df.loc[("surface", "Explicit NN + RKHS head", "200k")]
-    assert row["mae_mean"] == 20.0 and row["t025_mean"] == 35.0 and row["lat_median"] == 2.5
-    assert ("surface_spot", "NW re-solve on $S_1$", "--") in df.index
-    assert len(LAGGED_ROWS) == 10
+def test_section4_tables_writes_three_files(store, tmp_path):
     paths = section4_tables(store, tmp_path / "tables", FULL)
-    names = sorted(p.name for p in paths)
-    assert names == [
-        "suite_appendix.tex", "suite_cold_heston.tex", "suite_cold_heston_price.tex",
-        "suite_cold_ssvi.tex", "suite_cold_ssvi_price.tex", "suite_lagged_heston.tex",
-        "suite_lagged_heston_price.tex", "suite_lagged_ssvi.tex", "suite_lagged_ssvi_price.tex",
-    ]
-    cold = (tmp_path / "tables" / "suite_cold_ssvi.tex").read_text()
-    assert "\\begin{tabular}" in cold and "NW & 25 & 25 &" in cold
-    assert "Explicit NN, short training & -- & --" in cold
-    assert "PDE (attainable floor) & 3 & 3 &" in cold
-    assert "PDE (attainable floor) & 3 & 3 & 4 & 4 & 5 & 5 & 0.000 & 150.0\\\\" in cold
+    assert sorted(p.name for p in paths) == [
+        "suite_bodies.tex", "suite_cold.tex", "suite_heads.tex"]
 
 
-def test_heston_lagged_table_drops_the_t025_column(store, tmp_path):
+def test_cold_tex_columns_and_formats(store, tmp_path):
     section4_tables(store, tmp_path / "tables", FULL)
-    ssvi = (tmp_path / "tables" / "suite_lagged_ssvi.tex").read_text()
-    heston = (tmp_path / "tables" / "suite_lagged_heston.tex").read_text()
-    assert "$T=0.25$ MAE" in ssvi and "\\multicolumn{7}" in ssvi
-    assert "$T=0.25$ MAE" not in heston and "\\multicolumn{6}" in heston
-    assert "Explicit NN + RKHS head & 200k & 22 & 27 & 33 & 2.7" in heston
+    cold = (tmp_path / "tables" / "suite_cold.tex").read_text()
+    expected = (f"NW & {_two_stage(0):.0f} & {_two_stage(0):.0f} & {_two_stage(1):.0f} & "
+                f"{_two_stage(2):.0f} & {_two_stage(3):.1f} & 1.0")
+    assert f"{expected}\\\\" in cold
+    assert "& mean & median & liquid & wings & pooled & median\\\\" in cold
+    assert "\\begin{tabular}{l rrrrr r}" in cold
+    assert "Explicit NN, short training & -- & -- & -- & -- & -- & --\\\\" in cold
+    assert f"PDE (attainable floor) & 3 & 3 & 2 & 5 & 1.0 & {PDE_SOLVE_S:.1f}\\\\" in cold
 
 
-def test_appendix_has_one_resized_block_per_experiment_family_and_lag(store, tmp_path):
+def test_bodies_tex_has_a_size_column_and_the_floor_row(store, tmp_path):
     section4_tables(store, tmp_path / "tables", FULL)
-    appendix = (tmp_path / "tables" / "suite_appendix.tex").read_text()
-    for title in ("Cold suite, SSVI scenarios, pooled MAE (bp)",
-                  "Cold suite, Heston scenarios, pooled MAE (bp)",
-                  "Lagged suite, surface lag, SSVI scenarios, pooled MAE (bp)",
-                  "Lagged suite, surface lag, Heston scenarios, pooled MAE (bp)"):
-        assert f"\\paragraph{{{title}}}" in appendix
-    assert appendix.count("\\resizebox{\\textwidth}{!}{%") == 4
-    # method/size only: the lag is the block, not a column
-    assert "sid & explicit\\_rkhs/200000" in appendix
+    bodies = (tmp_path / "tables" / "suite_bodies.tex").read_text()
+    assert "body & particles & pooled & liquid & wings & price, bp & s\\\\" in bodies
+    assert "Explicit NN, tuned & 500k & 50 & 18 & 72 & 4.5 & 9000.0\\\\" in bodies
+    assert "Explicit NN, short training & 200k & -- & -- & -- & -- & --\\\\" in bodies
+    assert f"PDE (attainable floor) & -- & 3 & 2 & 5 & 1.0 & {PDE_SOLVE_S:.1f}\\\\" in bodies
 
 
-def test_appendix_escapes_underscore_scenario_ids(store, tmp_path):
+def test_heads_tex_renders_missing_cells_as_dashes(store, tmp_path):
     section4_tables(store, tmp_path / "tables", FULL)
-    appendix = (tmp_path / "tables" / "suite_appendix.tex").read_text()
-    assert "li\\_simple &" in appendix
-    assert "li_simple &" not in appendix
+    heads = (tmp_path / "tables" / "suite_heads.tex").read_text()
+    assert "\\begin{tabular}{l rrrrr rrrrr rr}" in heads
+    assert ("& 10k & 30k & 80k & 100k & liquid & 10k & 30k & 80k & 100k & liquid & "
+            "10k & 100k\\\\") in heads
+    assert "\\multicolumn{2}{c}{online s}" in heads
+    for _, label in HEAD_ROWS:
+        # cells 6..10 are the surface-plus-spot block: no such run in the fixture
+        assert _cells(heads, label)[6:11] == ["--"] * 5
+    assert ("Tuned body + spline head & 51 & -- & -- & 49 & 16 & -- & -- & -- & -- & -- & "
+            "0.4 & 1.0\\\\") in heads
