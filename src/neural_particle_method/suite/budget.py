@@ -7,6 +7,9 @@ stage and trained here if that stage has not produced it yet; its cells go to `s
 `explicit` is the legacy path: the short-trained body from `suite_offline_conv`, cells in
 `suite_budget`. `explicit_opt` is the recipe-driven body from the Optuna search; it shares the
 tuned experiment and is separated from it by the `recipe_hash` in the run key.
+
+`nw_resolve` is the exception: it re-solves from scratch and reads no body, so every body shares
+one cell for it, logged under `explicit_tuned` with no recipe.
 """
 import time
 from dataclasses import replace
@@ -60,7 +63,14 @@ def body_run(store, sid, body, settings=FULL, recipe=None):
 
 def run_budget_cell(store, sid, method, budget, lag, seed, body=DEFAULT_BODY, settings=FULL,
                     recipe=None):
-    exp = EXPERIMENTS[body]
+    # `nw_resolve` re-solves from scratch and never touches the body, so it is one cell per
+    # (sid, budget, lag, seed) shared by every body: it stays in the tuned experiment with no
+    # `recipe_hash`, which is the row the tuned sweep already logged. Without this an
+    # `explicit_opt` re-solve would land beside the tuned one under the same method, and the
+    # containment filter in `find_finished` would let a tuned query match it.
+    if method == "nw_resolve":
+        body, recipe = DEFAULT_BODY, None
+    exp = settings.experiment(EXPERIMENTS[body])
     key = {"sid": sid, "method": method, "budget": int(budget), "lag": lag.kind, "seed": int(seed),
            "n_steps": int(settings.explicit.n_steps)}
     if body == "explicit_opt":
@@ -73,8 +83,11 @@ def run_budget_cell(store, sid, method, budget, lag, seed, body=DEFAULT_BODY, se
     lsc = lagged_scenario(sc, lag)
     lv = lsc.local_vol()
     ecfg = replace(settings.explicit, n_particles=int(budget), fit_subsample=int(budget))
-    body_rid = body_run(store, sid, body, settings, recipe)
-    loaded = load_run(store, body_rid)
+    # a body-free cell logs the same param names as the others, with an empty `body_run`
+    body_rid, loaded = "", None
+    if method != "nw_resolve":
+        body_rid = body_run(store, sid, body, settings, recipe)
+        loaded = load_run(store, body_rid)
     head = head_for(method)
     params = {**key, "git_hash": git_hash(), "body_run": body_rid, "body": body, **lsc.as_params(),
               **{f"explicit.{k}": v for k, v in ecfg.as_params().items()}}

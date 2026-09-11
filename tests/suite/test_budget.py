@@ -46,3 +46,19 @@ def test_opt_cell_runs_on_tiny_and_is_keyed_by_recipe(store):
                             body="explicit_opt", settings=TINY, recipe={**FAST, "tail": "flat"})
     assert other != rid
     assert store.get_metrics(rid)["liquid_mae_bp"] >= 0
+    assert len(store.search(TINY.experiment("suite_budget_tuned"))) == 2
+
+
+def test_nw_resolve_is_one_body_free_cell_shared_by_every_body(store):
+    rid = run_budget_cell(store, "s01", "nw_resolve", TINY.n_online, LAGS[0], 0,
+                          body="explicit_opt", settings=TINY, recipe=FAST)
+    p = store.get_params(rid)
+    assert "recipe_hash" not in p and not any(k.startswith("recipe.") for k in p)
+    assert p["body"] == "explicit_tuned" and p["body_run"] == ""
+    # no body of any kind was trained for it
+    assert store.search(TINY.experiment("suite_offline")).empty
+    assert run_budget_cell(store, "s01", "nw_resolve", TINY.n_online, LAGS[0], 0,
+                           body="explicit_tuned", settings=TINY) == rid
+    assert run_budget_cell(store, "s01", "nw_resolve", TINY.n_online, LAGS[0], 0,
+                           body="explicit", settings=TINY) == rid
+    assert len(store.search(TINY.experiment("suite_budget_tuned"))) == 1
