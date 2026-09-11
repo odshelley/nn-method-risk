@@ -69,7 +69,7 @@ A trial is a dict `recipe` with these keys (Optuna distributions in brackets):
 | `fit_subsample` | categorical {100000, 250000, 400000} |
 | `warm_start` | categorical {True, False}; False calls `reset()` and re-initialises the net before every slice |
 | `mean_match` | categorical {False, True}: after fitting a slice, multiply the fitted grid values by `mean(w·v_plus) / mean(w·f(lnx))` over the fit sample, so the fitted slice reproduces the cloud's own mean variance exactly. The sample mean is used rather than the analytic CIR mean because the Euler cloud's mean differs from the continuous one by the truncation bias, and the pass must be consistent with the cloud it simulates |
-| `monotone` / `monotone_penalty` | `monotone` categorical {False, True}; when True, `monotone_penalty` log-uniform [1e-4, 1]: adds `λ · mean(relu(sign(ρ) · df/dz))²` on the batch, penalising slope of the wrong sign. With ρ < 0 the target decreases in log-spot |
+| `monotone` / `monotone_penalty` | `monotone` categorical {False, True}; when True, `monotone_penalty` log-uniform [1e-5, 1e-1] (the penalty is normalised by the squared variance scale, so 1 already outweighs the data by two orders of magnitude): adds `λ · mean(relu(sign(ρ) · df/dz))²` on the batch, penalising slope of the wrong sign. With ρ < 0 the target decreases in log-spot |
 | `tail` | categorical {"free", "flat", "linear"}: beyond the grid's outermost quantiles the slice is continued by the network ("free", today's behaviour), by the boundary value ("flat"), or linearly with the slope of the last two grid points ("linear"). Applied in `calibrate_explicit`'s interpolation (`np.interp` already gives "flat"; "linear" and "free" are new) |
 | `hetero` | categorical {False, True}: heteroscedastic loss, weights `1 / (var_local + 1e-8)` where `var_local` is the NW local variance estimate of v_plus given lnx on the fit sample (bandwidth as NW), normalised to mean one, multiplied into `weights` |
 
@@ -113,7 +113,7 @@ per trial (tag `mlflow.parentRunId`), params = the recipe plus `trial_number`, m
 `results/optuna/<study>.db`; `nparticle optuna run --study <name> --trials N --jobs J`
 loads or creates it (`optuna.create_study(storage=..., load_if_exists=True,
 direction="minimize", sampler=TPESampler(seed=0), pruner=MedianPruner(n_startup_trials=10))`)
-and runs N more trials with J worker processes (`study.optimize(n_jobs=1)` per process, J
+and runs N more trials with J worker processes (each worker samples with `TPESampler(seed=worker_index)`, so a study is reproducible for a given J but not across different J) (`study.optimize(n_jobs=1)` per process, J
 processes sharing the SQLite storage, the standard Optuna multi-process pattern). The parent
 run is found by `study` name and reused, so a crash or a second invocation continues the
 same study. The best recipes are read back from MLflow (`search("optuna_offline")`, state
@@ -182,3 +182,23 @@ recipe side by side.
 
 Searching the implicit loop; searching the head; changing the suite's 100k cold budget;
 Heston-market scenarios.
+
+## Implementation notes
+
+- **`BODIES` vs `STAGE_BODIES`** (`suite/offline.py`). `BODIES` is what `run_offline` accepts
+  and now includes `explicit_opt`; `STAGE_BODIES` is the narrower list that
+  `suite run --stage offline` trains and deliberately excludes it. The searched body is
+  recipe-driven, so it is trained on demand: by `validate` (with the trial's recipe passed
+  explicitly) and, once a recipe is promoted, by `run_online` and `run_budget_cell` through
+  `body_run`. `run_stage`'s online precheck therefore only requires the three staged bodies to
+  be finished, and does not block on a body that has no recipe yet.
+- **The recipe file gates the extra rows.** `cold_algos()` returns `COLD_ALGOS + ("explicit_nn_opt",)`
+  only when `recipes/explicit_opt.json` exists, and `online_jobs` skips every method whose body
+  is `explicit_opt` under the same condition. So the suite's job counts are unchanged before a
+  promotion and grow by one cold row and two online methods after it, with no separate flag to
+  keep in sync. The searched body, like the tuned one, is quoted at the largest offline size only.
+- **`monotone_sign = -sign(rho)`.** The leverage slice is fitted against log-spot; with the usual
+  negative correlation the variance rises as spot falls, so the monotone penalty must push the
+  fit downwards in `lnx`. Taking the sign from `scenario.dynamics.rho` keeps the same recipe
+  correct on a positively correlated scenario, and the search, the offline body, the budget
+  cells and the cold row all derive it the same way.

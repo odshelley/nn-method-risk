@@ -2,11 +2,18 @@
 import time
 from dataclasses import dataclass, replace
 
+import numpy as np
+
 from ..calibrate.config import ExplicitConfig, ImplicitConfig
 from ..calibrate.explicit import calibrate_explicit
 from ..calibrate.implicit import calibrate_implicit
 from ..calibrate.importance import design_mixture
 from ..estimators import make_estimator
+from ..estimators.recipes import (
+    explicit_config_from_recipe,
+    load_recipe,
+    regressor_from_recipe,
+)
 from ..estimators.ridge import GlobalRidge
 from ..simulate.leverage import LeverageField
 
@@ -127,8 +134,17 @@ def _nn_tuned(sc, n, seed, e, i, knobs=None):
                      knobs={**TUNED_KNOBS, **(knobs or {})})
 
 
+def _nn_opt(sc, n, seed, e, i, knobs=None):
+    """Per-slice network with the promoted Optuna recipe (estimators/recipes/explicit_opt.json)."""
+    recipe = load_recipe("explicit_opt")
+    est = regressor_from_recipe(recipe, seed=seed,
+                                monotone_sign=-float(np.sign(sc.dynamics.rho) or 1.0),
+                                **(knobs or {}))
+    return _explicit(sc, n, seed, explicit_config_from_recipe(e, recipe), "nn", estimator=est)
+
+
 # Suite-only algorithms, kept out of ALGOS so the paper/baseline grids and goldens are unchanged.
-SUITE_ALGOS = {"explicit_nn_tuned": _nn_tuned}
+SUITE_ALGOS = {"explicit_nn_tuned": _nn_tuned, "explicit_nn_opt": _nn_opt}
 
 
 def run_algo(name, scenario, n_particles, seed, explicit=ExplicitConfig(), implicit=ImplicitConfig(), knobs=None):

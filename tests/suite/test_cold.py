@@ -2,7 +2,7 @@ import pytest
 
 from neural_particle_method.suite.artifacts import load_run
 from neural_particle_method.suite.cold import COLD_ALGOS, run_cold
-from neural_particle_method.suite.config import FULL, SMOKE, SuiteSettings
+from neural_particle_method.suite.config import FULL, SMOKE, SuiteSettings, cold_algos
 from neural_particle_method.tracking.store import Store
 
 TINY = SuiteSettings.tiny()
@@ -25,6 +25,8 @@ def test_full_settings_match_the_spec():
            and SMOKE.experiment("suite_cold") == "suite_cold_smoke")
     assert COLD_ALGOS == ("nw", "explicit_nn", "explicit_nn_tuned", "implicit_nn", "rkhs",
                           "spline", "nw_ghl", "bins", "muguruza", "purbf")
+    # the searched network joins the cold rows only once a recipe has been promoted
+    assert cold_algos() == COLD_ALGOS
 
 
 @pytest.mark.parametrize("algo", ["nw", "explicit_nn", "implicit_nn"])

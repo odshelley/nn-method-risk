@@ -97,6 +97,7 @@ def test_cold_frame_aggregates_mean_and_median_over_scenarios_and_seeds(store):
     assert pde["lat_median"] == pytest.approx(PDE_SOLVE_S)
     assert df.loc["Explicit NN, short training"].isna().all()
     assert list(df.index) == [r[1] for r in COLD_ROWS]
+    assert ("explicit_nn_opt", "Explicit NN, searched") in COLD_ROWS
 
 
 def test_bodies_frame_rows_per_body_and_size_with_the_pde_floor(store):
@@ -116,7 +117,8 @@ def test_bodies_frame_rows_per_body_and_size_with_the_pde_floor(store):
     floor = df.loc[("PDE (attainable floor)", "--")]
     assert floor["mae_mean"] == PDE_FLOOR[0]
     assert floor["train_s"] == pytest.approx(PDE_SOLVE_S)
-    assert len(BODY_ROWS) == 3
+    assert len(BODY_ROWS) == 4
+    assert ("explicit_opt", "Explicit NN, searched") in BODY_ROWS
 
 
 def test_heads_frame_joins_the_budget_sweep_to_the_lagged_suite(store):
@@ -136,6 +138,7 @@ def test_heads_frame_joins_the_budget_sweep_to_the_lagged_suite(store):
     nw = df.loc["NW re-solve on $S_1$"]
     assert nw["mae_surface_10k"] == pytest.approx(BUDGET["nw_resolve"][0])
     assert list(df.index) == [r[1] for r in HEAD_ROWS]
+    assert ("explicit_opt_spline", "Searched body + spline head") in HEAD_ROWS
 
 
 def test_section4_tables_writes_three_files(store, tmp_path):
@@ -176,6 +179,7 @@ def test_cold_tex_columns_and_formats(store, tmp_path):
     assert "& mean & median & liquid & wings & pooled & median\\\\" in cold
     assert "\\begin{tabular}{l rrrrr r}" in cold
     assert "Explicit NN, short training & -- & -- & -- & -- & -- & --\\\\" in cold
+    assert "Explicit NN, searched & -- & -- & -- & -- & -- & --\\\\" in cold
     assert f"PDE (attainable floor) & 3 & 3 & 2 & 5 & 1.0 & {PDE_SOLVE_S:.1f}\\\\" in cold
 
 

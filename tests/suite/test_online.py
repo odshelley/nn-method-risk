@@ -1,11 +1,16 @@
 import pytest
 
+from neural_particle_method.estimators import recipes as R
 from neural_particle_method.suite.config import SuiteSettings
 from neural_particle_method.suite.lag import LAGS
 from neural_particle_method.suite.online import ONLINE_METHODS, run_online
 from neural_particle_method.tracking.store import Store
 
 TINY = SuiteSettings.tiny()
+FAST = {"hidden": 16, "depth": 2, "lr": 1e-2, "batch_size": 0, "first_steps": 5,
+        "later_steps": 2, "weight_decay": 0.0, "fit_subsample": 400, "warm_start": True,
+        "mean_match": False, "monotone": False, "monotone_penalty": 0.0, "tail": "flat",
+        "hetero": False}
 
 
 @pytest.fixture
@@ -19,11 +24,15 @@ def test_method_table_is_the_agreed_one():
                                     "explicit_spline", "implicit_spline",
                                     "explicit_tuned_stale", "explicit_tuned_rkhs",
                                     "explicit_tuned_ridge", "explicit_tuned_spline",
+                                    "explicit_opt_stale", "explicit_opt_spline",
                                     "stale_L", "nw_resolve"]
 
 
 @pytest.mark.parametrize("method", list(ONLINE_METHODS))
-def test_every_method_runs_on_the_spot_lag(store, method):
+def test_every_method_runs_on_the_spot_lag(store, method, tmp_path, monkeypatch):
+    if method.startswith("explicit_opt"):
+        monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)
+        R.save_recipe("explicit_opt", FAST)
     n = TINY.offline_sizes[0]
     rid = run_online(store, "s01", method, n, LAGS[1], 0, TINY)
     p, m = store.get_params(rid), store.get_metrics(rid)

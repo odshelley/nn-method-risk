@@ -12,19 +12,23 @@ from .config import FULL, SSVI_SIDS
 
 COLD_ROWS = (
     ("nw", "NW"), ("explicit_nn", "Explicit NN, short training"),
-    ("explicit_nn_tuned", "Explicit NN, tuned"), ("implicit_nn", "Implicit NN"), ("rkhs", "RKHS"),
+    ("explicit_nn_tuned", "Explicit NN, tuned"),
+    ("explicit_nn_opt", "Explicit NN, searched"),
+    ("implicit_nn", "Implicit NN"), ("rkhs", "RKHS"),
     ("spline", "Spline"), ("nw_ghl", "GHL kernel"), ("bins", "Bins"), ("muguruza", "Muguruza"),
     ("purbf", "PU-RBF"), ("pde", "PDE (attainable floor)"),
 )
 BODY_ROWS = (
     ("explicit", "Explicit NN, short training"),
     ("explicit_tuned", "Explicit NN, tuned"),
+    ("explicit_opt", "Explicit NN, searched"),
     ("implicit", "Implicit NN"),
 )
 HEAD_ROWS = (
     ("nw_resolve", "NW re-solve on $S_1$"),
     ("explicit_tuned_stale", "Tuned body, stale $f$, fresh Dupire"),
     ("explicit_tuned_spline", "Tuned body + spline head"),
+    ("explicit_opt_spline", "Searched body + spline head"),
     ("explicit_tuned_rkhs", "Tuned body + RKHS head"),
     ("explicit_tuned_ridge", "Tuned body + ridge head"),
 )

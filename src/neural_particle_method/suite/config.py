@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from ..bench.scenarios import heston_registry, make_registry, make_tuning_registry
 from ..calibrate.config import ExplicitConfig, ImplicitConfig
+from ..estimators.recipes import recipe_exists
 from ..pricing.reprice import RepriceConfig
 
 SSVI_SIDS = tuple(make_registry())
@@ -10,6 +11,11 @@ HESTON_SIDS = tuple(heston_registry())
 TUNING_SIDS = tuple(make_tuning_registry())
 COLD_ALGOS = ("nw", "explicit_nn", "explicit_nn_tuned", "implicit_nn", "rkhs", "spline", "nw_ghl",
              "bins", "muguruza", "purbf")
+
+
+def cold_algos():
+    """The cold rows to run: the agreed ten, plus the searched network once a recipe is promoted."""
+    return COLD_ALGOS + ("explicit_nn_opt",) if recipe_exists("explicit_opt") else COLD_ALGOS
 
 
 @dataclass(frozen=True)

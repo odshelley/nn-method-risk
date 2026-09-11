@@ -1067,7 +1067,7 @@ def suggest_recipe(trial):
         "warm_start": trial.suggest_categorical("warm_start", [True, False]),
         "mean_match": trial.suggest_categorical("mean_match", [False, True]),
         "monotone": monotone,
-        "monotone_penalty": (trial.suggest_float("monotone_penalty", 1e-4, 1.0, log=True)
+        "monotone_penalty": (trial.suggest_float("monotone_penalty", 1e-5, 1e-1, log=True)
                              if monotone else 0.0),
         "tail": trial.suggest_categorical("tail", ["free", "flat", "linear"]),
         "hetero": trial.suggest_categorical("hetero", [False, True]),

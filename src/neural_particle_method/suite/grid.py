@@ -4,9 +4,10 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 
 from ..bench.runner import run_key
+from ..estimators.recipes import recipe_exists
 from ..tracking.store import Store
-from .cold import COLD_ALGOS, run_cold
-from .config import FULL
+from .cold import run_cold
+from .config import FULL, cold_algos
 from .lag import LAGS
 from .offline import STAGE_BODIES, run_offline
 from .online import ONLINE_METHODS, ensure_lagged_reference, run_online
@@ -36,7 +37,7 @@ def pde_jobs(settings=FULL, sids=None):
 
 
 def cold_jobs(settings=FULL, sids=None):
-    return [("cold", sid, algo, seed) for sid in _sids(settings, sids) for algo in COLD_ALGOS
+    return [("cold", sid, algo, seed) for sid in _sids(settings, sids) for algo in cold_algos()
             for seed in settings.seeds]
 
 
@@ -51,10 +52,12 @@ def online_jobs(settings=FULL, sids=None):
         for lag in LAGS:
             for seed in settings.seeds:
                 for method, (body, _) in ONLINE_METHODS.items():
+                    if body == "explicit_opt" and not recipe_exists("explicit_opt"):
+                        continue      # no recipe promoted yet: the searched body has no rows
                     if body is None:
                         sizes = (0,)
-                    elif body == "explicit_tuned":
-                        # the head table quotes the tuned body at the largest size only
+                    elif body in ("explicit_tuned", "explicit_opt"):
+                        # the head table quotes the trained bodies at the largest size only
                         sizes = (max(settings.offline_sizes),)
                     elif method == "stale_L":
                         sizes = (settings.offline_sizes[0],)

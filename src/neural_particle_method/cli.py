@@ -1,6 +1,7 @@
 """nparticle: benchmark, experiments, aggregation, figures, and legacy import over the MLflow store."""
 import argparse
 import json
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -67,7 +68,27 @@ def _parser():
     q.add_argument("--smoke", action="store_true")
     q = ss.add_parser("load"); q.add_argument("run_id"); q.add_argument("--out", default=None)
     q = ss.add_parser("tables"); q.add_argument("--out", default="paper/tables")
+    p = sub.add_parser("optuna")
+    os_ = p.add_subparsers(dest="optuna_cmd", required=True)
+    q = os_.add_parser("clouds"); q.add_argument("--jobs", type=int, default=1)
+    q.add_argument("--sids", nargs="*", default=None)
+    q = os_.add_parser("run"); q.add_argument("--study", required=True)
+    q.add_argument("--trials", type=int, required=True)
+    q.add_argument("--jobs", type=int, default=1)
+    q.add_argument("--per-trial", type=int, default=8)
+    q = os_.add_parser("validate"); q.add_argument("--study", required=True)
+    q.add_argument("--top", type=int, default=3); q.add_argument("--jobs", type=int, default=1)
+    q.add_argument("--budget", type=int, default=80_000)
+    q = os_.add_parser("promote"); q.add_argument("--study", required=True)
+    q.add_argument("--trial", type=int, required=True)
     return ap
+
+
+def _cloud_worker(args):
+    """One tuning cloud in its own process (the clouds are independent full offline passes)."""
+    from .suite.optuna_clouds import ensure_cloud
+    uri, root, sid = args
+    return ensure_cloud(Store(uri, root), sid)
 
 
 def main(argv=None):
@@ -172,5 +193,26 @@ def main(argv=None):
             from .suite.tables import section4_tables
             for pth in section4_tables(store, args.out):
                 print("wrote", pth)
+            return 0
+    if args.cmd == "optuna":
+        from .suite.config import TUNING_SIDS
+        from .suite.optuna_search import run_study
+        from .suite.optuna_validate import promote, validate
+        if args.optuna_cmd == "clouds":
+            sids = tuple(args.sids or TUNING_SIDS)
+            work = [(store.tracking_uri, store.artifact_root, s) for s in sids]
+            with ProcessPoolExecutor(max_workers=args.jobs) as ex:
+                for sid, rid in zip(sids, ex.map(_cloud_worker, work)):
+                    print("cloud", sid, rid, flush=True)
+            return 0
+        if args.optuna_cmd == "run":
+            print("study", run_study(store, args.study, args.trials, n_jobs=args.jobs,
+                                     per_trial=args.per_trial))
+            return 0
+        if args.optuna_cmd == "validate":
+            validate(store, args.study, top=args.top, jobs=args.jobs, budget=args.budget)
+            return 0
+        if args.optuna_cmd == "promote":
+            print("wrote", promote(store, args.study, args.trial))
             return 0
     return 1

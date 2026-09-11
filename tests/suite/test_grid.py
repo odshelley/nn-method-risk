@@ -1,5 +1,6 @@
 import pytest
 
+from neural_particle_method.estimators import recipes as R
 from neural_particle_method.suite.config import FULL, SuiteSettings
 from neural_particle_method.suite.grid import (
     STAGES,
@@ -12,6 +13,10 @@ from neural_particle_method.suite.grid import (
 from neural_particle_method.tracking.store import Store
 
 TINY = SuiteSettings.tiny()
+FAST = {"hidden": 16, "depth": 2, "lr": 1e-2, "batch_size": 0, "first_steps": 5,
+        "later_steps": 2, "weight_decay": 0.0, "fit_subsample": 400, "warm_start": True,
+        "mean_match": False, "monotone": False, "monotone_penalty": 0.0, "tail": "flat",
+        "hetero": False}
 
 
 def test_full_job_counts():
@@ -22,6 +27,14 @@ def test_full_job_counts():
     # 2 lags; 2 seeds
     assert len(online_jobs(FULL)) == 23 * (8 * 2 + 4 * 1 + 1 + 1) * 2 * 2
     assert STAGES == ("pde", "cold", "offline", "online")
+
+
+def test_job_lists_grow_when_a_recipe_is_promoted(tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)
+    R.save_recipe("explicit_opt", FAST)
+    assert len(cold_jobs(FULL)) == 23 * 11 * 2
+    # the two searched-body methods join the four tuned-body ones at the largest size only
+    assert len(online_jobs(FULL)) == 23 * (8 * 2 + 4 + 2 + 1 + 1) * 2 * 2
 
 
 def test_tuned_methods_only_run_on_the_largest_body():
