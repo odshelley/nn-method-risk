@@ -19,6 +19,9 @@ class ExplicitConfig:
     grid: str = "quantile"  # "quantile": per-slice cloud quantiles (paper); "fixed": DEFAULT_GRID
     # fit the estimator on max(v, 0), the variance the dynamics use; False = pre-fix paper behaviour
     fit_v_floor: bool = True
+    # continuation of a fitted slice beyond its quantile grid: "flat" (np.interp's end values),
+    # "linear" (end slopes), "free" (the estimator evaluated TAIL_DX beyond each end)
+    tail: str = "flat"
 
     def as_params(self):
         return _flat(asdict(self))

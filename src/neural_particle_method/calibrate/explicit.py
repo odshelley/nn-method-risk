@@ -9,6 +9,26 @@ from ..simulate.leverage import DEFAULT_GRID, LeverageField, Slice
 from ..simulate.stepper import heston_step
 from .config import ExplicitConfig
 
+TAIL_DX = 0.5   # log-spot distance of the tail anchor points beyond the grid ends
+TAILS = ("flat", "linear", "free")
+
+
+def extend_tail(grid, f_grid, tail, estimator=None, dx=TAIL_DX):
+    """Append one anchor point beyond each end of `grid` so np.interp continues the slice by the
+    chosen rule. "flat" returns the inputs unchanged (np.interp already holds the end values)."""
+    if tail not in TAILS:
+        raise ValueError(f"tail must be one of {TAILS}, got {tail!r}")
+    if tail == "flat" or len(grid) < 2:
+        return grid, f_grid
+    lo, hi = grid[0] - dx, grid[-1] + dx
+    if tail == "linear":
+        f_lo = f_grid[0] + (f_grid[0] - f_grid[1]) / (grid[1] - grid[0]) * dx
+        f_hi = f_grid[-1] + (f_grid[-1] - f_grid[-2]) / (grid[-1] - grid[-2]) * dx
+    else:
+        f_lo, f_hi = (float(x) for x in estimator.predict(np.array([lo, hi])))
+    return (np.concatenate([[lo], grid, [hi]]),
+            np.concatenate([[f_lo], f_grid, [f_hi]]))
+
 
 @dataclass(frozen=True)
 class StepContext:
@@ -88,6 +108,7 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
             else:
                 f_grid = estimator.fit_predict(t, lnx[idx], v_fit, grid, weights=wi)
             fit_s += time.perf_counter() - t0
+            grid, f_grid = extend_tail(grid, f_grid, cfg.tail, estimator)
         f_grid = np.clip(f_grid, 1e-4, None)
         sig = local_vol.sigma(max(t, local_vol.T_grid[0]), np.exp(grid), s0)
         L_grid = np.clip(sig / np.sqrt(f_grid), 0.0, L_max)
