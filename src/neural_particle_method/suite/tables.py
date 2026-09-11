@@ -7,7 +7,8 @@ import pandas as pd
 from .config import FULL, HESTON_SIDS, SSVI_SIDS
 
 COLD_ROWS = (
-    ("nw", "NW"), ("explicit_nn", "Explicit NN"), ("implicit_nn", "Implicit NN"), ("rkhs", "RKHS"),
+    ("nw", "NW"), ("explicit_nn", "Explicit NN, short training"),
+    ("explicit_nn_tuned", "Explicit NN, tuned"), ("implicit_nn", "Implicit NN"), ("rkhs", "RKHS"),
     ("spline", "Spline"), ("nw_ghl", "GHL kernel"), ("bins", "Bins"), ("muguruza", "Muguruza"),
     ("purbf", "PU-RBF"), ("pde", "PDE (attainable floor)"),
 )
@@ -97,6 +98,21 @@ EMPTY = pd.Series({k: np.nan for k in (
 )})
 
 
+def _pde_solve_seconds(store, settings, family):
+    """Median, over the family's scenarios, of the Fokker-Planck solve time (`runtime_s` on the
+    `pde_reference` run at the suite's step count, unlagged)."""
+    df = _finished(store, "pde_reference")
+    if len(df) == 0:
+        return np.nan
+    sel = df[df["params.sid"].isin(_sids(family))
+             & (df["params.n_steps"] == str(settings.explicit.n_steps))
+             & (df["params.lag"] == "none")]
+    if len(sel) == 0:
+        return np.nan
+    per_sid = _num(sel, "metrics.runtime_s").groupby(sel["params.sid"]).median()
+    return per_sid.median()
+
+
 def cold_frame(store, settings=FULL, family="ssvi"):
     cold = _finished(store, settings.experiment("suite_cold"))
     pde = _finished(store, settings.experiment("suite_pde_floor"))
@@ -109,7 +125,11 @@ def cold_frame(store, settings=FULL, family="ssvi"):
         sel = src[src["params.sid"].isin(_sids(family))]
         if algo != "pde":
             sel = sel[sel["params.algo"] == algo]
-        rows[label] = _agg(_prep(sel)) if len(sel) else EMPTY.copy()
+        row = _agg(_prep(sel)) if len(sel) else EMPTY.copy()
+        if algo == "pde":
+            row = row.copy()
+            row["lat_median"] = _pde_solve_seconds(store, settings, family)
+        rows[label] = row
     return pd.DataFrame(rows).T
 
 

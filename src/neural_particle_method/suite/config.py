@@ -7,8 +7,8 @@ from ..pricing.reprice import RepriceConfig
 
 SSVI_SIDS = tuple(make_registry())
 HESTON_SIDS = tuple(heston_registry())
-COLD_ALGOS = ("nw", "explicit_nn", "implicit_nn", "rkhs", "spline", "nw_ghl", "bins", "muguruza",
-             "purbf")
+COLD_ALGOS = ("nw", "explicit_nn", "explicit_nn_tuned", "implicit_nn", "rkhs", "spline", "nw_ghl",
+             "bins", "muguruza", "purbf")
 
 
 @dataclass(frozen=True)

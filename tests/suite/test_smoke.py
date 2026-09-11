@@ -11,7 +11,7 @@ def test_smoke_all_stages_end_to_end(tmp_path):
     assert main(["--tracking-uri", uri, "--artifact-root", root,
                 "suite", "run", "--stage", "all", "--smoke"]) == 0
     store = Store(uri, root)
-    assert len(store.search(SMOKE.experiment("suite_cold"))) == 2 * 9
+    assert len(store.search(SMOKE.experiment("suite_cold"))) == 2 * 10
     assert len(store.search(SMOKE.experiment("suite_pde_floor"))) == 2
     assert len(store.search(SMOKE.experiment("suite_offline"))) == 2 * 2
     assert len(store.search(SMOKE.experiment("suite_lagged"))) == 2 * 10 * 2

@@ -42,7 +42,8 @@ def run_pde_floor(store, sid, seed, settings=FULL):
               **{f"reprice.{k}": v for k, v in settings.reprice.as_params().items()}}
     with store.run(exp, params) as h:
         metrics, err = score_field(field, sc, seed, settings.reprice)
-        metrics.update({"fit_s": 0.0, "total_s": 0.0, "lev_rmse": 0.0})
+        solve_s = store.get_metrics(ref)["runtime_s"]
+        metrics.update({"fit_s": 0.0, "total_s": 0.0, "lev_rmse": 0.0, "solve_s": solve_s})
         h.log_metrics(metrics)
         h.log_json("leverage.json", field.to_json())
         h.log_json("iv_err_bp.json", err)

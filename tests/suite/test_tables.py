@@ -41,6 +41,8 @@ def store(tmp_path):
             "lev_rmse": 0.0, "price_bp/pooled": 1.0, "price_bp/wings": 1.5, "price_bp/near": 0.5,
             "price_bp/max": 2.0, "price_bp/T2": 0.8,
         })
+    with s.run("pde_reference", {"sid": "s01", "n_steps": 200, "lag": "none"}) as h:
+        h.log_metrics({"runtime_s": 150.0, "mass": 1.0, "forward": 1.0})
     lagged_params = {
         "sid": "s01", "method": "explicit_rkhs", "offline_n": 200_000, "lag": "surface",
         "seed": 0, "n_steps": 200,
@@ -78,7 +80,8 @@ def test_cold_frame_aggregates_mean_and_median_over_scenarios_and_seeds(store):
     assert nw["mae_mean"] != pytest.approx((10 + 11 + 30 + 31 + 60) / 5)
     assert nw["lat_median"] == 1.0 and nw["lev_median"] == 0.05
     assert df.loc["PDE (attainable floor)"]["mae_mean"] == 3.0
-    assert df.loc["Explicit NN"].isna().all()
+    assert df.loc["PDE (attainable floor)"]["lat_median"] == pytest.approx(150.0)
+    assert df.loc["Explicit NN, short training"].isna().all()
     assert list(df.index) == [r[1] for r in COLD_ROWS]
 
 
@@ -116,8 +119,9 @@ def test_lagged_frame_and_files(store, tmp_path):
     ]
     cold = (tmp_path / "tables" / "suite_cold_ssvi.tex").read_text()
     assert "\\begin{tabular}" in cold and "NW & 25 & 25 &" in cold
-    assert "Explicit NN & -- & --" in cold
+    assert "Explicit NN, short training & -- & --" in cold
     assert "PDE (attainable floor) & 3 & 3 &" in cold
+    assert "PDE (attainable floor) & 3 & 3 & 4 & 4 & 5 & 5 & 0.000 & 150.0\\\\" in cold
 
 
 def test_heston_lagged_table_drops_the_t025_column(store, tmp_path):

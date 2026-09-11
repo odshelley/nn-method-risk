@@ -168,7 +168,8 @@ This section specifies the clean benchmark agreed on 8 September 2026 and run on
 One calibration from scratch per method, scenario and seed at $100\,000$ particles. Methods, with their estimator of $\E[V^+\mid X]$ per slice:
 \begin{enumerate}
 \item \textbf{NW}: Gaussian Nadaraya--Watson, Silverman bandwidth (\cref{sec:onepass}).
-\item \textbf{Explicit NN}: per-slice network, warm-started across slices (\cref{sec:onepass}).
+\item \textbf{Explicit NN, short training}: per-slice network, warm-started across slices, $400$ Adam steps on the first slice and $120$ on each later slice, full batch (\cref{sec:onepass}).
+\item \textbf{Explicit NN, tuned}: the same per-slice scheme with a $1\to64\to64\to64\to1$ SiLU network, minibatch Adam (batches of $8192$, learning rate $10^{-3}$), $2000$ steps on the first slice and $500$ warm-started steps on each later slice; the architecture and schedule that \cref{sec:studies} found accurate in the wings and robust under Feller violation.
 \item \textbf{Implicit NN}: damped global-network loop (\cref{sec:implicit}, configuration above).
 \item \textbf{RKHS}: Gaussian kernel ridge with $100$ quantile centres, Bayer et al.'s published knobs (\cref{sec:onepass}).
 \item \textbf{Spline}: penalised cubic B-spline, $25$ quantile knots, $\lambda=1$.
@@ -177,7 +178,7 @@ One calibration from scratch per method, scenario and seed at $100\,000$ particl
 \end{enumerate}
 
 \begin{table}[h]\centering\footnotesize
-\caption{Cold suite, SSVI scenarios: mean and median over the $20$ scenarios and two seeds. The PDE row is the attainable floor of the scoring; its seed-to-seed spread (median over scenarios of the absolute difference in pooled MAE between the two reprice seeds) is $6.6\bp$, the Monte Carlo noise floor of the score.}\label{tab:suite-cold}
+\caption{Cold suite, SSVI scenarios: mean and median over the $20$ scenarios and two seeds. The PDE row is the attainable floor of the scoring; its seed-to-seed spread (median over scenarios of the absolute difference in pooled MAE between the two reprice seeds) is $6.6\bp$, the Monte Carlo noise floor of the score. The PDE row's latency is the Fokker--Planck solve.}\label{tab:suite-cold}
 \input{tables/suite_cold_ssvi.tex}
 \end{table}
 

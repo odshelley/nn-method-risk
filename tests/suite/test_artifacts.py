@@ -86,6 +86,31 @@ def test_save_and_load_round_trip(store, tmp_path):
         np.testing.assert_array_equal(a.f, b.f)
 
 
+def test_slice_bank_round_trips_depth_through_state():
+    sc = make_registry()["s01"]
+    est = NNRegressor(seed=0, first_steps=5, later_steps=2, depth=3, keep_slice_weights=True)
+    r = calibrate_explicit(sc.local_vol(), sc.dynamics, est, E, s0=sc.s0, T=sc.T, seed=0)
+    bank = SliceBank.from_regressor(est)
+    reloaded = SliceBank.from_state(bank.state())
+    x = np.linspace(-0.2, 0.2, 9)
+    t = r.field[1].t
+    np.testing.assert_allclose(reloaded.f(t, x), bank.f(t, x), rtol=1e-6)
+    assert bank.state()["depth"] == 3
+
+
+def test_slice_bank_state_without_depth_loads_as_depth_two():
+    sc = make_registry()["s01"]
+    est = NNRegressor(seed=0, first_steps=5, later_steps=2, keep_slice_weights=True)
+    calibrate_explicit(sc.local_vol(), sc.dynamics, est, E, s0=sc.s0, T=sc.T, seed=0)
+    bank = SliceBank.from_regressor(est)
+    d = bank.state()
+    assert d["depth"] == 2
+    del d["depth"]
+    reloaded = SliceBank.from_state(d)
+    x = np.linspace(-0.2, 0.2, 9)
+    np.testing.assert_allclose(reloaded.f(bank.times[0], x), bank.f(bank.times[0], x), rtol=1e-6)
+
+
 def test_field_only_models_load_with_model_none(store):
     _sc, _est, r = _explicit()
     from neural_particle_method.estimators import make_estimator

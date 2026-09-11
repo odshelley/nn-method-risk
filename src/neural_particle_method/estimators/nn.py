@@ -7,12 +7,14 @@ Z_SCALE = 0.3   # rough log-spot scale for input conditioning
 
 
 class SliceNet(nn.Module):
-    def __init__(self, hidden=64):
+    def __init__(self, hidden=64, depth=2):
         super().__init__()
-        self.body = nn.Sequential(
-            nn.Linear(1, hidden), nn.SiLU(),
-            nn.Linear(hidden, hidden), nn.SiLU(),
-        )
+        layers = []
+        in_dim = 1
+        for _ in range(depth):
+            layers += [nn.Linear(in_dim, hidden), nn.SiLU()]
+            in_dim = hidden
+        self.body = nn.Sequential(*layers)
         self.head = nn.Linear(hidden, 1)
 
     def forward(self, z):
@@ -32,14 +34,16 @@ class NNRegressor:
     supports_weights = True
 
     def __init__(self, seed=0, first_steps=400, later_steps=120, hidden=64,
-                 keep_slice_weights=False):
+                 keep_slice_weights=False, depth=2, lr=1e-2, batch_size=None):
         torch.manual_seed(seed)
-        self.net = SliceNet(hidden)
-        self.opt = torch.optim.Adam(self.net.parameters(), lr=1e-2)
+        self.net = SliceNet(hidden, depth)
+        self.opt = torch.optim.Adam(self.net.parameters(), lr=lr)
         self.first_steps, self.later_steps = first_steps, later_steps
         self._n_fits = 0
         self.keep_slice_weights = keep_slice_weights
         self.slice_weights = []   # [(t, state_dict copy)] per fitted slice when keep_slice_weights
+        self.batch_size = batch_size
+        self._gen = torch.Generator().manual_seed(seed)
 
     def reset(self):
         """Zero the fit counter so the next `fit_predict` call again uses `first_steps`."""
@@ -49,10 +53,17 @@ class NNRegressor:
         z = torch.tensor(lnx[:, None] / Z_SCALE, dtype=torch.float32)
         tv = torch.tensor(v[:, None], dtype=torch.float32)
         tw = None if weights is None else torch.tensor(weights[:, None], dtype=torch.float32)
+        n = z.shape[0]
         for _ in range(steps):
+            if self.batch_size is None:
+                zb, tvb, twb = z, tv, tw
+            else:
+                idx = torch.randint(0, n, (self.batch_size,), generator=self._gen)
+                zb, tvb = z[idx], tv[idx]
+                twb = None if tw is None else tw[idx]
             self.opt.zero_grad()
-            resid = (self.net(z) - tv) ** 2
-            loss = (resid if tw is None else tw * resid).mean()
+            resid = (self.net(zb) - tvb) ** 2
+            loss = (resid if twb is None else twb * resid).mean()
             loss.backward()
             self.opt.step()
         return float(loss.detach())

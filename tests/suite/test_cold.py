@@ -23,8 +23,8 @@ def test_full_settings_match_the_spec():
     assert len(FULL.sids) == 23 and FULL.sids[:2] == ("s01", "s02") and FULL.sids[-1] == "bayer"
     assert (FULL.experiment("suite_cold") == "suite_cold"
            and SMOKE.experiment("suite_cold") == "suite_cold_smoke")
-    assert COLD_ALGOS == ("nw", "explicit_nn", "implicit_nn", "rkhs", "spline", "nw_ghl", "bins",
-                          "muguruza", "purbf")
+    assert COLD_ALGOS == ("nw", "explicit_nn", "explicit_nn_tuned", "implicit_nn", "rkhs",
+                          "spline", "nw_ghl", "bins", "muguruza", "purbf")
 
 
 @pytest.mark.parametrize("algo", ["nw", "explicit_nn", "implicit_nn"])

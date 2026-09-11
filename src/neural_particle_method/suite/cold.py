@@ -9,7 +9,8 @@ __all__ = ["COLD_ALGOS", "run_cold"]
 
 def run_cold(store, sid, algo, seed, settings=FULL):
     sc = full_registry()[sid]
-    knobs = {"keep_slice_weights": True} if algo == "explicit_nn" else None
+    knobs = ({"keep_slice_weights": True}
+            if algo in ("explicit_nn", "explicit_nn_tuned") else None)
 
     def save(h, res):
         save_model(h, res.model, {"sid": sid, "algo": algo, "seed": seed, "T": sc.T,

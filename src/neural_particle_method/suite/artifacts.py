@@ -19,6 +19,10 @@ def _slice_index(times, t):
     return max(int(np.searchsorted(times, t + 1e-12)) - 1, 0)
 
 
+def _body_depth(body):
+    return sum(1 for m in body if isinstance(m, torch.nn.Linear))
+
+
 class SliceBank:
     """Per-slice explicit networks; slice in force at t is the last time <= t (as
     LeverageField.at)."""
@@ -29,8 +33,9 @@ class SliceBank:
     @classmethod
     def from_regressor(cls, est):
         nets = []
+        depth = _body_depth(est.net.body)
         for _, sd in est.slice_weights:
-            n = SliceNet(est.net.body[0].out_features)
+            n = SliceNet(est.net.body[0].out_features, depth)
             n.load_state_dict(sd)
             nets.append(n)
         return cls([t for t, _ in est.slice_weights], nets)
@@ -56,13 +61,15 @@ class SliceBank:
 
     def state(self):
         return {"times": self.times.tolist(), "hidden": self.nets[0].body[0].out_features,
+                "depth": _body_depth(self.nets[0].body),
                 "state_dicts": [n.state_dict() for n in self.nets]}
 
     @classmethod
     def from_state(cls, d):
         nets = []
+        depth = d.get("depth", 2)
         for sd in d["state_dicts"]:
-            n = SliceNet(d["hidden"])
+            n = SliceNet(d["hidden"], depth)
             n.load_state_dict(sd)
             nets.append(n)
         return cls(d["times"], nets)

@@ -115,5 +115,17 @@ MECHANISM_ALGOS = {"explicit_nn_wide": _nn_wide, "nw_wide": _nw_wide, "implicit_
                    "nw_vfloor": _nw_vfloor, "explicit_nn_vfloor": _nn_vfloor, "rkhs_vfloor": _rkhs_vfloor}
 
 
+def _nn_tuned(sc, n, seed, e, i, knobs=None):
+    """Per-slice network with the studies' tuned architecture and minibatch schedule."""
+    return _explicit(sc, n, seed, replace(e, first_steps=2000, later_steps=500), "nn",
+                     knobs={"hidden": 64, "depth": 3, "batch_size": 8192, "lr": 1e-3,
+                            **(knobs or {})})
+
+
+# Suite-only algorithms, kept out of ALGOS so the paper/baseline grids and goldens are unchanged.
+SUITE_ALGOS = {"explicit_nn_tuned": _nn_tuned}
+
+
 def run_algo(name, scenario, n_particles, seed, explicit=ExplicitConfig(), implicit=ImplicitConfig(), knobs=None):
-    return {**ALGOS, **MECHANISM_ALGOS}[name](scenario, n_particles, seed, explicit, implicit, knobs=knobs)
+    return {**ALGOS, **MECHANISM_ALGOS, **SUITE_ALGOS}[name](
+        scenario, n_particles, seed, explicit, implicit, knobs=knobs)

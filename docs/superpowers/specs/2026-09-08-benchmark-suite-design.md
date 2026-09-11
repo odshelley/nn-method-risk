@@ -53,7 +53,7 @@ Defined once in `suite/grid.py` as frozen dataclasses and used by every stage:
 
 `run_cold(store, sid, algo, seed)` calls `bench.runner.run_one` with `experiment="suite_cold"`, `n_particles=100_000`, `SUITE_EXPLICIT`, `SUITE_IMPLICIT`, `SUITE_REPRICE`. It is idempotent through `run_one`'s `find_finished`.
 
-Algorithms (registry names in `bench/algos.py`): `nw`, `explicit_nn`, `implicit_nn`, `rkhs`, `spline`, `nw_ghl`, `bins`, `muguruza`, `purbf`. Estimator knobs are the registry defaults.
+Algorithms (registry names in `bench/algos.py`): `nw`, `explicit_nn`, `explicit_nn_tuned`, `implicit_nn`, `rkhs`, `spline`, `nw_ghl`, `bins`, `muguruza`, `purbf`. Estimator knobs are the registry defaults, except `explicit_nn_tuned`, which is `explicit_nn` with the studies' tuned architecture and schedule (hidden 64, depth 3, minibatch Adam at batches of 8192 and learning rate 1e-3, 2000/500 first/later steps) and is kept out of the golden-replayed `ALGOS` registry, in a separate `SUITE_ALGOS` dict merged into `run_algo`. The table label for `explicit_nn` becomes "Explicit NN, short training" to distinguish it from the tuned row.
 
 Additive hook in `bench/runner.py::run_one`: a new keyword `save_model: callable | None = None`; when given, it is called with `(h, res)` after the metrics are logged so the suite can attach the trained object (below). Default `None` keeps every existing caller unchanged.
 
