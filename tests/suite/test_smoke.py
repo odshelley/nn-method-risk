@@ -13,6 +13,6 @@ def test_smoke_all_stages_end_to_end(tmp_path):
     store = Store(uri, root)
     assert len(store.search(SMOKE.experiment("suite_cold"))) == 2 * 10
     assert len(store.search(SMOKE.experiment("suite_pde_floor"))) == 2
-    assert len(store.search(SMOKE.experiment("suite_offline"))) == 2 * 2
-    assert len(store.search(SMOKE.experiment("suite_lagged"))) == 2 * 10 * 2
+    assert len(store.search(SMOKE.experiment("suite_offline"))) == 2 * 3
+    assert len(store.search(SMOKE.experiment("suite_lagged"))) == 2 * 14 * 2
     assert (store.search(SMOKE.experiment("suite_lagged"))["status"] == "FINISHED").all()

@@ -16,7 +16,10 @@ def store(tmp_path):
 def test_method_table_is_the_agreed_one():
     assert list(ONLINE_METHODS) == ["explicit_stale", "implicit_stale", "explicit_rkhs",
                                     "implicit_rkhs", "explicit_ridge", "implicit_ridge",
-                                    "explicit_spline", "implicit_spline", "stale_L", "nw_resolve"]
+                                    "explicit_spline", "implicit_spline",
+                                    "explicit_tuned_stale", "explicit_tuned_rkhs",
+                                    "explicit_tuned_ridge", "explicit_tuned_spline",
+                                    "stale_L", "nw_resolve"]
 
 
 @pytest.mark.parametrize("method", list(ONLINE_METHODS))
@@ -27,7 +30,7 @@ def test_every_method_runs_on_the_spot_lag(store, method):
     assert p["method"] == method and p["lag"] == "surface_spot" and p["lag.kind"] == "surface_spot"
     assert float(p["scenario.s0"]) > 1.0 and "bumped.sigma0" in p
     assert m["pooled_mae_bp"] >= 0 and m["online_s"] >= 0
-    if method in ("explicit_stale", "implicit_stale", "stale_L"):
+    if method in ("explicit_stale", "implicit_stale", "explicit_tuned_stale", "stale_L"):
         assert m["online_s"] == 0.0
     if method != "nw_resolve":
         assert p["offline_run"]

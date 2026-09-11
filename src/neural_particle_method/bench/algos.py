@@ -115,11 +115,16 @@ MECHANISM_ALGOS = {"explicit_nn_wide": _nn_wide, "nw_wide": _nw_wide, "implicit_
                    "nw_vfloor": _nw_vfloor, "explicit_nn_vfloor": _nn_vfloor, "rkhs_vfloor": _rkhs_vfloor}
 
 
+# The tuned recipe, in one place: the studies' architecture and minibatch schedule. The suite's
+# `explicit_tuned` offline body builds its own NNRegressor from these same two dicts.
+TUNED_KNOBS = {"hidden": 64, "depth": 3, "batch_size": 8192, "lr": 1e-3}
+TUNED_STEPS = {"first_steps": 2000, "later_steps": 500}
+
+
 def _nn_tuned(sc, n, seed, e, i, knobs=None):
     """Per-slice network with the studies' tuned architecture and minibatch schedule."""
-    return _explicit(sc, n, seed, replace(e, first_steps=2000, later_steps=500), "nn",
-                     knobs={"hidden": 64, "depth": 3, "batch_size": 8192, "lr": 1e-3,
-                            **(knobs or {})})
+    return _explicit(sc, n, seed, replace(e, **TUNED_STEPS), "nn",
+                     knobs={**TUNED_KNOBS, **(knobs or {})})
 
 
 # Suite-only algorithms, kept out of ALGOS so the paper/baseline grids and goldens are unchanged.

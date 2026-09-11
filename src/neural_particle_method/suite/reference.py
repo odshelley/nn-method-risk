@@ -20,7 +20,7 @@ def score_field(field, sc, seed, reprice):
     iv_target = sc.target_ivs(k, snap_times(mats, reprice.n_steps))
     m = iv_metrics(iv_model, iv_target, k, mats)
     out = {c: m[c] for c in ("pooled_rmse_bp", "pooled_max_bp", "wings_rmse_bp", "wings_max_bp",
-                             "n_failed", "pooled_mae_bp", "wings_mae_bp")}
+                             "n_failed", "pooled_mae_bp", "wings_mae_bp", "liquid_mae_bp")}
     out.update({f"rmse_bp/T{r['T']:g}": r["rmse_bp"] for r in m["per_maturity"]})
     out.update({f"mae_bp/T{r['T']:g}": r["mae_bp"] for r in m["mae_per_maturity"]})
     return out, ((iv_model - iv_target) * 1e4).tolist()

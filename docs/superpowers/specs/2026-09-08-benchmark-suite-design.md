@@ -59,7 +59,7 @@ Additive hook in `bench/runner.py::run_one`: a new keyword `save_model: callable
 
 Additive hook in `bench/algos.py::CalibResult`: a new optional field `model: object = None` carrying the trained object (the implicit network, or the per-slice snapshots described under artifacts). `_implicit_core` sets it to `r.net`; `_explicit` sets it to the estimator instance. Existing consumers ignore it.
 
-Metrics per run are those `run_one` already logs: `pooled_rmse_bp`, `pooled_mae_bp`, `wings_rmse_bp`, `wings_mae_bp`, `rmse_bp/T*`, `mae_bp/T*`, `n_failed`, timings (`fit_s`, `total_s`), and `lev_rmse` against the `pde_reference` run for the scenario at `n_steps=200`. `_leverage_error` currently finds the reference by `sid` alone; it gains the calibration `n_steps` in its lookup key so the 50-step references already in the store are not matched to 200-step runs.
+Metrics per run are those `run_one` already logs: `pooled_rmse_bp`, `pooled_mae_bp`, `wings_rmse_bp`, `wings_mae_bp`, `liquid_mae_bp` (the MAE over the liquid quotes only: `|k| <= 0.25` and `T >= 0.5`, an additive key on `iv_metrics` that leaves every other key byte-identical), `rmse_bp/T*`, `mae_bp/T*`, `n_failed`, timings (`fit_s`, `total_s`), and `lev_rmse` against the `pde_reference` run for the scenario at `n_steps=200`. `_leverage_error` currently finds the reference by `sid` alone; it gains the calibration `n_steps` in its lookup key so the 50-step references already in the store are not matched to 200-step runs.
 
 Latency column of the tables: `fit_s` (calibration only).
 
@@ -109,6 +109,7 @@ Unit tests: the shifted target at `k` equals the unshifted target at `k + delta`
 `run_offline(store, sid, body, n_particles, seed=0) -> run_id`, experiment `suite_offline`, key `{sid, body, n_particles, seed, n_steps: 200}`, idempotent.
 
 - `body == "explicit"`: `calibrate_explicit(lv, dyn, NNRegressor(seed, keep_slice_weights=True), SUITE_EXPLICIT with n_particles, ...)`. Additive hook in `NNRegressor`: `keep_slice_weights: bool = False`; when true, `fit_predict` appends `(t, {k: v.clone()} state_dict)` to `self.slice_weights` after each fit. Default false leaves the goldens untouched (no numerical change, only a copy).
+- `body == "explicit_tuned"`: the same explicit sweep with the tuned per-slice network of the cold row `explicit_nn_tuned` -- `NNRegressor(seed, keep_slice_weights=True, **TUNED_KNOBS, **TUNED_STEPS)`, the two dicts that `bench/algos.py` also builds `_nn_tuned` from, so the recipe (hidden 64, depth 3, batch 8192, lr 1e-3, 2000/500 steps) has one definition. The run's `explicit.*` params carry the tuned step counts so the logged configuration says what was run. This is the body of the notes' head table.
 - `body == "implicit"`: explicit warm start as above (weights not kept), then `calibrate_implicit(lv, dyn, SUITE_IMPLICIT with n_particles, L0=w.field, ...)`.
 
 Artifacts (via `suite/artifacts.py::save_model`): `leverage.json` (field with `f` per slice, already the convention), `model.pt` (explicit: list of per-slice state dicts with their times, plus `Z_SCALE`; implicit: the global network state dict plus `T`), `model_meta.json` (`{"body": ..., "n_steps": 200, "n_particles": ..., "seed": ..., "sid": ..., "git_hash": ...}`). Metrics: `fit_s`, plus the cold-style scores of the body on the overnight surface (`anchor` scores) so the appendix can show how good each body was before any lag.
@@ -171,8 +172,14 @@ Online methods, registry `ONLINE_METHODS` in `suite/online.py`:
 | `implicit_ridge` | implicit | RidgeHead on global features |
 | `explicit_spline` | explicit | SplineHead |
 | `implicit_spline` | implicit | SplineHead |
+| `explicit_tuned_stale` | explicit_tuned | none |
+| `explicit_tuned_rkhs` | explicit_tuned | RKHSHead |
+| `explicit_tuned_ridge` | explicit_tuned | RidgeHead on slice features |
+| `explicit_tuned_spline` | explicit_tuned | SplineHead |
 | `stale_L` | either (explicit body) | none; the offline field repriced as-is on S1 |
 | `nw_resolve` | none | cold NW on the lagged scenario at 100k, 200 steps |
+
+The four `explicit_tuned_*` methods run on the 500k body only (the largest offline size): the head table quotes one body, and the 200k tuned body would cost a second overnight training for a column nobody reads.
 
 `stale_L` and `nw_resolve` take `offline_n` as a parameter for keying only (`stale_L` uses that body; `nw_resolve` records `offline_n = 0`).
 
@@ -195,6 +202,10 @@ PDE reference for lagged scenarios: `run_reference` gains an optional `scenario`
 CLI: `nparticle suite run --stage {pde,cold,offline,online,all} --jobs N [--sids s01 s02] [--smoke]`. `--smoke` uses 2 scenarios, 1 seed, `n_particles=2_000`, `n_steps=10`, `n_iters=2`, reprice `20_000` paths, and separate experiment names suffixed `_smoke`, so a full pass of every stage runs in under two minutes and is the integration test.
 
 Budget at 4 workers on this machine, from stored timings scaled to 200 steps and particle count: pde minutes; cold about 2.5 h; offline about 12 h; online under 1 h.
+
+## Online-budget sweep (`scripts/budget_sweep.py`)
+
+Outside the four stages: the frozen 500k body with its online heads against NW re-solved at the same budget, for online budgets of 10k, 30k and 80k particles, both lags, two seeds. `python scripts/budget_sweep.py [--jobs N] [--body explicit_tuned|explicit] [--sids s01 ...]`; the default body is `explicit_tuned` and its cells go to `suite_budget_tuned`, keyed `{sid, method, budget, lag, seed, n_steps: 200}`, with the body taken from (or trained by) the offline stage's `run_offline(store, sid, "explicit_tuned", 500_000)`. `--body explicit` is the legacy path kept for the runs already in the store: the short-trained body from `suite_offline_conv`, cells in `suite_budget`. Methods are `nw_resolve` plus `<body>_stale`, `<body>_rkhs`, `<body>_spline`, `<body>_ridge`; the head keys off the method suffix.
 
 ## Stage 9: tables (`suite/tables.py`)
 

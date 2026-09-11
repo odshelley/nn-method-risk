@@ -17,10 +17,16 @@ TINY = SuiteSettings.tiny()
 def test_full_job_counts():
     assert len(pde_jobs(FULL)) == 23 * 2 + 23 * 2   # floors (2 seeds) + lagged references (2 lags)
     assert len(cold_jobs(FULL)) == 23 * 10 * 2
-    assert len(offline_jobs(FULL)) == 23 * 2 * 2
-    # 6 head/stale methods x 2 sizes, stale_L, nw_resolve; 2 lags; 2 seeds
-    assert len(online_jobs(FULL)) == 23 * (8 * 2 + 1 + 1) * 2 * 2
+    assert len(offline_jobs(FULL)) == 23 * 3 * 2
+    # 8 head/stale methods x 2 sizes, 4 tuned-body methods at 500k only, stale_L, nw_resolve;
+    # 2 lags; 2 seeds
+    assert len(online_jobs(FULL)) == 23 * (8 * 2 + 4 * 1 + 1 + 1) * 2 * 2
     assert STAGES == ("pde", "cold", "offline", "online")
+
+
+def test_tuned_methods_only_run_on_the_largest_body():
+    sizes = {j[3] for j in online_jobs(FULL) if j[2].startswith("explicit_tuned_")}
+    assert sizes == {max(FULL.offline_sizes)}
 
 
 def test_sid_filter_and_online_refuses_without_bodies(tmp_path):

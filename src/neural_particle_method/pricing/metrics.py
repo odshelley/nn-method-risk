@@ -5,8 +5,12 @@ from ..market.ssvi import implied_vol_ssvi
 from .reprice import snap_times
 
 
-def iv_metrics(iv_model, iv_target, k_grid, maturities, wing_cut=0.25):
-    """RMSE/max IV errors in vol bp: pooled, wings-only, per maturity; NaNs counted and excluded."""
+def iv_metrics(iv_model, iv_target, k_grid, maturities, wing_cut=0.25, liquid_T=0.5):
+    """RMSE/max IV errors in vol bp: pooled, wings-only, per maturity; NaNs counted and excluded.
+
+    `liquid_mae_bp` is the MAE over the liquid quotes only: |k| <= `wing_cut` and T >= `liquid_T`.
+    It is additive; every other key is what it was before the liquid mask existed.
+    """
     err = (np.asarray(iv_model) - np.asarray(iv_target)) * 1e4
     ok = np.isfinite(err)
     wings = np.abs(np.asarray(k_grid)) > wing_cut
@@ -37,11 +41,16 @@ def iv_metrics(iv_model, iv_target, k_grid, maturities, wing_cut=0.25):
         row = np.zeros_like(ok, dtype=bool)
         row[i] = True
         mae_per.append({"T": float(T), "mae_bp": mae(row)})
+    liquid = np.zeros_like(ok, dtype=bool)
+    for i, T in enumerate(maturities):
+        if float(T) >= liquid_T:
+            liquid[i] = ~wings
     # `per_maturity` is kept verbatim (golden replays compare it); MAE lives in its own keys.
     return {"pooled_rmse_bp": pooled[0], "pooled_max_bp": pooled[1],
             "wings_rmse_bp": wing_stats[0], "wings_max_bp": wing_stats[1],
             "n_failed": int((~ok).sum()), "per_maturity": per,
-            "pooled_mae_bp": mae(all_mask), "wings_mae_bp": mae(wing_mask), "mae_per_maturity": mae_per}
+            "pooled_mae_bp": mae(all_mask), "wings_mae_bp": mae(wing_mask),
+            "mae_per_maturity": mae_per, "liquid_mae_bp": mae(liquid)}
 
 
 def target_ivs(ssvi_params, k_grid, maturities, n_steps):

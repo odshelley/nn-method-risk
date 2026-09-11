@@ -1,8 +1,10 @@
+import numpy as np
 import pytest
 
+from neural_particle_method.bench.algos import TUNED_KNOBS, TUNED_STEPS
 from neural_particle_method.suite.artifacts import GlobalNetModel, SliceBank, load_run
 from neural_particle_method.suite.config import SuiteSettings
-from neural_particle_method.suite.offline import run_offline
+from neural_particle_method.suite.offline import BODIES, run_offline
 from neural_particle_method.tracking.store import Store
 
 TINY = SuiteSettings.tiny()
@@ -25,6 +27,25 @@ def test_offline_body_is_cached_and_reloadable(store, body, cls):
     assert lr.meta["body"] == body and lr.meta["n_particles"] == n
     assert run_offline(store, "s01", body, n, TINY) == rid
     assert len(store.search(TINY.experiment("suite_offline"))) == 1
+
+
+def test_bodies_are_the_three_agreed_ones():
+    assert BODIES == ("explicit", "explicit_tuned", "implicit")
+
+
+def test_tuned_body_reloads_as_a_depth_three_bank(store):
+    n = TINY.offline_sizes[0]
+    rid = run_offline(store, "s01", "explicit_tuned", n, TINY)
+    p = store.get_params(rid)
+    assert p["body"] == "explicit_tuned"
+    assert p["explicit.first_steps"] == str(TUNED_STEPS["first_steps"])
+    assert p["explicit.later_steps"] == str(TUNED_STEPS["later_steps"])
+    lr = load_run(store, rid)
+    assert isinstance(lr.model, SliceBank)
+    assert lr.model.state()["depth"] == TUNED_KNOBS["depth"] == 3
+    x = np.linspace(-0.2, 0.2, 9)
+    assert np.all(np.isfinite(lr.model.f(float(lr.model.times[0]), x)))
+    assert run_offline(store, "s01", "explicit_tuned", n, TINY) == rid
 
 
 def test_unknown_body_rejected(store):

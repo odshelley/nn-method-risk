@@ -3,6 +3,7 @@ online cell."""
 import time
 from dataclasses import replace
 
+from ..bench.algos import TUNED_KNOBS, TUNED_STEPS
 from ..bench.scenarios import full_registry
 from ..calibrate.explicit import calibrate_explicit
 from ..calibrate.implicit import calibrate_implicit
@@ -12,7 +13,8 @@ from .artifacts import save_model
 from .config import FULL
 from .reference import score_field
 
-BODIES = ("explicit", "implicit")
+BODIES = ("explicit", "explicit_tuned", "implicit")
+EXPLICIT_BODIES = ("explicit", "explicit_tuned")
 
 
 def run_offline(store, sid, body, n_particles, settings=FULL, seed=0):
@@ -27,7 +29,10 @@ def run_offline(store, sid, body, n_particles, settings=FULL, seed=0):
         return existing
     sc = full_registry()[sid]
     lv = sc.local_vol()
-    ecfg = replace(settings.explicit, n_particles=int(n_particles))
+    tuned = body == "explicit_tuned"
+    # the tuned body trains on its own schedule; the logged explicit.* params say what was run
+    ecfg = replace(settings.explicit, n_particles=int(n_particles),
+                   **(TUNED_STEPS if tuned else {}))
     icfg = replace(settings.implicit, n_particles=int(n_particles))
     params = {**key, "git_hash": git_hash(), **sc.as_params(),
               **{f"explicit.{k}": v for k, v in ecfg.as_params().items()},
@@ -35,10 +40,12 @@ def run_offline(store, sid, body, n_particles, settings=FULL, seed=0):
               **{f"reprice.{k}": v for k, v in settings.reprice.as_params().items()}}
     with store.run(exp, params) as h:
         t0 = time.perf_counter()
-        est = NNRegressor(seed=seed, first_steps=ecfg.first_steps, later_steps=ecfg.later_steps,
-                          keep_slice_weights=(body == "explicit"))
+        est = (NNRegressor(seed=seed, keep_slice_weights=True, **TUNED_KNOBS, **TUNED_STEPS)
+               if tuned else
+               NNRegressor(seed=seed, first_steps=ecfg.first_steps, later_steps=ecfg.later_steps,
+                           keep_slice_weights=(body == "explicit")))
         w = calibrate_explicit(lv, sc.dynamics, est, ecfg, s0=sc.s0, T=sc.T, seed=seed)
-        if body == "explicit":
+        if body in EXPLICIT_BODIES:
             field, model, fit_s = w.field, est, w.fit_s
         else:
             r = calibrate_implicit(lv, sc.dynamics, icfg, s0=sc.s0, T=sc.T, seed=seed, L0=w.field)

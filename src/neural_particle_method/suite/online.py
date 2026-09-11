@@ -20,6 +20,10 @@ ONLINE_METHODS = {
     "explicit_rkhs": ("explicit", "rkhs"), "implicit_rkhs": ("implicit", "rkhs"),
     "explicit_ridge": ("explicit", "ridge"), "implicit_ridge": ("implicit", "ridge"),
     "explicit_spline": ("explicit", "spline"), "implicit_spline": ("implicit", "spline"),
+    "explicit_tuned_stale": ("explicit_tuned", None),
+    "explicit_tuned_rkhs": ("explicit_tuned", "rkhs"),
+    "explicit_tuned_ridge": ("explicit_tuned", "ridge"),
+    "explicit_tuned_spline": ("explicit_tuned", "spline"),
     "stale_L": ("explicit", "stale_L"), "nw_resolve": (None, "nw_resolve"),
 }
 

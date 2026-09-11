@@ -51,10 +51,15 @@ def online_jobs(settings=FULL, sids=None):
         for lag in LAGS:
             for seed in settings.seeds:
                 for method, (body, _) in ONLINE_METHODS.items():
-                    sizes = settings.offline_sizes if body and method != "stale_L" else (
-                        settings.offline_sizes[0],)
                     if body is None:
                         sizes = (0,)
+                    elif body == "explicit_tuned":
+                        # the head table quotes the tuned body at the largest size only
+                        sizes = (max(settings.offline_sizes),)
+                    elif method == "stale_L":
+                        sizes = (settings.offline_sizes[0],)
+                    else:
+                        sizes = settings.offline_sizes
                     for n in sizes:
                         jobs.append(("online", sid, method, n, lag.kind, seed))
     return jobs
