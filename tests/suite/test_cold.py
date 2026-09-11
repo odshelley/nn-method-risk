@@ -1,5 +1,6 @@
 import pytest
 
+from neural_particle_method.estimators import recipes as R
 from neural_particle_method.suite.artifacts import load_run
 from neural_particle_method.suite.cold import COLD_ALGOS, run_cold
 from neural_particle_method.suite.config import FULL, SMOKE, SuiteSettings, cold_algos
@@ -13,7 +14,8 @@ def store(tmp_path):
     return Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
 
 
-def test_full_settings_match_the_spec():
+def test_full_settings_match_the_spec(tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)      # a promoted recipe must not change this
     assert (FULL.explicit.n_steps, FULL.implicit.n_steps, FULL.reprice.n_steps) == (200, 200, 200)
     assert FULL.explicit.fit_v_floor is True and FULL.reprice.n_particles == 500_000
     assert FULL.explicit.fit_subsample == 100_000   # every per-slice fit uses the full online cloud

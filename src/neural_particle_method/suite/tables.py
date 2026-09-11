@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ..estimators.recipes import load_recipe, recipe_exists, recipe_hash
 from .config import FULL, SSVI_SIDS
 
 COLD_ROWS = (
@@ -41,6 +42,18 @@ BODY_OFFLINE_N = "500000"
 
 def _sids():
     return set(SSVI_SIDS)
+
+
+def _only_promoted_recipe(sel):
+    """Keep the rows written with the recipe that is currently promoted.
+
+    `validate --top k` leaves searched bodies and budget cells for every candidate in the store,
+    so a row that quoted them all would average the winner with the recipes it beat. Nothing
+    promoted, or runs written before the hash was logged, means the row has no numbers.
+    """
+    if not recipe_exists("explicit_opt") or "params.recipe_hash" not in sel.columns:
+        return sel.iloc[:0]
+    return sel[sel["params.recipe_hash"] == recipe_hash(load_recipe("explicit_opt"))]
 
 
 def _finished(store, experiment):
@@ -140,6 +153,8 @@ def bodies_frame(store, settings=FULL):
             sel = off[off["params.sid"].isin(_sids())
                       & (off["params.body"] == body)
                       & (_num(off, "params.n_particles") == n)]
+            if body.startswith("explicit_opt"):
+                sel = _only_promoted_recipe(sel)
             rows[key] = _agg(_prep(sel)) if len(sel) else EMPTY.copy()
     floor = EMPTY.copy()
     pde = cold_frame(store, settings).loc[FLOOR_LABEL]
@@ -174,6 +189,8 @@ def _head_cells(store, settings, method, budget, lag=None):
             return df
         sel = df[(df["params.method"] == method)
                  & (_num(df, "params.budget") == budget)]
+    if method.startswith("explicit_opt"):
+        sel = _only_promoted_recipe(sel)
     sel = sel[sel["params.sid"].isin(_sids())]
     return sel if lag is None else sel[sel["params.lag"] == lag]
 

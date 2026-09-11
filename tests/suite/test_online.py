@@ -43,6 +43,11 @@ def test_every_method_runs_on_the_spot_lag(store, method, tmp_path, monkeypatch)
         assert m["online_s"] == 0.0
     if method != "nw_resolve":
         assert p["offline_run"]
+    if method.startswith("explicit_opt"):
+        # the searched body is recipe-driven, so the run key names the promoted recipe
+        assert p["recipe_hash"] == R.recipe_hash(R.coerce_recipe(FAST))
+    else:
+        assert "recipe_hash" not in p
     assert run_online(store, "s01", method, n, LAGS[1], 0, TINY) == rid
 
 

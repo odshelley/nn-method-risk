@@ -10,7 +10,7 @@ from .cold import run_cold
 from .config import FULL, cold_algos
 from .lag import LAGS
 from .offline import STAGE_BODIES, run_offline
-from .online import ONLINE_METHODS, ensure_lagged_reference, run_online
+from .online import ONLINE_METHODS, ensure_lagged_reference, online_key, run_online
 from .reference import run_pde_floor
 
 STAGES = ("pde", "cold", "offline", "online")
@@ -123,9 +123,7 @@ def _is_finished(store, job, settings):
         return store.find_finished(settings.experiment("suite_offline"), key) is not None
     if kind == "online":
         _, sid, method, offline_n, lag_kind, seed = job
-        body, _ = ONLINE_METHODS[method]
-        key = {"sid": sid, "method": method, "offline_n": int(offline_n if body else 0),
-               "lag": lag_kind, "seed": int(seed), "n_steps": n_steps}
+        key = online_key(sid, method, offline_n, lag_kind, seed, n_steps)
         return store.find_finished(settings.experiment("suite_lagged"), key) is not None
     raise KeyError(kind)
 

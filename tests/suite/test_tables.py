@@ -3,6 +3,7 @@ import re
 import numpy as np
 import pytest
 
+from neural_particle_method.estimators import recipes as R
 from neural_particle_method.suite.config import FULL
 from neural_particle_method.suite.tables import (
     BODY_ROWS,
@@ -35,6 +36,11 @@ LAGGED = {  # (method, seed): pooled, liquid, online_s
     ("nw_resolve", 1): (49.0, 16.0, 1.0),
 }
 BUDGET = {"explicit_tuned_spline": (51.0, 0.4), "nw_resolve": (57.0, 0.5)}
+FAST = {"hidden": 16, "depth": 2, "lr": 1e-2, "batch_size": 0, "first_steps": 5,
+        "later_steps": 2, "weight_decay": 0.0, "fit_subsample": 400, "warm_start": True,
+        "mean_match": False, "monotone": False, "monotone_penalty": 0.0, "tail": "flat",
+        "hetero": False}
+PROMOTED_MAE, REJECTED_MAE = 33.0, 99.0
 
 
 @pytest.fixture
@@ -68,6 +74,43 @@ def store(tmp_path):
         with s.run("suite_budget_tuned", params) as h:
             h.log_metrics({"pooled_mae_bp": mae, "online_s": online_s})
     return s
+
+
+def _log_searched_runs(store, promoted_hash, rejected_hash):
+    """One searched body and one searched budget cell per recipe, as `validate --top 2` leaves."""
+    for h, mae in ((promoted_hash, PROMOTED_MAE), (rejected_hash, REJECTED_MAE)):
+        cell = {"sid": "s01", "method": "explicit_opt_spline", "budget": 10_000,
+                "lag": "surface", "seed": 0, "n_steps": 200, "recipe_hash": h}
+        with store.run("suite_budget_tuned", cell) as handle:
+            handle.log_metrics({"pooled_mae_bp": mae, "online_s": 0.3})
+        body = {"sid": "s01", "body": "explicit_opt", "n_particles": 500_000, "seed": 0,
+                "n_steps": 200, "recipe_hash": h}
+        with store.run("suite_offline", body) as handle:
+            handle.log_metrics({"pooled_mae_bp": mae, "liquid_mae_bp": mae / 2,
+                                "wings_mae_bp": mae * 2, "price_bp/pooled": 1.0,
+                                "total_s": 20.0, "fit_s": 20.0})
+
+
+def test_searched_rows_quote_only_the_promoted_recipe(store, tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)
+    R.save_recipe("explicit_opt", FAST)
+    _log_searched_runs(store, R.recipe_hash(R.coerce_recipe(FAST)),
+                       R.recipe_hash(R.coerce_recipe({**FAST, "hidden": 64})))
+    heads = heads_frame(store, FULL)
+    assert heads.loc["Searched body + spline head", "mae_surface_10k"] == pytest.approx(
+        PROMOTED_MAE)
+    bodies = bodies_frame(store, FULL)
+    assert bodies.loc[("Explicit NN, searched", "500k"), "mae_mean"] == pytest.approx(
+        PROMOTED_MAE)
+    assert bodies.loc[("Explicit NN, searched", "200k")].isna().all()
+
+
+def test_searched_rows_are_blank_until_a_recipe_is_promoted(store, tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path / "empty")
+    _log_searched_runs(store, "aaaaaaaaaa", "bbbbbbbbbb")
+    assert np.isnan(heads_frame(store, FULL).loc["Searched body + spline head",
+                                                 "mae_surface_10k"])
+    assert bodies_frame(store, FULL).loc[("Explicit NN, searched", "500k")].isna().all()
 
 
 def _two_stage(index):

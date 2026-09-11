@@ -7,6 +7,7 @@ from ..bench.runner import _leverage_error
 from ..bench.scenarios import full_registry
 from ..calibrate.explicit import calibrate_explicit
 from ..estimators import make_estimator
+from ..estimators.recipes import load_recipe, recipe_hash
 from ..tracking.store import git_hash, to_jsonable
 from .artifacts import load_run
 from .config import FULL
@@ -30,6 +31,18 @@ ONLINE_METHODS = {
 }
 
 
+def online_key(sid, method, offline_n, lag_kind, seed, n_steps):
+    """The identity of an online run. The searched body is recipe-driven, so its runs carry the
+    promoted recipe's hash as `run_offline` does: without it `find_finished` matches by
+    containment and a second promotion would read back the first recipe's runs."""
+    body, _ = ONLINE_METHODS[method]
+    key = {"sid": sid, "method": method, "offline_n": int(offline_n if body else 0),
+           "lag": lag_kind, "seed": int(seed), "n_steps": int(n_steps)}
+    if body == "explicit_opt":
+        key["recipe_hash"] = recipe_hash(load_recipe("explicit_opt"))
+    return key
+
+
 def _head(kind):
     return {"rkhs": RKHSHead(), "ridge": FeatureRidgeHead(), "spline": SplineHead()}[kind]
 
@@ -50,8 +63,7 @@ def run_online(store, sid, method, offline_n, lag, seed, settings=FULL):
         raise KeyError(f"unknown online method {method!r}; choose from {list(ONLINE_METHODS)}")
     body, head_kind = ONLINE_METHODS[method]
     n_steps = settings.explicit.n_steps
-    key = {"sid": sid, "method": method, "offline_n": int(offline_n if body else 0),
-           "lag": lag.kind, "seed": int(seed), "n_steps": int(n_steps)}
+    key = online_key(sid, method, offline_n, lag.kind, seed, n_steps)
     exp = settings.experiment("suite_lagged")
     existing = store.find_finished(exp, key)
     if existing is not None:

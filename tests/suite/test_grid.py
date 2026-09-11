@@ -19,7 +19,8 @@ FAST = {"hidden": 16, "depth": 2, "lr": 1e-2, "batch_size": 0, "first_steps": 5,
         "hetero": False}
 
 
-def test_full_job_counts():
+def test_full_job_counts(tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)      # counts before anything is promoted
     assert len(pde_jobs(FULL)) == 23 * 2 + 23 * 2   # floors (2 seeds) + lagged references (2 lags)
     assert len(cold_jobs(FULL)) == 23 * 10 * 2
     assert len(offline_jobs(FULL)) == 23 * 3 * 2
@@ -37,12 +38,14 @@ def test_job_lists_grow_when_a_recipe_is_promoted(tmp_path, monkeypatch):
     assert len(online_jobs(FULL)) == 23 * (8 * 2 + 4 + 2 + 1 + 1) * 2 * 2
 
 
-def test_tuned_methods_only_run_on_the_largest_body():
+def test_tuned_methods_only_run_on_the_largest_body(tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)
     sizes = {j[3] for j in online_jobs(FULL) if j[2].startswith("explicit_tuned_")}
     assert sizes == {max(FULL.offline_sizes)}
 
 
-def test_sid_filter_and_online_refuses_without_bodies(tmp_path):
+def test_sid_filter_and_online_refuses_without_bodies(tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path / "recipes")
     store = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     assert {j[1] for j in cold_jobs(TINY, sids=["s01"])} == {"s01"}
     with pytest.raises(RuntimeError, match="offline"):

@@ -1,12 +1,16 @@
 import pytest
 
 from neural_particle_method.cli import main
+from neural_particle_method.estimators import recipes as R
 from neural_particle_method.suite.config import SMOKE
 from neural_particle_method.tracking.store import Store
 
 
 @pytest.mark.slow
-def test_smoke_all_stages_end_to_end(tmp_path):
+def test_smoke_all_stages_end_to_end(tmp_path, monkeypatch):
+    # the counts below are the pre-promotion suite; a promoted recipe would add a cold row and
+    # two online methods, so pin the recipe directory empty rather than track the store's state
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path / "recipes")
     uri, root = f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art")
     assert main(["--tracking-uri", uri, "--artifact-root", root,
                 "suite", "run", "--stage", "all", "--smoke"]) == 0
