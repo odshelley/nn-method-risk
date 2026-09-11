@@ -8,7 +8,7 @@ from ..tracking.store import Store
 from .cold import COLD_ALGOS, run_cold
 from .config import FULL
 from .lag import LAGS
-from .offline import BODIES, run_offline
+from .offline import STAGE_BODIES, run_offline
 from .online import ONLINE_METHODS, ensure_lagged_reference, run_online
 from .reference import run_pde_floor
 
@@ -41,7 +41,7 @@ def cold_jobs(settings=FULL, sids=None):
 
 
 def offline_jobs(settings=FULL, sids=None):
-    return [("offline", sid, body, n) for sid in _sids(settings, sids) for body in BODIES
+    return [("offline", sid, body, n) for sid in _sids(settings, sids) for body in STAGE_BODIES
             for n in settings.offline_sizes]
 
 

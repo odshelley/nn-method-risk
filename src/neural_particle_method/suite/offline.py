@@ -3,26 +3,40 @@ online cell."""
 import time
 from dataclasses import replace
 
+import numpy as np
+
 from ..bench.algos import TUNED_KNOBS, TUNED_STEPS
 from ..bench.scenarios import full_registry
 from ..calibrate.explicit import calibrate_explicit
 from ..calibrate.implicit import calibrate_implicit
 from ..estimators.nn import NNRegressor
+from ..estimators.recipes import (
+    coerce_recipe,
+    explicit_config_from_recipe,
+    load_recipe,
+    recipe_hash,
+    regressor_from_recipe,
+)
 from ..tracking.store import git_hash
 from .artifacts import save_model
 from .config import FULL
 from .reference import score_field
 
-BODIES = ("explicit", "explicit_tuned", "implicit")
-EXPLICIT_BODIES = ("explicit", "explicit_tuned")
+BODIES = ("explicit", "explicit_tuned", "implicit", "explicit_opt")
+# what `suite run --stage offline` trains; `explicit_opt` is recipe-driven and run on demand
+STAGE_BODIES = ("explicit", "explicit_tuned", "implicit")
+EXPLICIT_BODIES = ("explicit", "explicit_tuned", "explicit_opt")
 
 
-def run_offline(store, sid, body, n_particles, settings=FULL, seed=0):
+def run_offline(store, sid, body, n_particles, settings=FULL, seed=0, recipe=None):
     if body not in BODIES:
         raise ValueError(f"body must be one of {BODIES}, got {body!r}")
     n_steps = settings.explicit.n_steps
     key = {"sid": sid, "body": body, "n_particles": int(n_particles), "seed": int(seed),
            "n_steps": int(n_steps)}
+    if body == "explicit_opt":
+        recipe = coerce_recipe(recipe if recipe is not None else load_recipe("explicit_opt"))
+        key["recipe_hash"] = recipe_hash(recipe)
     exp = settings.experiment("suite_offline")
     existing = store.find_finished(exp, key)
     if existing is not None:
@@ -33,17 +47,26 @@ def run_offline(store, sid, body, n_particles, settings=FULL, seed=0):
     # the tuned body trains on its own schedule; the logged explicit.* params say what was run
     ecfg = replace(settings.explicit, n_particles=int(n_particles),
                    **(TUNED_STEPS if tuned else {}))
+    if body == "explicit_opt":
+        ecfg = explicit_config_from_recipe(ecfg, recipe)
     icfg = replace(settings.implicit, n_particles=int(n_particles))
     params = {**key, "git_hash": git_hash(), **sc.as_params(),
               **{f"explicit.{k}": v for k, v in ecfg.as_params().items()},
               **{f"implicit.{k}": v for k, v in icfg.as_params().items()},
               **{f"reprice.{k}": v for k, v in settings.reprice.as_params().items()}}
+    if body == "explicit_opt":
+        params.update({f"recipe.{k}": v for k, v in recipe.items()})
     with store.run(exp, params) as h:
         t0 = time.perf_counter()
-        est = (NNRegressor(seed=seed, keep_slice_weights=True, **TUNED_KNOBS, **TUNED_STEPS)
-               if tuned else
-               NNRegressor(seed=seed, first_steps=ecfg.first_steps, later_steps=ecfg.later_steps,
-                           keep_slice_weights=(body == "explicit")))
+        if body == "explicit_opt":
+            est = regressor_from_recipe(recipe, seed=seed, keep_slice_weights=True,
+                                        monotone_sign=-float(np.sign(sc.dynamics.rho) or 1.0))
+        elif tuned:
+            est = NNRegressor(seed=seed, keep_slice_weights=True, **TUNED_KNOBS, **TUNED_STEPS)
+        else:
+            est = NNRegressor(seed=seed, first_steps=ecfg.first_steps,
+                              later_steps=ecfg.later_steps,
+                              keep_slice_weights=(body == "explicit"))
         w = calibrate_explicit(lv, sc.dynamics, est, ecfg, s0=sc.s0, T=sc.T, seed=seed)
         if body in EXPLICIT_BODIES:
             field, model, fit_s = w.field, est, w.fit_s
