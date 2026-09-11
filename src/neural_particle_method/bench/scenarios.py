@@ -99,6 +99,39 @@ def make_registry():
     return reg
 
 
+def feller_ratio(dyn):
+    return 2.0 * dyn.kappa * dyn.theta / dyn.xi ** 2
+
+
+TUNING_STRATA = ((0.0, 0.3), (0.3, 0.7), (0.7, float("inf")))   # Feller ratio bands
+
+
+def make_tuning_registry(n=24, seed=5000):
+    """A held-out set for estimator tuning: the registry's parameter ranges, stratified so that
+    each Feller band gets n/3 scenarios. Deterministic in `seed`; ids t01..t{n}."""
+    quota = [n // 3] * 3
+    quota[1] += n - sum(quota)
+    picked, i = [], 0
+    while len(picked) < n:
+        rng = np.random.default_rng(seed + i)
+        i += 1
+        if i > 100_000:
+            raise RuntimeError("tuning registry: strata not fillable")
+        p = _draw_ssvi(rng)
+        dyn = HestonParams(kappa=float(rng.choice(KAPPAS)), theta=p.sigma0 ** 2,
+                           xi=float(rng.choice(XIS)), rho=float(rng.choice(RHOS)),
+                           v0=p.sigma0 ** 2)
+        fr = feller_ratio(dyn)
+        band = next(j for j, (lo, hi) in enumerate(TUNING_STRATA) if lo <= fr < hi
+                    or (j == 2 and fr >= lo))
+        if quota[band] == 0:
+            continue
+        quota[band] -= 1
+        picked.append((p, dyn))
+    return {f"t{k:02d}": ScenarioSpec(f"t{k:02d}", p, dyn) for k, (p, dyn) in
+            enumerate(picked, start=1)}
+
+
 def fig3_registry():
     base = make_registry()["s01"]
     reg = {}
