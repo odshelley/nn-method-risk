@@ -1,0 +1,81 @@
+import numpy as np
+import pytest
+import torch
+
+from neural_particle_method.estimators.nadaraya_watson import nw_local_variance
+from neural_particle_method.estimators.nn import NNRegressor, SliceNet
+
+rng = np.random.default_rng(0)
+LNX = rng.normal(0.0, 0.3, 300)
+V = 0.04 * np.exp(-2.0 * LNX) * (1 + 0.3 * rng.normal(size=300))   # decreasing target
+GRID = np.linspace(-0.8, 0.8, 41)
+
+
+def test_defaults_are_bit_for_bit():
+    a = NNRegressor(seed=0, first_steps=5, later_steps=2).fit_predict(0.5, LNX, V, GRID)
+    b = NNRegressor(seed=0, first_steps=5, later_steps=2, weight_decay=0.0, warm_start=True,
+                    mean_match=False, monotone_penalty=0.0, hetero=False).fit_predict(
+        0.5, LNX, V, GRID)
+    np.testing.assert_array_equal(a, b)
+
+
+def test_log_scale_buffer_defaults_to_identity_and_loads_old_state():
+    net = SliceNet()
+    assert "log_scale" in net.state_dict() and float(net.log_scale) == 0.0
+    old = {k: v for k, v in net.state_dict().items() if k != "log_scale"}
+    fresh = SliceNet()
+    fresh.load_state_dict(old, strict=False)
+    z = torch.zeros(3, 1)
+    torch.testing.assert_close(fresh(z), net(z))
+
+
+def test_mean_match_reproduces_the_sample_mean():
+    est = NNRegressor(seed=0, first_steps=20, later_steps=5, mean_match=True)
+    est.fit_predict(0.5, LNX, V, GRID)
+    assert abs(est.predict(LNX).mean() - V.mean()) < 1e-6 * V.mean()
+
+
+def test_mean_match_is_weighted():
+    w = rng.uniform(0.5, 1.5, 300)
+    est = NNRegressor(seed=0, first_steps=20, later_steps=5, mean_match=True)
+    est.fit_predict(0.5, LNX, V, GRID, weights=w)
+    assert abs(np.average(est.predict(LNX), weights=w) - np.average(V, weights=w)) < 1e-6 * V.mean()
+
+
+def test_monotone_penalty_is_zero_on_a_decreasing_fit_and_positive_on_an_increasing_one():
+    # lambda = 0.01, not 1.0: the penalty is normalised by V_SCALE ** 2 while the data loss is on
+    # the raw V_SCALE ** 2 scale, so lambda = 1.0 weights the prior ~600x the data, flattens the
+    # fit outright and leaves a violation of ~1e-6 at every step budget from 100 to 1600. At 0.01
+    # the prior and the data actually trade off, which is what the penalty has to register.
+    dec = NNRegressor(seed=0, first_steps=200, later_steps=5, monotone_penalty=0.01,
+                      monotone_sign=1.0)
+    dec.fit_predict(0.5, LNX, V, GRID)
+    assert dec.last_penalty < 1e-6
+    inc = NNRegressor(seed=0, first_steps=200, later_steps=5, monotone_penalty=0.01,
+                      monotone_sign=-1.0)
+    inc.fit_predict(0.5, LNX, V, GRID)
+    assert inc.last_penalty > 1e-4
+
+
+def test_warm_start_off_refits_from_scratch():
+    cold = NNRegressor(seed=0, first_steps=5, later_steps=2, warm_start=False)
+    a = cold.fit_predict(0.5, LNX, V, GRID)
+    b = cold.fit_predict(0.6, LNX, V, GRID)
+    fresh = NNRegressor(seed=0, first_steps=5, later_steps=2).fit_predict(0.5, LNX, V, GRID)
+    np.testing.assert_array_equal(a, fresh)
+    assert not np.array_equal(a, b)        # re-initialised with a different seed offset
+    assert cold._n_fits == 2
+
+
+def test_hetero_weights_are_positive_with_mean_one():
+    var = nw_local_variance(LNX, V)
+    assert var.shape == (300,) and (var > 0).all()
+    est = NNRegressor(seed=0, first_steps=3, later_steps=1, hetero=True)
+    est.fit_predict(0.5, LNX, V, GRID)
+    w = est.last_weights
+    assert w.shape == (300,) and (w > 0).all() and abs(w.mean() - 1.0) < 1e-9
+
+
+def test_weight_decay_reaches_the_optimiser():
+    est = NNRegressor(weight_decay=1e-4)
+    assert est.opt.param_groups[0]["weight_decay"] == pytest.approx(1e-4)

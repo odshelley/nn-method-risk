@@ -70,7 +70,7 @@ class SliceBank:
         depth = d.get("depth", 2)
         for sd in d["state_dicts"]:
             n = SliceNet(d["hidden"], depth)
-            n.load_state_dict(sd)
+            n.load_state_dict(sd, strict=False)   # banks stored before `log_scale` existed
             nets.append(n)
         return cls(d["times"], nets)
 

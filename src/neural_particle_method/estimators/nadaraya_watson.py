@@ -34,9 +34,9 @@ def quartic_kernel(u):
 
 
 class GHLKernel:
-    """Nadaraya-Watson in spot with the GHL rule-of-thumb bandwidth as stated by Cozma et al. (2019):
-    h(t) = c * 1.5 * S0 * sigma_LV(S0, t) * sqrt(max(t, 0.25)) * N^(-1/5). Quartic kernel by default.
-    Without a local-vol object the ATM vol is proxied by sqrt(mean(v)) of the cloud.
+    """Nadaraya-Watson in spot with the GHL rule-of-thumb bandwidth as stated by Cozma et al.
+    (2019): h(t) = c * 1.5 * S0 * sigma_LV(S0, t) * sqrt(max(t, 0.25)) * N^(-1/5). Quartic kernel
+    is the default. Without a local-vol object the ATM vol is proxied by sqrt(mean(v)) of the cloud.
 
     N in the bandwidth rule is `len(lnx)` as delivered by the harness: the fitted sample size
     (`ExplicitConfig.fit_subsample`, 30 000 by default), not the full particle count. So at a
@@ -47,7 +47,8 @@ class GHLKernel:
     def __init__(self, c=1.0, kernel="quartic", local_vol=None, s0=1.0, fixed_scale=None):
         if kernel not in ("quartic", "gaussian"):
             raise ValueError(f"unknown kernel {kernel!r}")
-        self.c, self.kernel, self.local_vol, self.s0, self.fixed_scale = c, kernel, local_vol, s0, fixed_scale
+        self.c, self.kernel, self.local_vol = c, kernel, local_vol
+        self.s0, self.fixed_scale = s0, fixed_scale
 
     def sigma_atm(self, t, v):
         if self.local_vol is not None:
@@ -77,3 +78,13 @@ class GHLKernel:
             else:
                 f[~ok] = np.interp(grid[~ok], grid[ok], f[ok])
         return f
+
+
+def nw_local_variance(lnx, v, weights=None, bandwidth=None, n_grid=101):
+    """Conditional variance of v given lnx at every particle: NW estimates of E[v|x] and E[v^2|x]
+    on a quantile grid, interpolated back to the particles, floored at 1e-8."""
+    grid = np.unique(np.quantile(lnx, np.linspace(0.001, 0.999, n_grid)))
+    m1 = nw_estimate(lnx, v, grid, weights=weights, bandwidth=bandwidth)
+    m2 = nw_estimate(lnx, v ** 2, grid, weights=weights, bandwidth=bandwidth)
+    var = np.clip(m2 - m1 ** 2, 1e-8, None)
+    return np.interp(lnx, grid, var)
