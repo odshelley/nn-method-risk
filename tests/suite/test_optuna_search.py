@@ -124,8 +124,8 @@ def test_the_worker_loads_the_study_with_the_spec_sampler_and_pruner(store, tmp_
     monkeypatch.setattr(S, "suggest_recipe", lambda trial: dict(FAST))
     seen, real = [], S._load_study
 
-    def spy(study, storage):
-        seen.append(real(study, storage))
+    def spy(study, storage, seed=0):
+        seen.append(real(study, storage, seed))
         return seen[-1]
 
     monkeypatch.setattr(S, "_load_study", spy)
@@ -136,6 +136,18 @@ def test_the_worker_loads_the_study_with_the_spec_sampler_and_pruner(store, tmp_
     for st in seen:
         assert isinstance(st.sampler, optuna.samplers.TPESampler)
         assert st.pruner._n_startup_trials == 10 and st.pruner._n_warmup_steps == 1
+
+
+def test_each_worker_gets_its_own_sampler_seed():
+    """Workers share one storage, so an identical sampler seed duplicates the startup trials."""
+    import neural_particle_method.suite.optuna_search as S
+
+    def draw(seed):
+        return S._sampler_and_pruner(seed)[0]._rng.rng.random_sample(4).tolist()
+
+    assert draw(0) == draw(0), "the same seed must be reproducible"
+    assert S._sampler_and_pruner()[0]._rng.rng.random_sample(4).tolist() == draw(0)
+    assert draw(3) != draw(0) and draw(1) != draw(0)
 
 
 def test_top_recipes_is_empty_and_writes_nothing_for_an_unknown_study(store):

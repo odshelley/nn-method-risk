@@ -96,24 +96,25 @@ def _storage(storage_dir, study):
     return f"sqlite:///{Path(storage_dir) / f'{study}.db'}"
 
 
-def _sampler_and_pruner():
-    """Optuna persists neither in storage, so every open of the study must rebuild both."""
-    return (optuna.samplers.TPESampler(seed=0),
+def _sampler_and_pruner(seed=0):
+    """Optuna persists neither in storage, so every open of the study must rebuild both. `seed`
+    is the worker index: concurrent workers must not draw the same startup trials."""
+    return (optuna.samplers.TPESampler(seed=seed),
             optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=1))
 
 
-def _load_study(study, storage):
-    sampler, pruner = _sampler_and_pruner()
+def _load_study(study, storage, seed=0):
+    sampler, pruner = _sampler_and_pruner(seed)
     return optuna.load_study(study_name=study, storage=storage, sampler=sampler, pruner=pruner)
 
 
 def _trial_worker(args):
     """One process: runs `n` trials of the shared study, logging each as a nested MLflow run."""
-    uri, root, study, storage, parent, cloud_runs, per_trial, n, cache_dir, seed = args
+    uri, root, study, storage, parent, cloud_runs, per_trial, n, cache_dir, seed, widx = args
     store = Store(uri, root)
     clouds = {rid: load_cloud(store, rid, cache_dir=None if cache_dir is None
                               else Path(cache_dir) / rid) for rid in cloud_runs}
-    st = _load_study(study, storage)
+    st = _load_study(study, storage, seed=widx)
     exp = store.experiment_id(EXPERIMENT)
 
     def objective(trial):
@@ -161,13 +162,14 @@ def run_study(store, study, n_trials, n_jobs=1, settings=FULL, sids=TUNING_SIDS,
               times=SLICE_TIMES, registry=None, storage_dir=STORAGE_DIR, cache_dir=None, seed=0):
     cloud_runs = [ensure_cloud(store, sid, settings, registry, times) for sid in sids]
     storage = _storage(storage_dir, study)
-    sampler, pruner = _sampler_and_pruner()
+    sampler, pruner = _sampler_and_pruner(seed=0)
     optuna.create_study(study_name=study, storage=storage, load_if_exists=True,
                         direction="minimize", sampler=sampler, pruner=pruner)
     parent = study_parent(store, study)
     per_proc = [n_trials // n_jobs + (1 if i < n_trials % n_jobs else 0) for i in range(n_jobs)]
     args = [(store.tracking_uri, store.artifact_root, study, storage, parent, cloud_runs,
-             per_trial, n, cache_dir, seed) for n in per_proc if n > 0]
+             per_trial, n, cache_dir, seed, widx)
+            for widx, n in enumerate(per_proc) if n > 0]
     if n_jobs == 1:
         _trial_worker(args[0])
     else:
