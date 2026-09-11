@@ -199,6 +199,37 @@ def _cell(x, fmt="{:.0f}"):
     return "--" if x is None or (isinstance(x, float) and np.isnan(x)) else fmt.format(x)
 
 
+FLOOR_LABEL = "PDE (attainable floor)"
+
+
+def _render_rows(rows, secs_cols=()):
+    """Render table rows, bolding the best value in every column.
+
+    `rows` is a list of (prefix, cells) with cells a list of (value, fmt). The best is the
+    smallest value among the rows whose prefix is not the PDE floor (the reference, never a
+    contender); in the `secs_cols` columns a zero (no online work) does not count. Ties at the
+    displayed precision are all bold.
+    """
+    n = max((len(cells) for _, cells in rows), default=0)
+    best = []
+    for j in range(n):
+        vals = [cells[j][0] for prefix, cells in rows
+                if not prefix.startswith(FLOOR_LABEL) and cells[j][0] is not None
+                and np.isfinite(cells[j][0]) and not (j in secs_cols and cells[j][0] <= 0)]
+        best.append(min(vals) if vals else None)
+    lines = []
+    for prefix, cells in rows:
+        out = []
+        for j, (v, fmt) in enumerate(cells):
+            txt = _cell(v, fmt)
+            if (best[j] is not None and not prefix.startswith(FLOOR_LABEL) and txt != "--"
+                    and txt == fmt.format(best[j])):
+                txt = f"\\textbf{{{txt}}}"
+            out.append(txt)
+        lines.append(f"{prefix} & " + " & ".join(out) + "\\\\")
+    return lines
+
+
 def _cold_tex(df):
     lines = [
         "\\begin{tabular}{l rrrrr r}", "\\toprule",
@@ -206,12 +237,11 @@ def _cold_tex(df):
         "\\cmidrule(lr){2-5}",
         "& mean & median & liquid & wings & pooled & median\\\\", "\\midrule",
     ]
-    for label, r in df.iterrows():
-        cells = [
-            _cell(r.mae_mean), _cell(r.mae_median), _cell(r.liquid_mean), _cell(r.wings_mean),
-            _cell(r.p_pooled_mean, "{:.1f}"), _cell(r.lat_median, "{:.1f}"),
-        ]
-        lines.append(f"{label} & " + " & ".join(cells) + "\\\\")
+    f0, f1 = "{:.0f}", "{:.1f}"
+    rows = [(label, [(r.mae_mean, f0), (r.mae_median, f0), (r.liquid_mean, f0),
+                     (r.wings_mean, f0), (r.p_pooled_mean, f1), (r.lat_median, f1)])
+            for label, r in df.iterrows()]
+    lines += _render_rows(rows, secs_cols={5})
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
@@ -221,12 +251,11 @@ def _bodies_tex(df):
         "\\begin{tabular}{l l rrr r r}", "\\toprule",
         "body & particles & pooled & liquid & wings & price, bp & s\\\\", "\\midrule",
     ]
-    for (label, size), r in df.iterrows():
-        cells = [
-            _cell(r.mae_mean), _cell(r.liquid_mean), _cell(r.wings_mean),
-            _cell(r.p_pooled_mean, "{:.1f}"), _cell(r.train_s, "{:.1f}"),
-        ]
-        lines.append(f"{label} & {size} & " + " & ".join(cells) + "\\\\")
+    f0, f1 = "{:.0f}", "{:.1f}"
+    rows = [(f"{label} & {size}", [(r.mae_mean, f0), (r.liquid_mean, f0), (r.wings_mean, f0),
+                                   (r.p_pooled_mean, f1), (r.train_s, f1)])
+            for (label, size), r in df.iterrows()]
+    lines += _render_rows(rows, secs_cols={4})
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 
@@ -243,13 +272,17 @@ def _heads_tex(df, budgets=(10_000, 30_000, 80_000, 100_000)):
         "\\cmidrule(lr){2-6}\\cmidrule(lr){7-11}\\cmidrule(lr){12-13}",
         "& " + " & ".join(sub) + "\\\\", "\\midrule",
     ]
+    f0, f1 = "{:.0f}", "{:.1f}"
+    rows = []
     for label, r in df.iterrows():
         cells = []
         for lag in LAGS:
-            cells += [_cell(r[f"mae_{lag}_{_label(b)}"]) for b in budgets]
-            cells.append(_cell(r[f"liquid_{lag}_{_label(budgets[-1])}"]))
-        cells += [_cell(r[f"s_{_label(b)}"], "{:.1f}") for b in (budgets[0], budgets[-1])]
-        lines.append(f"{label} & " + " & ".join(cells) + "\\\\")
+            cells += [(r[f"mae_{lag}_{_label(b)}"], f0) for b in budgets]
+            cells.append((r[f"liquid_{lag}_{_label(budgets[-1])}"], f0))
+        cells += [(r[f"s_{_label(b)}"], f1) for b in (budgets[0], budgets[-1])]
+        rows.append((label, cells))
+    n_vol = 5 * len(LAGS)
+    lines += _render_rows(rows, secs_cols={n_vol, n_vol + 1})
     lines += ["\\bottomrule", "\\end{tabular}"]
     return "\n".join(lines) + "\n"
 

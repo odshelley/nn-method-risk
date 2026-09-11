@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pytest
 
@@ -6,6 +8,7 @@ from neural_particle_method.suite.tables import (
     BODY_ROWS,
     COLD_ROWS,
     HEAD_ROWS,
+    _render_rows,
     bodies_frame,
     cold_frame,
     heads_frame,
@@ -141,9 +144,32 @@ def test_section4_tables_writes_three_files(store, tmp_path):
         "suite_bodies.tex", "suite_cold.tex", "suite_heads.tex"]
 
 
+def _plain(text):
+    """Strip the bold wrappers so the number layout can be compared on its own."""
+    return re.sub(r"\\textbf\{([^}]*)\}", r"\1", text)
+
+
+def test_render_rows_bolds_the_best_and_skips_the_floor_and_zero_seconds():
+    f = "{:.1f}"
+    rows = [("PDE (attainable floor)", [(1.0, f), (5.0, f)]),
+            ("stale", [(3.0, f), (0.0, f)]),
+            ("head", [(2.0, f), (2.0, f)]),
+            ("nw", [(2.04, f), (4.0, f)])]
+    lines = _render_rows(rows, secs_cols={1})
+    assert lines[0] == "PDE (attainable floor) & 1.0 & 5.0\\\\"
+    assert lines[1] == "stale & 3.0 & 0.0\\\\"
+    assert lines[2] == "head & \\textbf{2.0} & \\textbf{2.0}\\\\"
+    assert lines[3] == "nw & \\textbf{2.0} & 4.0\\\\"   # a tie at the displayed precision
+
+
 def test_cold_tex_columns_and_formats(store, tmp_path):
     section4_tables(store, tmp_path / "tables", FULL)
-    cold = (tmp_path / "tables" / "suite_cold.tex").read_text()
+    raw = (tmp_path / "tables" / "suite_cold.tex").read_text()
+    cold = _plain(raw)
+    nw_line = next(ln for ln in raw.splitlines() if ln.startswith("NW &"))
+    assert nw_line.count("\\textbf{") == 6      # the only method row with numbers
+    pde_line = next(ln for ln in raw.splitlines() if ln.startswith("PDE"))
+    assert "\\textbf" not in pde_line
     expected = (f"NW & {_two_stage(0):.0f} & {_two_stage(0):.0f} & {_two_stage(1):.0f} & "
                 f"{_two_stage(2):.0f} & {_two_stage(3):.1f} & 1.0")
     assert f"{expected}\\\\" in cold
@@ -155,7 +181,10 @@ def test_cold_tex_columns_and_formats(store, tmp_path):
 
 def test_bodies_tex_has_a_size_column_and_the_floor_row(store, tmp_path):
     section4_tables(store, tmp_path / "tables", FULL)
-    bodies = (tmp_path / "tables" / "suite_bodies.tex").read_text()
+    raw = (tmp_path / "tables" / "suite_bodies.tex").read_text()
+    bodies = _plain(raw)
+    assert "\\textbf{" in raw
+    assert "\\textbf" not in next(ln for ln in raw.splitlines() if ln.startswith("PDE"))
     assert "body & particles & pooled & liquid & wings & price, bp & s\\\\" in bodies
     assert "Explicit NN, tuned & 500k & 50 & 18 & 72 & 4.5 & 9000.0\\\\" in bodies
     assert "Explicit NN, short training & 200k & -- & -- & -- & -- & --\\\\" in bodies
@@ -164,7 +193,7 @@ def test_bodies_tex_has_a_size_column_and_the_floor_row(store, tmp_path):
 
 def test_heads_tex_renders_missing_cells_as_dashes(store, tmp_path):
     section4_tables(store, tmp_path / "tables", FULL)
-    heads = (tmp_path / "tables" / "suite_heads.tex").read_text()
+    heads = _plain((tmp_path / "tables" / "suite_heads.tex").read_text())
     assert "\\begin{tabular}{l rrrrr rrrrr rr}" in heads
     assert ("& 10k & 30k & 80k & 100k & liquid & 10k & 30k & 80k & 100k & liquid & "
             "10k & 100k\\\\") in heads

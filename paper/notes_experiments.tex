@@ -178,7 +178,7 @@ One calibration from scratch per method, scenario and seed at $100\,000$ particl
 \end{enumerate}
 
 \begin{table}[h]\centering\footnotesize
-\caption{Cold suite, $20$ SSVI scenarios, mean and median over scenarios and two seeds. Liquid: $|k|\le0.25$, $T\ge0.5$. The PDE row is the attainable floor of the scoring, its seed-to-seed spread is $6.6\bp$ (the Monte Carlo noise floor of the score), and its latency is the Fokker--Planck solve.}\label{tab:suite-cold}
+\caption{Cold suite, $20$ SSVI scenarios, mean and median over scenarios and two seeds. Liquid: $|k|\le0.25$, $T\ge0.5$. The PDE row is the attainable floor of the scoring, its seed-to-seed spread is $6.6\bp$ (the Monte Carlo noise floor of the score), and its latency is the Fokker--Planck solve. Bold: the best method row in each column; the PDE floor is the reference and is not a contender.}\label{tab:suite-cold}
 \input{tables/suite_cold.tex}
 \end{table}
 
@@ -198,7 +198,7 @@ An overnight calibration is done on surface $S_0$; the intraday market is $S_1$,
 \emph{Offline stage} (experiment \code{suite\_offline}, one run per scenario, body type and particle count): a full calibration on $S_0$ at $200\,000$ or $500\,000$ particles, $200$ steps, seed $0$. Three bodies are trained. The \textbf{explicit NN, short training} is the per-slice network pass on the paper's schedule ($400$ Adam steps on the first slice, $120$ on each later slice, full batch); the \textbf{explicit NN, tuned} is the same pass with the network and schedule of item~3 of \cref{sec:suite-cold} ($1\to64\to64\to64\to1$ SiLU, minibatch Adam, $2000$ steps on the first slice and $500$ on each later slice); both save the per-slice networks and the per-slice denominators $f_k$. The \textbf{implicit NN} is the damped global loop of \cref{sec:implicit} and saves the global network. Each body is scored here as a cold calibrator on its own overnight surface $S_0$, against the same repricer and the same quotes as \cref{sec:suite-cold}, so the table says what a body is worth before any lag. These runs are cached and reused by every online cell below.
 
 \begin{table}[h]\centering\footnotesize
-\caption{Offline bodies as cold calibrators on $S_0$, $20$ SSVI scenarios, seed $0$; training time is the full offline calibration.}\label{tab:suite-bodies}
+\caption{Offline bodies as cold calibrators on $S_0$, $20$ SSVI scenarios, seed $0$; training time is the full offline calibration. Bold: the best method row in each column; the PDE floor is the reference and is not a contender.}\label{tab:suite-bodies}
 \input{tables/suite_bodies.tex}
 \end{table}
 
@@ -217,7 +217,7 @@ An overnight calibration is done on surface $S_0$; the intraday market is $S_1$,
 The online reference row is NW re-solved from scratch on $S_1$ at the same budget and $200$ steps (the best intraday strategy in the floor-corrected bump runs, experiment \code{bump\_floor}). The online budget is varied over $10\,000$, $30\,000$, $80\,000$ and $100\,000$ particles, with every fit on the whole online cloud: the $100\,000$ column is experiment \code{suite\_lagged}, the other three are \code{suite\_budget\_tuned} (\code{scripts/budget\_sweep.py}). The same four heads on the short-trained explicit body and on the implicit body are also in the store (experiment \code{suite\_lagged}) and are summarised in \cref{sec:studies}.
 
 \begin{table}[h]\centering\footnotesize
-\caption{Frozen tuned body ($500\,000$ particles) with an online head, against NW re-solved from scratch, by online particle budget: pooled MAE in vol bp, $20$ SSVI scenarios, two online seeds, both lags; liquid MAE at $100\,000$; online seconds at $10\,000$ and $100\,000$ particles (median).}\label{tab:suite-heads}
+\caption{Frozen tuned body ($500\,000$ particles) with an online head, against NW re-solved from scratch, by online particle budget: pooled MAE in vol bp, $20$ SSVI scenarios, two online seeds, both lags; liquid MAE at $100\,000$; online seconds at $10\,000$ and $100\,000$ particles (median). Bold: the best method row in each column; the PDE floor is the reference and is not a contender, and a zero online time (no online work) does not count.}\label{tab:suite-heads}
 \resizebox{\textwidth}{!}{\input{tables/suite_heads.tex}}
 \end{table}
 
