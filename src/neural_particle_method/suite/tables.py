@@ -54,6 +54,8 @@ def _agg(g):
     per_sid = g.groupby("params.sid").agg(
         mae=("mae", "mean"), rmse=("rmse", "mean"), wings=("wings", "mean"),
         t025=("t025", "mean"), lev=("lev", "median"), lat=("lat", "median"),
+        p_pooled=("p_pooled", "mean"), p_wings=("p_wings", "mean"),
+        p_near=("p_near", "mean"), p_max=("p_max", "mean"), p_t2=("p_t2", "mean"),
     )
     return pd.Series({
         "mae_mean": per_sid.mae.mean(), "mae_median": per_sid.mae.median(),
@@ -61,6 +63,9 @@ def _agg(g):
         "wings_mean": per_sid.wings.mean(), "wings_median": per_sid.wings.median(),
         "t025_mean": per_sid.t025.mean(), "lev_median": per_sid.lev.median(),
         "lat_median": per_sid.lat.median(),
+        "p_pooled_mean": per_sid.p_pooled.mean(), "p_pooled_median": per_sid.p_pooled.median(),
+        "p_wings_mean": per_sid.p_wings.mean(), "p_near_mean": per_sid.p_near.mean(),
+        "p_max_mean": per_sid.p_max.mean(), "p_t2_mean": per_sid.p_t2.mean(),
     })
 
 
@@ -76,12 +81,19 @@ def _prep(df):
         out["lat"] = _num(df, "metrics.online_s")
     else:
         out["lat"] = _num(df, "metrics.fit_s")
+    out["p_pooled"] = _num(df, "metrics.price_bp/pooled")
+    out["p_wings"] = _num(df, "metrics.price_bp/wings")
+    out["p_near"] = _num(df, "metrics.price_bp/near")
+    out["p_max"] = _num(df, "metrics.price_bp/max")
+    out["p_t2"] = _num(df, "metrics.price_bp/T2")
     return out
 
 
 EMPTY = pd.Series({k: np.nan for k in (
     "mae_mean", "mae_median", "rmse_mean", "rmse_median", "wings_mean",
     "wings_median", "t025_mean", "lev_median", "lat_median",
+    "p_pooled_mean", "p_pooled_median", "p_wings_mean", "p_near_mean",
+    "p_max_mean", "p_t2_mean",
 )})
 
 
@@ -178,6 +190,54 @@ def _lagged_tex(df, family="ssvi"):
     return "\n".join(lines) + "\n"
 
 
+def _cold_price_tex(df, family="ssvi"):
+    """Price-space companion to `_cold_tex`: absolute option-price error in bp of spot."""
+    t2 = family != "heston"
+    cols = ["pooled mean", "pooled median", "near-money", "wings"]
+    if t2:
+        cols.append("$T=2$")
+    cols.append("worst quote")
+    lines = [
+        "\\begin{tabular}{l " + "r" * len(cols) + "}", "\\toprule",
+        "method & " + " & ".join(cols) + "\\\\", "\\midrule",
+    ]
+    for label, r in df.iterrows():
+        cells = [
+            _cell(r.p_pooled_mean, "{:.1f}"), _cell(r.p_pooled_median, "{:.1f}"),
+            _cell(r.p_near_mean, "{:.1f}"), _cell(r.p_wings_mean, "{:.1f}"),
+        ]
+        if t2:
+            cells.append(_cell(r.p_t2_mean, "{:.1f}"))
+        cells.append(_cell(r.p_max_mean, "{:.1f}"))
+        lines.append(f"{label} & " + " & ".join(cells) + "\\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def _lagged_price_tex(df, family="ssvi"):
+    """Price-space companion to `_lagged_tex`: absolute option-price error in bp of spot."""
+    del family  # same four columns for both families; kept for signature symmetry
+    lines = [
+        "\\begin{tabular}{l l rrrr}", "\\toprule",
+        "method & offline $N$ & pooled & near-money & wings & worst quote\\\\",
+        "\\midrule",
+    ]
+    for lag in ("surface", "surface_spot"):
+        lines.append(f"\\multicolumn{{6}}{{l}}{{\\emph{{{LAG_TITLES[lag]}}}}}\\\\")
+        for (lg, label, size), r in df.iterrows():
+            if lg != lag:
+                continue
+            cells = [
+                _cell(r.p_pooled_mean, "{:.1f}"), _cell(r.p_near_mean, "{:.1f}"),
+                _cell(r.p_wings_mean, "{:.1f}"), _cell(r.p_max_mean, "{:.1f}"),
+            ]
+            lines.append(f"{label} & {size} & " + " & ".join(cells) + "\\\\")
+        if lag == "surface":
+            lines.append("\\midrule")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
 def _tex(x):
     return str(x).replace("_", "\\_")
 
@@ -235,14 +295,20 @@ def _appendix_tex(store, settings):
 def section4_tables(store, out_dir="paper/tables", settings=FULL):
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    cold_ssvi = cold_frame(store, settings, "ssvi")
+    cold_heston = cold_frame(store, settings, "heston")
+    lagged_ssvi = lagged_frame(store, settings, "ssvi")
+    lagged_heston = lagged_frame(store, settings, "heston")
     files = {
-        "suite_cold_ssvi.tex": _cold_tex(cold_frame(store, settings, "ssvi")),
-        "suite_cold_heston.tex": _cold_tex(cold_frame(store, settings, "heston")),
-        "suite_lagged_ssvi.tex": _lagged_tex(lagged_frame(store, settings, "ssvi"),
-                                            "ssvi"),
-        "suite_lagged_heston.tex": _lagged_tex(
-            lagged_frame(store, settings, "heston"), "heston"),
+        "suite_cold_ssvi.tex": _cold_tex(cold_ssvi),
+        "suite_cold_heston.tex": _cold_tex(cold_heston),
+        "suite_lagged_ssvi.tex": _lagged_tex(lagged_ssvi, "ssvi"),
+        "suite_lagged_heston.tex": _lagged_tex(lagged_heston, "heston"),
         "suite_appendix.tex": _appendix_tex(store, settings),
+        "suite_cold_ssvi_price.tex": _cold_price_tex(cold_ssvi, "ssvi"),
+        "suite_cold_heston_price.tex": _cold_price_tex(cold_heston, "heston"),
+        "suite_lagged_ssvi_price.tex": _lagged_price_tex(lagged_ssvi, "ssvi"),
+        "suite_lagged_heston_price.tex": _lagged_price_tex(lagged_heston, "heston"),
     }
     paths = []
     for name, text in files.items():

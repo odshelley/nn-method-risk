@@ -204,6 +204,13 @@ Budget at 4 workers on this machine, from stored timings scaled to 200 steps and
 - `suite_cold_heston.tex`: same rows, the three Heston scenarios, no wings columns.
 - `suite_lagged_ssvi.tex` and `suite_lagged_heston.tex`: one block per lag kind; rows `stale_L`, `nw_resolve`, then the six methods each at 200k and 500k; columns mean pooled MAE, pooled RMSE, wings MAE, `mae_bp/T0.25`, median `online_s`.
 - `suite_appendix.tex`: per-scenario pooled MAE, one table per experiment, scenarios as rows and methods as columns, seeds averaged.
+- `suite_cold_ssvi_price.tex` and `suite_cold_heston_price.tex`: price-space companions to the cold
+  tables, same row order; columns pooled mean, pooled median, near-money, wings, `T=2` (dropped for
+  Heston, which has a single one-year maturity), worst quote, from `price_bp/pooled`,
+  `price_bp/wings`, `price_bp/near`, `price_bp/max`, `price_bp/T2`; one decimal, `--` when absent.
+- `suite_lagged_ssvi_price.tex` and `suite_lagged_heston_price.tex`: price-space companions to the
+  lagged tables, same rows and per-lag blocks; columns pooled, near-money, wings, worst quote; one
+  decimal, `--` when absent.
 
 The notes' section 4 replaces its inline TBD tabulars with `\input{tables/...}` once the tables exist; that edit is part of the table task. A method with no finished run in a cell prints `--`.
 

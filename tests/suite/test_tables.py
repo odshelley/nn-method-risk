@@ -15,13 +15,16 @@ from neural_particle_method.tracking.store import Store
 def store(tmp_path):
     s = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
     common = {"n_particles": 100_000}
-    for sid, mae, rmse in (("s01", 10.0, 12.0), ("s02", 30.0, 40.0)):
+    for sid, mae, rmse, p_pooled in (("s01", 10.0, 12.0, 2.0), ("s02", 30.0, 40.0, 3.0)):
         for seed in (0, 1):
             params = {"sid": sid, "algo": "nw", "seed": seed, **common}
             with s.run("suite_cold", params) as h:
                 h.log_metrics({
                     "pooled_mae_bp": mae + seed, "pooled_rmse_bp": rmse, "wings_mae_bp": mae * 2,
                     "lev_rmse": 0.05, "fit_s": 1.0, "mae_bp/T0.25": mae,
+                    "price_bp/pooled": p_pooled + seed * 0.2, "price_bp/wings": p_pooled * 2,
+                    "price_bp/near": p_pooled * 0.5, "price_bp/max": p_pooled * 3,
+                    "price_bp/T2": p_pooled * 1.5,
                 })
     # an unbalanced design: s02 has a third seed, so a pooled mean would differ from the
     # two-stage (per-scenario then across-scenario) mean the tables report.
@@ -29,11 +32,14 @@ def store(tmp_path):
         h.log_metrics({
             "pooled_mae_bp": 60.0, "pooled_rmse_bp": 40.0, "wings_mae_bp": 60.0,
             "lev_rmse": 0.05, "fit_s": 1.0, "mae_bp/T0.25": 30.0,
+            "price_bp/pooled": 6.0, "price_bp/wings": 6.0, "price_bp/near": 1.5,
+            "price_bp/max": 9.0, "price_bp/T2": 4.5,
         })
     with s.run("suite_pde_floor", {"sid": "s01", "seed": 0, "n_steps": 200}) as h:
         h.log_metrics({
             "pooled_mae_bp": 3.0, "pooled_rmse_bp": 4.0, "wings_mae_bp": 5.0, "fit_s": 0.0,
-            "lev_rmse": 0.0,
+            "lev_rmse": 0.0, "price_bp/pooled": 1.0, "price_bp/wings": 1.5, "price_bp/near": 0.5,
+            "price_bp/max": 2.0, "price_bp/T2": 0.8,
         })
     lagged_params = {
         "sid": "s01", "method": "explicit_rkhs", "offline_n": 200_000, "lag": "surface",
@@ -76,6 +82,25 @@ def test_cold_frame_aggregates_mean_and_median_over_scenarios_and_seeds(store):
     assert list(df.index) == [r[1] for r in COLD_ROWS]
 
 
+def test_cold_frame_price_two_stage_aggregate(store):
+    df = cold_frame(store, FULL, family="ssvi")
+    nw = df.loc["NW"]
+    # per-sid first: s01 = (2.0 + 2.2) / 2 = 2.1, s02 = (3.0 + 3.2 + 6.0) / 3
+    two_stage_p = (2.1 + (3.0 + 3.2 + 6.0) / 3) / 2
+    assert nw["p_pooled_mean"] == pytest.approx(two_stage_p)
+    assert df.loc["PDE (attainable floor)"]["p_pooled_mean"] == pytest.approx(1.0)
+
+
+def test_section4_tables_price_table_contents(store, tmp_path):
+    section4_tables(store, tmp_path / "tables", FULL)
+    two_stage_p = (2.1 + (3.0 + 3.2 + 6.0) / 3) / 2
+    cold_price = (tmp_path / "tables" / "suite_cold_ssvi_price.tex").read_text()
+    assert f"NW & {two_stage_p:.1f} &" in cold_price
+    assert "PDE (attainable floor) & 1.0 &" in cold_price
+    lagged_price = (tmp_path / "tables" / "suite_lagged_ssvi_price.tex").read_text()
+    assert "Explicit NN + RKHS head & 200k & -- & -- & -- & --" in lagged_price
+
+
 def test_lagged_frame_and_files(store, tmp_path):
     df = lagged_frame(store, FULL, family="ssvi")
     row = df.loc[("surface", "Explicit NN + RKHS head", "200k")]
@@ -85,8 +110,9 @@ def test_lagged_frame_and_files(store, tmp_path):
     paths = section4_tables(store, tmp_path / "tables", FULL)
     names = sorted(p.name for p in paths)
     assert names == [
-        "suite_appendix.tex", "suite_cold_heston.tex", "suite_cold_ssvi.tex",
-        "suite_lagged_heston.tex", "suite_lagged_ssvi.tex",
+        "suite_appendix.tex", "suite_cold_heston.tex", "suite_cold_heston_price.tex",
+        "suite_cold_ssvi.tex", "suite_cold_ssvi_price.tex", "suite_lagged_heston.tex",
+        "suite_lagged_heston_price.tex", "suite_lagged_ssvi.tex", "suite_lagged_ssvi_price.tex",
     ]
     cold = (tmp_path / "tables" / "suite_cold_ssvi.tex").read_text()
     assert "\\begin{tabular}" in cold and "NW & 25 & 25 &" in cold

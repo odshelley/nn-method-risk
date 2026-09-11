@@ -158,7 +158,7 @@ This section specifies the clean benchmark agreed on 8 September 2026 and run on
 \item \textbf{Seeds.} Two seeds ($0$, $1$) for every cold row and every online stage; one seed for each offline body. The reprice seed is $10\,000$ plus the calibration seed.
 \item \textbf{Floor.} All one-pass schemes fit $\E[V^+\mid X]$; \code{fit\_v\_floor} becomes the default in this work and the tiny golden replays are regenerated in the same commit.
 \item \textbf{Implicit configuration.} Warm start from the explicit network field, $30$ damped iterations at $\alpha=\tfrac12$ with fresh noise per iteration, persistent network and optimiser (the best practical setting found in the convergence diagnostics of 8 September 2026, experiment \code{mechanism}).
-\item \textbf{Scoring.} As in \cref{sec:quotes}: $500\,000$ repricing paths, Black--Scholes inversion at the snapped maturity, exact SSVI (or semi-analytic Heston) implied volatility as the target. Metrics per run: pooled and wings MAE and RMSE in volatility bp, both per maturity, the count of failed inversions, and the leverage RMSE against the PDE reference of the scenario.
+\item \textbf{Scoring.} As in \cref{sec:quotes}: $500\,000$ repricing paths, Black--Scholes inversion at the snapped maturity, exact SSVI (or semi-analytic Heston) implied volatility as the target. Metrics per run: pooled and wings MAE and RMSE in volatility bp, both per maturity, the count of failed inversions, and the leverage RMSE against the PDE reference of the scenario. Errors are reported in implied-vol basis points (the headline) and, in the companion tables, as absolute option-price errors in basis points of spot, recovered exactly from the implied-vol errors through the Black--Scholes formula.
 \item \textbf{Latency.} Wall-clock seconds of the calibration only (repricing excluded). For the lagged suite, only the online stage is timed.
 \item \textbf{PDE reference.} The Fokker--Planck reference leverage (\code{reference/pde.py}) is solved per scenario at $200$ steps and enters twice: repriced under the same Monte Carlo as every other row, which is the attainable floor of the scoring under this repricer (Gy\"ongy), and as the reference for the leverage-error column. Its repricing is repeated under a second reprice seed to measure the Monte Carlo noise floor of the score itself.
 \end{itemize}
@@ -182,8 +182,18 @@ One calibration from scratch per method, scenario and seed at $100\,000$ particl
 \end{table}
 
 \begin{table}[h]\centering\footnotesize
+\caption{Cold suite, SSVI scenarios, the same runs in price space: absolute option-price error in basis points of spot (spot is one), mean over scenarios and seeds. Relative price error is not shown; in the far wings the target prices are of order $10^{-6}$ of spot.}\label{tab:suite-cold-price}
+\input{tables/suite_cold_ssvi_price.tex}
+\end{table}
+
+\begin{table}[h]\centering\footnotesize
 \caption{Cold suite, Heston-market scenarios (one-year maturity, same $13$ quotes): mean and median over the three scenarios and two seeds..}\label{tab:suite-cold-heston}
 \input{tables/suite_cold_heston.tex}
+\end{table}
+
+\begin{table}[h]\centering\footnotesize
+\caption{Cold suite, Heston-market scenarios, the same runs in price space: absolute option-price error in basis points of spot (spot is one), mean over scenarios and seeds. Relative price error is not shown; in the far wings the target prices are of order $10^{-6}$ of spot.}\label{tab:suite-cold-heston-price}
+\input{tables/suite_cold_heston_price.tex}
 \end{table}
 
 \subsection{What a lag is}\label{sec:suite-lag}
@@ -215,8 +225,16 @@ The online reference rows are NW re-solved from scratch on $S_1$ at $100\,000$ p
 \resizebox{\textwidth}{!}{\input{tables/suite_lagged_ssvi.tex}}\end{table}
 
 \begin{table}[h]\centering\footnotesize
+\caption{Lagged suite, SSVI scenarios, the same runs in price space: absolute option-price error in basis points of spot (spot is one), mean over scenarios and seeds. Relative price error is not shown; in the far wings the target prices are of order $10^{-6}$ of spot.}\label{tab:suite-lagged-price}
+\resizebox{\textwidth}{!}{\input{tables/suite_lagged_ssvi_price.tex}}\end{table}
+
+\begin{table}[h]\centering\footnotesize
 \caption{Lagged suite, Heston-market scenarios..}\label{tab:suite-lagged-heston}
 \resizebox{\textwidth}{!}{\input{tables/suite_lagged_heston.tex}}\end{table}
+
+\begin{table}[h]\centering\footnotesize
+\caption{Lagged suite, Heston-market scenarios, the same runs in price space: absolute option-price error in basis points of spot (spot is one), mean over scenarios and seeds. Relative price error is not shown; in the far wings the target prices are of order $10^{-6}$ of spot.}\label{tab:suite-lagged-heston-price}
+\resizebox{\textwidth}{!}{\input{tables/suite_lagged_heston_price.tex}}\end{table}
 
 \subsection{Per-scenario numbers}\label{sec:suite-appendix}
 \input{tables/suite_appendix.tex}
