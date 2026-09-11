@@ -106,7 +106,55 @@ def test_run_study_logs_parent_and_children_and_resumes(store, tmp_path, monkeyp
     assert run_study(store, "unit", n_trials=1, n_jobs=1, **kw) == parent
     storage = f"sqlite:///{tmp_path / 'optuna' / 'unit.db'}"
     assert len(optuna.load_study(study_name="unit", storage=storage).trials) == 3
+    before = store.client.get_run(parent).info.status
     top = top_recipes(store, "unit", 2)
     assert len(top) >= 1 and top[0]["score"] <= top[-1]["score"]
     assert set(top[0]) == {"trial_number", "score", "recipe", "run_id"}
     assert top[0]["recipe"]["hidden"] == 16
+    assert store.client.get_run(parent).info.status == before == "FINISHED"
+
+
+def test_the_worker_loads_the_study_with_the_spec_sampler_and_pruner(store, tmp_path, monkeypatch):
+    """Optuna persists neither sampler nor pruner, so the worker must rebuild both on load."""
+    import neural_particle_method.suite.optuna_search as S
+    sampler, pruner = S._sampler_and_pruner()
+    assert isinstance(sampler, optuna.samplers.TPESampler)
+    assert pruner._n_startup_trials == 10 and pruner._n_warmup_steps == 1
+
+    monkeypatch.setattr(S, "suggest_recipe", lambda trial: dict(FAST))
+    seen, real = [], S._load_study
+
+    def spy(study, storage):
+        seen.append(real(study, storage))
+        return seen[-1]
+
+    monkeypatch.setattr(S, "_load_study", spy)
+    run_study(store, "cfg", n_trials=1, n_jobs=1, settings=TINY, sids=("t01",), per_trial=1,
+              times=TIMES, registry=make_tuning_registry(), storage_dir=tmp_path / "optuna",
+              cache_dir=tmp_path / "cache")
+    assert seen, "the worker did not open the study through _load_study"
+    for st in seen:
+        assert isinstance(st.sampler, optuna.samplers.TPESampler)
+        assert st.pruner._n_startup_trials == 10 and st.pruner._n_warmup_steps == 1
+
+
+def test_top_recipes_is_empty_and_writes_nothing_for_an_unknown_study(store):
+    assert top_recipes(store, "never-run", 3) == []
+    assert len(store.search(EXPERIMENT)) == 0
+
+
+def test_top_recipes_is_empty_when_every_trial_was_pruned(store, tmp_path, monkeypatch):
+    import neural_particle_method.suite.optuna_search as S
+
+    def pruned(*a, **k):
+        raise optuna.TrialPruned()
+
+    monkeypatch.setattr(S, "suggest_recipe", lambda trial: dict(FAST))
+    monkeypatch.setattr(S, "score_recipe", pruned)
+    parent = run_study(store, "allpruned", n_trials=1, n_jobs=1, settings=TINY, sids=("t01",),
+                       per_trial=1, times=TIMES, registry=make_tuning_registry(),
+                       storage_dir=tmp_path / "optuna", cache_dir=tmp_path / "cache")
+    runs = store.search(EXPERIMENT)
+    kids = runs[runs["tags.mlflow.parentRunId"] == parent]
+    assert len(kids) == 1 and list(kids["tags.optuna.state"]) == ["PRUNED"]
+    assert top_recipes(store, "allpruned", 3) == []

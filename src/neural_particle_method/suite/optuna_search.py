@@ -68,15 +68,24 @@ def score_recipe(recipe, clouds, seed=0, report=None):
     return float(np.mean(logs)), detail, time.perf_counter() - t0
 
 
-def study_parent(store, study):
-    exp = store.experiment_id(EXPERIMENT)
+def find_parent(store, study):
+    """The study's parent run id, or None. Read-only: creates nothing, changes no status."""
+    exp = store.client.get_experiment_by_name(EXPERIMENT)
+    if exp is None:
+        return None
     runs = store.client.search_runs(
-        [exp], f"params.study = '{study}' and tags.`optuna.kind` = 'study'", max_results=1)
-    if runs:
-        rid = runs[0].info.run_id
+        [exp.experiment_id], f"params.study = '{study}' and tags.`optuna.kind` = 'study'",
+        max_results=1)
+    return runs[0].info.run_id if runs else None
+
+
+def study_parent(store, study):
+    """Find-or-create the parent run and mark it RUNNING. Writes; for `run_study` only."""
+    rid = find_parent(store, study)
+    if rid is not None:
         store.client.update_run(rid, status="RUNNING")
         return rid
-    r = store.client.create_run(exp, tags={"optuna.kind": "study"})
+    r = store.client.create_run(store.experiment_id(EXPERIMENT), tags={"optuna.kind": "study"})
     for k, v in {"study": study, "tuning_seed": TUNING_SEED, "git_hash": git_hash()}.items():
         store.client.log_param(r.info.run_id, k, v)
     return r.info.run_id
@@ -87,13 +96,24 @@ def _storage(storage_dir, study):
     return f"sqlite:///{Path(storage_dir) / f'{study}.db'}"
 
 
+def _sampler_and_pruner():
+    """Optuna persists neither in storage, so every open of the study must rebuild both."""
+    return (optuna.samplers.TPESampler(seed=0),
+            optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=1))
+
+
+def _load_study(study, storage):
+    sampler, pruner = _sampler_and_pruner()
+    return optuna.load_study(study_name=study, storage=storage, sampler=sampler, pruner=pruner)
+
+
 def _trial_worker(args):
     """One process: runs `n` trials of the shared study, logging each as a nested MLflow run."""
     uri, root, study, storage, parent, cloud_runs, per_trial, n, cache_dir, seed = args
     store = Store(uri, root)
     clouds = {rid: load_cloud(store, rid, cache_dir=None if cache_dir is None
                               else Path(cache_dir) / rid) for rid in cloud_runs}
-    st = optuna.load_study(study_name=study, storage=storage)
+    st = _load_study(study, storage)
     exp = store.experiment_id(EXPERIMENT)
 
     def objective(trial):
@@ -141,9 +161,9 @@ def run_study(store, study, n_trials, n_jobs=1, settings=FULL, sids=TUNING_SIDS,
               times=SLICE_TIMES, registry=None, storage_dir=STORAGE_DIR, cache_dir=None, seed=0):
     cloud_runs = [ensure_cloud(store, sid, settings, registry, times) for sid in sids]
     storage = _storage(storage_dir, study)
+    sampler, pruner = _sampler_and_pruner()
     optuna.create_study(study_name=study, storage=storage, load_if_exists=True,
-                        direction="minimize", sampler=optuna.samplers.TPESampler(seed=0),
-                        pruner=optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=1))
+                        direction="minimize", sampler=sampler, pruner=pruner)
     parent = study_parent(store, study)
     per_proc = [n_trials // n_jobs + (1 if i < n_trials % n_jobs else 0) for i in range(n_jobs)]
     args = [(store.tracking_uri, store.artifact_root, study, storage, parent, cloud_runs,
@@ -153,7 +173,7 @@ def run_study(store, study, n_trials, n_jobs=1, settings=FULL, sids=TUNING_SIDS,
     else:
         with ProcessPoolExecutor(max_workers=n_jobs) as ex:
             list(ex.map(_trial_worker, args))
-    st = optuna.load_study(study_name=study, storage=storage)
+    st = _load_study(study, storage)
     done = [t for t in st.trials if t.state == optuna.trial.TrialState.COMPLETE]
     store.client.log_metric(parent, "n_trials", len(st.trials))
     if done:
@@ -170,8 +190,15 @@ def run_study(store, study, n_trials, n_jobs=1, settings=FULL, sids=TUNING_SIDS,
 
 
 def top_recipes(store, study, k):
-    parent = study_parent(store, study)
+    """The k best COMPLETE trials of `study`, best first. Read-only; [] if there are none."""
+    parent = find_parent(store, study)
+    if parent is None:
+        return []
     df = store.search(EXPERIMENT)
+    needed = ("tags.mlflow.parentRunId", "tags.optuna.state", "metrics.score",
+              "params.trial_number")
+    if any(c not in df.columns for c in needed):
+        return []
     kids = df[(df["tags.mlflow.parentRunId"] == parent) & (df["tags.optuna.state"] == "COMPLETE")]
     kids = kids.sort_values("metrics.score").head(k)
     out = []
@@ -181,5 +208,4 @@ def top_recipes(store, study, k):
         out.append({"trial_number": int(r["params.trial_number"]),
                     "score": float(r["metrics.score"]), "recipe": recipe,
                     "run_id": r["run_id"]})
-    store.client.set_terminated(parent, status="FINISHED")
     return out
