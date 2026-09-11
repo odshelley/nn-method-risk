@@ -3,43 +3,43 @@
 method & offline $N$ & pooled & near-money & wings & worst quote\\
 \midrule
 \multicolumn{6}{l}{\emph{Surface lag}}\\
-Stale leverage, no action & -- & -- & -- & -- & --\\
-NW re-solve on $S_1$ & -- & -- & -- & -- & --\\
-Explicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & --\\
-Explicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & --\\
-Implicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & --\\
-Implicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & --\\
-Explicit NN + RKHS head & 200k & -- & -- & -- & --\\
-Explicit NN + RKHS head & 500k & -- & -- & -- & --\\
-Implicit NN + RKHS head & 200k & -- & -- & -- & --\\
-Implicit NN + RKHS head & 500k & -- & -- & -- & --\\
-Explicit NN + ridge head & 200k & -- & -- & -- & --\\
-Explicit NN + ridge head & 500k & -- & -- & -- & --\\
-Implicit NN + ridge head & 200k & -- & -- & -- & --\\
-Implicit NN + ridge head & 500k & -- & -- & -- & --\\
-Explicit NN + spline head & 200k & -- & -- & -- & --\\
-Explicit NN + spline head & 500k & -- & -- & -- & --\\
-Implicit NN + spline head & 200k & -- & -- & -- & --\\
-Implicit NN + spline head & 500k & -- & -- & -- & --\\
+Stale leverage, no action & -- & 16.8 & 26.9 & 7.7 & 61.0\\
+NW re-solve on $S_1$ & -- & 3.0 & 4.4 & 1.9 & 11.0\\
+Explicit NN, stale $f$, fresh Dupire & 200k & 4.9 & 7.2 & 2.8 & 16.0\\
+Explicit NN, stale $f$, fresh Dupire & 500k & 4.9 & 7.2 & 2.8 & 16.1\\
+Implicit NN, stale $f$, fresh Dupire & 200k & 4.9 & 7.3 & 2.8 & 17.5\\
+Implicit NN, stale $f$, fresh Dupire & 500k & 5.8 & 8.8 & 3.2 & 20.6\\
+Explicit NN + RKHS head & 200k & 2.8 & 3.9 & 1.8 & 9.6\\
+Explicit NN + RKHS head & 500k & 2.8 & 3.9 & 1.8 & 9.7\\
+Implicit NN + RKHS head & 200k & 2.8 & 3.9 & 1.8 & 9.7\\
+Implicit NN + RKHS head & 500k & 2.8 & 3.9 & 1.7 & 9.7\\
+Explicit NN + ridge head & 200k & 2.7 & 3.6 & 1.8 & 9.4\\
+Explicit NN + ridge head & 500k & 2.6 & 3.5 & 1.8 & 9.1\\
+Implicit NN + ridge head & 200k & 2.9 & 4.0 & 1.9 & 10.1\\
+Implicit NN + ridge head & 500k & 2.8 & 3.9 & 1.8 & 10.2\\
+Explicit NN + spline head & 200k & 2.7 & 3.9 & 1.7 & 9.7\\
+Explicit NN + spline head & 500k & 2.7 & 3.9 & 1.7 & 9.7\\
+Implicit NN + spline head & 200k & 2.8 & 3.9 & 1.8 & 9.7\\
+Implicit NN + spline head & 500k & 2.7 & 3.9 & 1.7 & 9.7\\
 \midrule
 \multicolumn{6}{l}{\emph{Surface plus $2\%$ sticky-strike spot lag}}\\
-Stale leverage, no action & -- & -- & -- & -- & --\\
-NW re-solve on $S_1$ & -- & -- & -- & -- & --\\
-Explicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & --\\
-Explicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & --\\
-Implicit NN, stale $f$, fresh Dupire & 200k & -- & -- & -- & --\\
-Implicit NN, stale $f$, fresh Dupire & 500k & -- & -- & -- & --\\
-Explicit NN + RKHS head & 200k & -- & -- & -- & --\\
-Explicit NN + RKHS head & 500k & -- & -- & -- & --\\
-Implicit NN + RKHS head & 200k & -- & -- & -- & --\\
-Implicit NN + RKHS head & 500k & -- & -- & -- & --\\
-Explicit NN + ridge head & 200k & -- & -- & -- & --\\
-Explicit NN + ridge head & 500k & -- & -- & -- & --\\
-Implicit NN + ridge head & 200k & -- & -- & -- & --\\
-Implicit NN + ridge head & 500k & -- & -- & -- & --\\
-Explicit NN + spline head & 200k & -- & -- & -- & --\\
-Explicit NN + spline head & 500k & -- & -- & -- & --\\
-Implicit NN + spline head & 200k & -- & -- & -- & --\\
-Implicit NN + spline head & 500k & -- & -- & -- & --\\
+Stale leverage, no action & -- & 13.7 & 21.5 & 6.5 & 52.4\\
+NW re-solve on $S_1$ & -- & 3.1 & 4.5 & 1.9 & 11.2\\
+Explicit NN, stale $f$, fresh Dupire & 200k & 10.5 & 16.6 & 5.2 & 30.7\\
+Explicit NN, stale $f$, fresh Dupire & 500k & 10.5 & 16.6 & 5.2 & 30.5\\
+Implicit NN, stale $f$, fresh Dupire & 200k & 10.1 & 15.8 & 5.0 & 29.9\\
+Implicit NN, stale $f$, fresh Dupire & 500k & 10.7 & 16.9 & 5.4 & 33.1\\
+Explicit NN + RKHS head & 200k & 2.8 & 3.9 & 1.8 & 9.7\\
+Explicit NN + RKHS head & 500k & 2.8 & 3.9 & 1.8 & 9.7\\
+Implicit NN + RKHS head & 200k & 2.8 & 3.9 & 1.9 & 9.8\\
+Implicit NN + RKHS head & 500k & 2.9 & 3.9 & 1.9 & 10.7\\
+Explicit NN + ridge head & 200k & 2.9 & 4.1 & 1.8 & 10.9\\
+Explicit NN + ridge head & 500k & 2.9 & 4.2 & 1.8 & 11.1\\
+Implicit NN + ridge head & 200k & 3.1 & 4.4 & 1.9 & 11.6\\
+Implicit NN + ridge head & 500k & 3.0 & 4.2 & 1.9 & 11.3\\
+Explicit NN + spline head & 200k & 2.8 & 3.9 & 1.8 & 9.8\\
+Explicit NN + spline head & 500k & 2.8 & 3.9 & 1.8 & 9.8\\
+Implicit NN + spline head & 200k & 2.9 & 3.9 & 2.0 & 10.4\\
+Implicit NN + spline head & 500k & 3.1 & 4.1 & 2.2 & 11.4\\
 \bottomrule
 \end{tabular}
