@@ -4,10 +4,10 @@ method & \multicolumn{5}{c}{surface lag} & \multicolumn{5}{c}{surface plus $2\%$
 \cmidrule(lr){2-6}\cmidrule(lr){7-11}\cmidrule(lr){12-13}
 & 10k & 30k & 80k & 100k & liquid & 10k & 30k & 80k & 100k & liquid & 10k & 100k\\
 \midrule
-NW re-solve on $S_1$ & -- & -- & -- & 44 & -- & -- & -- & -- & 44 & -- & -- & 8.5\\
-Tuned body, stale $f$, fresh Dupire & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & --\\
-Tuned body + spline head & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & --\\
-Tuned body + RKHS head & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & --\\
-Tuned body + ridge head & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & --\\
+NW re-solve on $S_1$ & 50 & 47 & 44 & 44 & 17 & 50 & 47 & 45 & 44 & 18 & 1.0 & 8.5\\
+Tuned body, stale $f$, fresh Dupire & 50 & 50 & 50 & 50 & 28 & 88 & 88 & 88 & 88 & 56 & 0.0 & 0.0\\
+Tuned body + spline head & 46 & 45 & 43 & 43 & 16 & 46 & 46 & 44 & 43 & 16 & 1.2 & 9.8\\
+Tuned body + RKHS head & 46 & 46 & 44 & 44 & 16 & 46 & 46 & 44 & 44 & 16 & 2.3 & 18.8\\
+Tuned body + ridge head & 46 & 45 & 43 & 44 & 15 & 46 & 45 & 43 & 43 & 16 & 3.3 & 28.4\\
 \bottomrule
 \end{tabular}
