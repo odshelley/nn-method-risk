@@ -17,7 +17,12 @@ from dataclasses import replace
 from ..bench.scenarios import full_registry
 from ..calibrate.explicit import calibrate_explicit
 from ..estimators import make_estimator
-from ..estimators.recipes import coerce_recipe, load_recipe, recipe_hash
+from ..estimators.recipes import (
+    coerce_recipe,
+    explicit_config_from_recipe,
+    load_recipe,
+    recipe_hash,
+)
 from ..tracking.store import git_hash
 from .artifacts import load_run
 from .config import FULL, SSVI_SIDS
@@ -83,6 +88,11 @@ def run_budget_cell(store, sid, method, budget, lag, seed, body=DEFAULT_BODY, se
     lsc = lagged_scenario(sc, lag)
     lv = lsc.local_vol()
     ecfg = replace(settings.explicit, n_particles=int(budget), fit_subsample=int(budget))
+    if body == "explicit_opt":
+        # the recipe's `tail` rule belongs to the body and has to reach the online sweep; the
+        # step counts it also sets are unused online, and `fit_subsample` stays the full cloud
+        # because the recipe's is never below an online budget.
+        ecfg = explicit_config_from_recipe(ecfg, recipe)
     # a body-free cell logs the same param names as the others, with an empty `body_run`
     body_rid, loaded = "", None
     if method != "nw_resolve":

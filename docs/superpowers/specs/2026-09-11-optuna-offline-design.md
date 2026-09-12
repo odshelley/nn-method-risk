@@ -42,10 +42,13 @@ each of the four slice times t ∈ {0.10, 0.50, 1.00, 1.75} (the nearest grid st
 arrays `lnx` and `v_plus = max(v, 0)` of the whole cloud, plus the scenario parameters.
 The cloud is simulated by `calibrate_explicit` with the NW estimator at the suite's FULL
 explicit settings (500 000 particles, 200 steps, full-cloud fits), i.e. under the
-NW-calibrated leverage, so the slices are what an offline pass actually sees. A fixed
-permutation (seed 1) splits each slice into the first 400 000 particles (fit pool) and the
-last 100 000 (held-out). The NW held-out loss per slice, fitted on the full 400 000 fit pool,
-is stored as metrics `nw_loss/t<t>` on the same run.
+NW-calibrated leverage, so the slices are what an offline pass actually sees. The split is
+80/20 by particle count: the first 80 % of the recorded particles are the fit pool and the
+last 20 % the held-out set, 400 000 and 100 000 at the FULL settings. The recorded order is
+already a uniform random permutation, because `calibrate_explicit` hands the estimator
+`rng.choice(n, size=fit_subsample, replace=False)` of the cloud, so no extra shuffle is
+needed. The NW held-out loss per slice, fitted on the whole fit pool, is stored as metrics
+`nw_loss/t<t>` on the same run.
 
 The held-out loss of a predictor f on a slice is
 `mean over held-out particles of (f(lnx) − v_plus)²`, evaluated by linear interpolation of
@@ -66,11 +69,11 @@ A trial is a dict `recipe` with these keys (Optuna distributions in brackets):
 | `first_steps` | int [500, 4000], step 250 |
 | `later_steps` | int [100, 1500], step 50 |
 | `weight_decay` | categorical {0, 1e-6, 1e-5, 1e-4, 1e-3} (Adam `weight_decay`) |
-| `fit_subsample` | categorical {100000, 250000, 400000} |
+| `fit_subsample` | categorical {100000, 250000, 400000}, **except under full batch**: a full-batch step costs one pass over the whole fit sample, so full batch times 400 000 particles times 4000 steps is two orders of magnitude more work than the cheapest corner of the space. When `batch_size == 0` the recipe takes `fit_subsample = 100000` and the value is not suggested at all, so the sampler never spends trials on a dimension it cannot vary |
 | `warm_start` | categorical {True, False}; False calls `reset()` and re-initialises the net before every slice |
 | `mean_match` | categorical {False, True}: after fitting a slice, multiply the fitted grid values by `mean(w·v_plus) / mean(w·f(lnx))` over the fit sample, so the fitted slice reproduces the cloud's own mean variance exactly. The sample mean is used rather than the analytic CIR mean because the Euler cloud's mean differs from the continuous one by the truncation bias, and the pass must be consistent with the cloud it simulates |
-| `monotone` / `monotone_penalty` | `monotone` categorical {False, True}; when True, `monotone_penalty` log-uniform [1e-5, 1e-1] (the penalty is normalised by the squared variance scale, so 1 already outweighs the data by two orders of magnitude): adds `λ · mean(relu(sign(ρ) · df/dz))²` on the batch, penalising slope of the wrong sign. With ρ < 0 the target decreases in log-spot |
-| `tail` | categorical {"free", "flat", "linear"}: beyond the grid's outermost quantiles the slice is continued by the network ("free", today's behaviour), by the boundary value ("flat"), or linearly with the slope of the last two grid points ("linear"). Applied in `calibrate_explicit`'s interpolation (`np.interp` already gives "flat"; "linear" and "free" are new) |
+| `monotone` / `monotone_penalty` | `monotone` categorical {False, True}; when True, `monotone_penalty` log-uniform [1e-5, 1e-1] (the penalty is normalised by the squared variance scale, so 1 already outweighs the data by two orders of magnitude): adds `λ · mean(relu(−sign(ρ) · df/dz))²` on the batch, penalising slope of the wrong sign. The convention is that `monotone_sign` is the sign of `df/dz` the penalty charges for, and it is `−sign(ρ)`: with ρ < 0 the target decreases in log-spot, so an increasing fit is the violation and `relu(+df/dz)` is what must be charged |
+| `tail` | categorical {"free", "flat", "linear"}: one anchor point is appended `TAIL_DX = 0.5` in log-spot beyond each end of the grid and the slice is linearly interpolated out to it, so the rule only says what value the anchor takes: the network's own prediction there ("free", today's behaviour), the boundary value ("flat", which is what `np.interp` already does and therefore appends nothing), or the extrapolation of the last two grid points ("linear"). Applied in `calibrate_explicit` after each per-slice fit, and in `suite/heads.py::online_sweep` after the head correction, so a promoted recipe's tail rule reaches the online cells too |
 | `hetero` | categorical {False, True}: heteroscedastic loss, weights `1 / (var_local + 1e-8)` where `var_local` is the NW local variance estimate of v_plus given lnx on the fit sample (bandwidth as NW), normalised to mean one, multiplied into `weights` |
 
 `NNRegressor` gains `weight_decay=0.0`, `mean_match=False`, `monotone_penalty=0.0` (0 is
@@ -100,16 +103,25 @@ three cannot drift apart.
 Per trial, 8 scenarios are drawn from the 24 with `rng(trial.number)` so that every trial
 sees a different but reproducible mix; a median pruner reports the running mean after each
 scenario and prunes below the median of completed trials at the same scenario count once 10
-trials have completed. Fit seconds per slice are recorded.
+trials have completed. Fit seconds per slice are recorded. A scenario's fit seed is its index
+in the full tuning list, not its position in the trial's draw, so the same scenario is fitted
+with the same seed in every trial and trials differ only by their recipe.
+
+Each trial also carries a wall-clock cap, `--trial-timeout` (900 s by default), checked after
+each scenario: past it the trial raises a `TrialPruned` subclass, Optuna records it PRUNED and
+the MLflow child is tagged `optuna.state = TIMEOUT` with `score_partial` and `fit_s`. Without
+it one unlucky corner of the space (deep, wide, full batch, 4000 steps) can hold a worker for
+hours. `--timeout-hours` caps the study as a whole through `study.optimize(timeout=...)`.
 
 ## 4. MLflow linkage
 
 Experiment `optuna_offline`. One parent run per study, params `{study, n_trials_requested,
-tuning_seed, git_hash}`, tag `optuna.study`, artifacts `optuna.db` (the Optuna SQLite
-storage, logged at the end and after every 10 trials) and `best.json`. One nested child run
+tuning_seed, git_hash}`, tag `optuna.study`, artifacts `<study>.db` (the Optuna SQLite
+storage, logged at the end of the run) and `best.json`. One nested child run
 per trial (tag `mlflow.parentRunId`), params = the recipe plus `trial_number`, metrics
 `score`, `score/<sid>` per scenario seen, `loss_ratio/<sid>/t<t>` per slice, `fit_s`
-(total), tag `optuna.state` ∈ {COMPLETE, PRUNED, FAIL}. The Optuna storage lives at
+(total), tag `optuna.state` ∈ {COMPLETE, PRUNED, TIMEOUT, FAIL}. The parent also carries
+`n_trials`, `n_failed` and `n_timeout`. The Optuna storage lives at
 `results/optuna/<study>.db`; `nparticle optuna run --study <name> --trials N --jobs J`
 loads or creates it (`optuna.create_study(storage=..., load_if_exists=True,
 direction="minimize", sampler=TPESampler(seed=0), pruner=MedianPruner(n_startup_trials=10))`)
@@ -119,6 +131,11 @@ run is found by `study` name and reused, so a crash or a second invocation conti
 same study. The best recipes are read back from MLflow (`search("optuna_offline")`, state
 COMPLETE, sorted by `score`), never from the Optuna file, so the notes and tables have a
 single source.
+
+Before any worker is spawned the parent downloads every tuning cloud into the per-run cache
+the workers read, so no two workers race to write the same `cloud.npz`; the download is
+`os.replace` of a file staged in a sibling temporary directory, so a partial file is never
+visible even if that warm-up is skipped.
 
 `optuna` is added to the project dependencies.
 

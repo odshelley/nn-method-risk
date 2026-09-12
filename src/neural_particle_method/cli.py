@@ -25,6 +25,7 @@ from .suite.artifacts import load_run
 from .suite.config import FULL as SUITE_FULL
 from .suite.config import SMOKE as SUITE_SMOKE
 from .suite.grid import STAGES, run_stage
+from .suite.optuna_search import TRIAL_TIMEOUT_S
 from .tracking.importer import import_all
 from .tracking.store import Store
 
@@ -76,6 +77,10 @@ def _parser():
     q.add_argument("--trials", type=int, required=True)
     q.add_argument("--jobs", type=int, default=1)
     q.add_argument("--per-trial", type=int, default=8)
+    q.add_argument("--trial-timeout", type=float, default=TRIAL_TIMEOUT_S,
+                   help="wall-clock cap on one trial, in seconds (0 for none)")
+    q.add_argument("--timeout-hours", type=float, default=None,
+                   help="wall-clock cap on the whole study, in hours")
     q = os_.add_parser("validate"); q.add_argument("--study", required=True)
     q.add_argument("--top", type=int, default=3); q.add_argument("--jobs", type=int, default=1)
     q.add_argument("--budget", type=int, default=80_000)
@@ -87,6 +92,7 @@ def _parser():
 def _cloud_worker(args):
     """One tuning cloud in its own process (the clouds are independent full offline passes)."""
     from .suite.optuna_clouds import ensure_cloud
+    torch.set_num_threads(1)   # one BLAS thread per worker; the pool is the parallelism
     uri, root, sid = args
     return ensure_cloud(Store(uri, root), sid)
 
@@ -206,8 +212,11 @@ def main(argv=None):
                     print("cloud", sid, rid, flush=True)
             return 0
         if args.optuna_cmd == "run":
+            hours = args.timeout_hours
             print("study", run_study(store, args.study, args.trials, n_jobs=args.jobs,
-                                     per_trial=args.per_trial))
+                                     per_trial=args.per_trial,
+                                     trial_timeout_s=args.trial_timeout,
+                                     study_timeout_s=None if hours is None else hours * 3600))
             return 0
         if args.optuna_cmd == "validate":
             validate(store, args.study, top=args.top, jobs=args.jobs, budget=args.budget)

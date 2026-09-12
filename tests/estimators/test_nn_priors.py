@@ -3,7 +3,7 @@ import pytest
 import torch
 
 from neural_particle_method.estimators.nadaraya_watson import nw_local_variance
-from neural_particle_method.estimators.nn import NNRegressor, SliceNet
+from neural_particle_method.estimators.nn import HETERO_W_MAX, NNRegressor, SliceNet
 
 rng = np.random.default_rng(0)
 LNX = rng.normal(0.0, 0.3, 300)
@@ -79,3 +79,30 @@ def test_hetero_weights_are_positive_with_mean_one():
 def test_weight_decay_reaches_the_optimiser():
     est = NNRegressor(weight_decay=1e-4)
     assert est.opt.param_groups[0]["weight_decay"] == pytest.approx(1e-4)
+
+
+def test_mean_match_is_skipped_when_the_weighted_target_mean_is_not_positive():
+    """A non-positive target mean has no scale to match; the fit must be left alone."""
+    zero = np.zeros_like(V)
+    est = NNRegressor(seed=0, first_steps=5, later_steps=2, mean_match=True)
+    got = est.fit_predict(0.5, LNX, zero, GRID)
+    plain = NNRegressor(seed=0, first_steps=5, later_steps=2).fit_predict(0.5, LNX, zero, GRID)
+    assert float(est.net.log_scale) == 0.0
+    np.testing.assert_array_equal(got, plain)
+
+
+def test_hetero_weights_are_capped(monkeypatch):
+    """A near-noiseless region sends 1 / var to the floor's reciprocal; the cap holds it down."""
+    import neural_particle_method.estimators.nn as N
+    n = 2000
+    x = rng.normal(0.0, 0.3, n)
+    v = 0.04 * np.exp(-2.0 * x)
+    var = np.full(n, 0.01)
+    var[0] = 1e-8                                     # a near-zero-variance region
+    monkeypatch.setattr(N, "nw_local_variance", lambda *a, **k: var)
+    raw = (1.0 / var) / (1.0 / var).mean()
+    assert raw.max() > HETERO_W_MAX, "the fixture must actually exercise the cap"
+    est = NNRegressor(seed=0, first_steps=3, later_steps=1, hetero=True)
+    est.fit_predict(0.5, x, v, GRID)
+    assert est.last_weights.max() <= HETERO_W_MAX
+    assert (est.last_weights[1:] > 0).all()

@@ -1,6 +1,7 @@
 """Tuning clouds for the estimator search: one MLflow run per held-out scenario holding the
 particle slices an offline pass sees, split into a fit pool and a held-out set, with NW's
 held-out loss per slice as the yardstick."""
+import os
 import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -14,6 +15,7 @@ from ..tracking.store import git_hash
 from .config import FULL
 
 EXPERIMENT = "optuna_clouds"
+CACHE_ROOT = "results/optuna/clouds"
 SLICE_TIMES = (0.10, 0.50, 1.00, 1.75)
 HELD_FRAC = 0.2
 
@@ -94,15 +96,32 @@ def ensure_cloud(store, sid, settings=FULL, registry=None, times=SLICE_TIMES):
         return h.run_id
 
 
+def cloud_cache(run_id, cache_dir=None):
+    """The per-run cache directory a worker reads `cloud.npz` from."""
+    return Path(cache_dir) if cache_dir is not None else Path(CACHE_ROOT) / run_id
+
+
 def load_cloud(store, run_id, cache_dir=None):
-    cache = Path(cache_dir or f"results/optuna/clouds/{run_id}")
+    """The cloud, from the per-run cache, downloading it once if it is not there.
+
+    The download is atomic: several workers may race on the same run id, and a half-written
+    `cloud.npz` would be loaded as a truncated archive by whoever looked next. Arrays come back
+    as float32; the fits run in float32 anyway and the full clouds are held in memory per worker.
+    """
+    cache = cloud_cache(run_id, cache_dir)
     p = cache / "cloud.npz"
     if not p.exists():
-        store.download(run_id, "cloud.npz", cache)
+        cache.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=cache.parent) as d:
+            os.replace(store.download(run_id, "cloud.npz", d), p)
     z = np.load(p)
     times = [float(t) for t in z["times"]]
     m = store.get_metrics(run_id)
+
+    def pair(kind, i):
+        return (z[f"lnx_{kind}_{i}"].astype(np.float32), z[f"v_{kind}_{i}"].astype(np.float32))
+
     return Cloud(sid=store.get_params(run_id)["sid"], rho=float(z["rho"]), times=times,
-                 fit=[(z[f"lnx_fit_{i}"], z[f"v_fit_{i}"]) for i in range(len(times))],
-                 held=[(z[f"lnx_held_{i}"], z[f"v_held_{i}"]) for i in range(len(times))],
+                 fit=[pair("fit", i) for i in range(len(times))],
+                 held=[pair("held", i) for i in range(len(times))],
                  nw_loss=[m[f"nw_loss/t{t:g}"] for t in times])

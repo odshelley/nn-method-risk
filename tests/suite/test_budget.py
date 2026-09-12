@@ -62,3 +62,23 @@ def test_nw_resolve_is_one_body_free_cell_shared_by_every_body(store):
     assert run_budget_cell(store, "s01", "nw_resolve", TINY.n_online, LAGS[0], 0,
                            body="explicit", settings=TINY) == rid
     assert len(store.search(TINY.experiment("suite_budget_tuned"))) == 1
+
+
+def test_opt_cell_takes_its_explicit_config_from_the_recipe(store):
+    """The recipe's tail rule belongs to the body and has to reach the online sweep."""
+    rid = run_budget_cell(store, "s01", "explicit_opt_spline", TINY.n_online, LAGS[0], 0,
+                          body="explicit_opt", settings=TINY, recipe=FAST)
+    p = store.get_params(rid)
+    assert p["explicit.tail"] == "linear"
+    assert p["explicit.n_particles"] == str(TINY.n_online)
+    flat = run_budget_cell(store, "s01", "explicit_opt_spline", TINY.n_online, LAGS[0], 0,
+                           body="explicit_opt", settings=TINY, recipe={**FAST, "tail": "flat"})
+    assert store.get_params(flat)["explicit.tail"] == "flat"
+
+
+def test_nw_resolve_keeps_the_settings_config(store):
+    rid = run_budget_cell(store, "s01", "nw_resolve", TINY.n_online, LAGS[0], 0,
+                          body="explicit_opt", settings=TINY, recipe=FAST)
+    p = store.get_params(rid)
+    assert p["explicit.tail"] == TINY.explicit.tail
+    assert p["explicit.fit_subsample"] == str(TINY.n_online)

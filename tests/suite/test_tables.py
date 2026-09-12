@@ -89,6 +89,11 @@ def _log_searched_runs(store, promoted_hash, rejected_hash):
             handle.log_metrics({"pooled_mae_bp": mae, "liquid_mae_bp": mae / 2,
                                 "wings_mae_bp": mae * 2, "price_bp/pooled": 1.0,
                                 "total_s": 20.0, "fit_s": 20.0})
+        cold = {"sid": "s01", "algo": "explicit_nn_opt", "seed": 0, "n_particles": 100_000,
+                "recipe_hash": h}
+        with store.run("suite_cold", cold) as handle:
+            handle.log_metrics({"pooled_mae_bp": mae, "liquid_mae_bp": mae / 2,
+                                "wings_mae_bp": mae * 2, "price_bp/pooled": 1.0, "fit_s": 2.0})
 
 
 def test_searched_rows_quote_only_the_promoted_recipe(store, tmp_path, monkeypatch):
@@ -103,6 +108,8 @@ def test_searched_rows_quote_only_the_promoted_recipe(store, tmp_path, monkeypat
     assert bodies.loc[("Explicit NN, searched", "500k"), "mae_mean"] == pytest.approx(
         PROMOTED_MAE)
     assert bodies.loc[("Explicit NN, searched", "200k")].isna().all()
+    cold = cold_frame(store, FULL)
+    assert cold.loc["Explicit NN, searched", "mae_mean"] == pytest.approx(PROMOTED_MAE)
 
 
 def test_searched_rows_are_blank_until_a_recipe_is_promoted(store, tmp_path, monkeypatch):
@@ -111,6 +118,7 @@ def test_searched_rows_are_blank_until_a_recipe_is_promoted(store, tmp_path, mon
     assert np.isnan(heads_frame(store, FULL).loc["Searched body + spline head",
                                                  "mae_surface_10k"])
     assert bodies_frame(store, FULL).loc[("Explicit NN, searched", "500k")].isna().all()
+    assert cold_frame(store, FULL).loc["Explicit NN, searched"].isna().all()
 
 
 def _two_stage(index):

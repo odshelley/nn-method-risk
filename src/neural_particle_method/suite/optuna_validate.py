@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import torch
 
 from ..estimators.recipes import coerce_recipe, recipe_hash, save_recipe
 from ..tracking.store import Store
@@ -19,7 +20,7 @@ LAG_BY_KIND = {lag.kind: lag for lag in LAGS}
 
 
 def _cell(args):
-    """One validation job in one process: the frozen body, or a budget cell on top of it."""
+    """One validation job: the frozen body, or a budget cell on top of it."""
     uri, root, sid, method, budget, lag_kind, seed, settings, recipe = args
     store = Store(uri, root)
     if method == "body":
@@ -30,11 +31,21 @@ def _cell(args):
                            body="explicit_opt", settings=settings, recipe=recipe)
 
 
+def _pinned_cell(args):
+    """`_cell` in a spawned worker: one BLAS thread each, the pool being the parallelism.
+
+    Only the spawned path pins. `n_jobs == 1` runs `_cell` in the caller's own process, where
+    changing the global thread count would change every later torch reduction it makes.
+    """
+    torch.set_num_threads(1)
+    return _cell(args)
+
+
 def _run_all(jobs, n_jobs):
     if n_jobs == 1:
         return [_cell(j) for j in jobs]
     with ProcessPoolExecutor(max_workers=n_jobs) as ex:
-        return list(ex.map(_cell, jobs))
+        return list(ex.map(_pinned_cell, jobs))
 
 
 def _mean_over_scenarios(sel, key):
@@ -79,6 +90,10 @@ def validate(store, study, top=3, jobs=1, sids=SSVI_SIDS, settings=FULL, budget=
     """Train each top recipe as a frozen body, run its spline head at `budget` against NW
     re-solved there, print the comparison and return it. Writes `<study>_top.json`."""
     best = top_recipes(store, study, top)
+    if not best:
+        # without this the run writes an empty `<study>_top.json`, runs the NW re-solve cells and
+        # prints a table with only the NW row, which reads as a finished validation
+        raise RuntimeError(f"study {study} has no COMPLETE trials")
     out = Path(STORAGE_DIR) / f"{study}_top.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps([{k: b[k] for k in ("trial_number", "score", "recipe")}

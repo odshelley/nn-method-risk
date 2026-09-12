@@ -2,7 +2,7 @@ import pytest
 
 from neural_particle_method.estimators import recipes as R
 from neural_particle_method.suite.artifacts import load_run
-from neural_particle_method.suite.cold import COLD_ALGOS, run_cold
+from neural_particle_method.suite.cold import COLD_ALGOS, cold_extra_key, run_cold
 from neural_particle_method.suite.config import FULL, SMOKE, SuiteSettings, cold_algos
 from neural_particle_method.tracking.store import Store
 
@@ -47,3 +47,46 @@ def test_run_cold_logs_and_saves_model(store, algo):
         }[algo]
     assert run_cold(store, "s01", algo, 0, TINY) == rid
     assert len(store.search(TINY.experiment("suite_cold"))) == 1
+
+
+def _fast_recipe():
+    return {"hidden": 16, "depth": 2, "lr": 1e-2, "batch_size": 0, "first_steps": 3,
+            "later_steps": 1, "weight_decay": 0.0, "fit_subsample": 400, "warm_start": True,
+            "mean_match": False, "monotone": False, "monotone_penalty": 0.0, "tail": "flat",
+            "hetero": False}
+
+
+def test_searched_cold_run_is_keyed_by_the_promoted_recipe(store, tmp_path, monkeypatch):
+    """A second promotion must not read back the first recipe's cold rows."""
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)
+    R.save_recipe("explicit_opt", _fast_recipe())
+    want = R.recipe_hash(R.load_recipe("explicit_opt"))
+    rid = run_cold(store, "s01", "explicit_nn_opt", 0, TINY)
+    assert store.get_params(rid)["recipe_hash"] == want
+    assert run_cold(store, "s01", "explicit_nn_opt", 0, TINY) == rid
+    assert len(store.search(TINY.experiment("suite_cold"))) == 1
+    R.save_recipe("explicit_opt", {**_fast_recipe(), "tail": "linear"})
+    other = run_cold(store, "s01", "explicit_nn_opt", 0, TINY)
+    assert other != rid and store.get_params(other)["recipe_hash"] != want
+
+
+def test_only_the_searched_cold_algo_carries_a_recipe_hash(store, tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)
+    R.save_recipe("explicit_opt", _fast_recipe())
+    assert cold_extra_key("explicit_nn") is None and cold_extra_key("nw") is None
+    assert set(cold_extra_key("explicit_nn_opt")) == {"recipe_hash"}
+    rid = run_cold(store, "s01", "explicit_nn", 0, TINY)
+    assert "recipe_hash" not in store.get_params(rid)
+
+
+def test_grid_sees_the_searched_cold_job_as_finished_only_for_its_own_recipe(store, tmp_path,
+                                                                             monkeypatch):
+    from neural_particle_method.suite.grid import _is_finished
+    monkeypatch.setattr(R, "RECIPE_DIR", tmp_path)
+    R.save_recipe("explicit_opt", _fast_recipe())
+    job = ("cold", "s01", "explicit_nn_opt", 0)
+    assert not _is_finished(store, job, TINY)
+    run_cold(store, "s01", "explicit_nn_opt", 0, TINY)
+    assert _is_finished(store, job, TINY)
+    R.save_recipe("explicit_opt", {**_fast_recipe(), "tail": "linear"})
+    assert not _is_finished(store, job, TINY)

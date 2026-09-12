@@ -7,7 +7,7 @@ from ..bench.runner import _leverage_error
 from ..bench.scenarios import full_registry
 from ..calibrate.explicit import calibrate_explicit
 from ..estimators import make_estimator
-from ..estimators.recipes import load_recipe, recipe_hash
+from ..estimators.recipes import explicit_config_from_recipe, load_recipe, recipe_hash
 from ..tracking.store import git_hash, to_jsonable
 from .artifacts import load_run
 from .config import FULL
@@ -72,6 +72,10 @@ def run_online(store, sid, method, offline_n, lag, seed, settings=FULL):
     lsc = lagged_scenario(sc, lag)
     lv = lsc.local_vol()
     ecfg = replace(settings.explicit, n_particles=settings.n_online)
+    if body == "explicit_opt":
+        # same reason as in `budget.run_budget_cell`: the recipe's tail rule belongs to the body
+        # and has to reach the online sweep
+        ecfg = explicit_config_from_recipe(ecfg, load_recipe("explicit_opt"))
     offline = load_run(store, run_offline(store, sid, body, offline_n, settings)) if body else None
     ensure_lagged_reference(store, sid, lag, settings)
     params = {**key, "git_hash": git_hash(), **lsc.as_params(),

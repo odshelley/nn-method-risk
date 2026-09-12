@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -6,6 +8,7 @@ from neural_particle_method.suite.config import TUNING_SIDS, SuiteSettings
 from neural_particle_method.suite.optuna_clouds import (
     EXPERIMENT,
     Cloud,
+    cloud_cache,
     ensure_cloud,
     heldout_loss,
     load_cloud,
@@ -51,3 +54,38 @@ def test_ensure_cloud_is_idempotent_and_records_the_slices(store, tmp_path):
         assert (vf >= 0).all() and (vh >= 0).all()
     assert c.rho == reg["t01"].dynamics.rho
     assert all(loss > 0 for loss in c.nw_loss)
+
+
+def test_load_cloud_downloads_once_and_lands_the_file_atomically(store, tmp_path, monkeypatch):
+    """Workers race on the same run id: a half-written `cloud.npz` must never be visible."""
+    rid = ensure_cloud(store, "t01", TINY, make_tuning_registry(), times=TIMES)
+    cache = tmp_path / "cache" / rid
+    calls, real = [], store.download
+    seen_partial = []
+
+    def spy(run_id, path, dst):
+        calls.append(run_id)
+        got = real(run_id, path, dst)
+        # while the download is in flight the destination is a temporary directory, not the cache
+        seen_partial.append((cache / "cloud.npz").exists())
+        return got
+
+    monkeypatch.setattr(store, "download", spy)
+    a = load_cloud(store, rid, cache_dir=cache)
+    b = load_cloud(store, rid, cache_dir=cache)
+    assert calls == [rid] and seen_partial == [False]
+    assert (cache / "cloud.npz").exists() and not list(cache.parent.glob("tmp*"))
+    assert a.times == b.times and a.sid == b.sid
+
+
+def test_load_cloud_returns_float32(store, tmp_path):
+    """The clouds are the worker's resident memory; float32 halves it and the fits cast anyway."""
+    rid = ensure_cloud(store, "t01", TINY, make_tuning_registry(), times=TIMES)
+    c = load_cloud(store, rid, cache_dir=tmp_path / "cache")
+    for (lf, vf), (lh, vh) in zip(c.fit, c.held):
+        assert lf.dtype == vf.dtype == lh.dtype == vh.dtype == np.float32
+
+
+def test_cloud_cache_is_the_path_the_workers_read(tmp_path):
+    assert cloud_cache("abc", tmp_path / "c") == tmp_path / "c"
+    assert cloud_cache("abc") == Path("results/optuna/clouds/abc")

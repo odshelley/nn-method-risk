@@ -132,6 +132,8 @@ def cold_frame(store, settings=FULL):
         sel = src[src["params.sid"].isin(_sids())]
         if algo != "pde":
             sel = sel[sel["params.algo"] == algo]
+        if algo == "explicit_nn_opt":
+            sel = _only_promoted_recipe(sel)
         row = _agg(_prep(sel)) if len(sel) else EMPTY.copy()
         if algo == "pde":
             row = row.copy()

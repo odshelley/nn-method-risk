@@ -1,8 +1,11 @@
+from dataclasses import replace
+
 import numpy as np
+import pytest
 
 from neural_particle_method.bench.scenarios import make_registry
 from neural_particle_method.calibrate.config import ExplicitConfig
-from neural_particle_method.calibrate.explicit import calibrate_explicit
+from neural_particle_method.calibrate.explicit import TAIL_DX, calibrate_explicit
 from neural_particle_method.estimators.nadaraya_watson import nw_estimate
 from neural_particle_method.estimators.nn import V_SCALE, NNRegressor
 from neural_particle_method.simulate.leverage import DEFAULT_GRID
@@ -197,3 +200,46 @@ def test_online_sweep_with_head_runs_and_changes_f():
     assert fit_s > 0 and len(field) == E.n_steps
     assert np.array_equal(field[0].f, ref[0].f)                 # slice 0 is v0 in both
     assert any(not np.array_equal(field[k].f, ref[k].f) for k in range(1, E.n_steps))
+
+
+def test_online_sweep_honours_the_tail_rule():
+    """`cfg.tail` continues each fitted slice past its quantile grid, as the explicit pass does.
+
+    Only slice 1 is comparable across tail rules: extending the grid changes the leverage the
+    particles see, so every later cloud (and its quantile grid) differs by construction.
+    """
+    sc, bank, _ = _body()
+    lv = sc.local_vol()
+    head = RKHSHead(n_centres=20)
+    flat, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=head, seed=5)
+    lin, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="linear"), head=head,
+                          seed=5)
+    free, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="free"), head=head,
+                           seed=5)
+    assert len(lin[0].grid) == len(flat[0].grid) == 1           # slice 0 is the one-point slice
+    np.testing.assert_array_equal(lin[1].grid[1:-1], flat[1].grid)
+    np.testing.assert_array_equal(free[1].f[1:-1], flat[1].f)
+    assert lin[1].grid[0] == pytest.approx(flat[1].grid[0] - TAIL_DX)
+    assert lin[1].grid[-1] == pytest.approx(flat[1].grid[-1] + TAIL_DX)
+    # "free" reads the body's own f at the anchors, which is not the linear extrapolation
+    assert free[1].f[0] != lin[1].f[0] and free[1].f[-1] != lin[1].f[-1]
+    for k in range(1, E.n_steps):
+        for fld in (lin, free):
+            assert len(fld[k].grid) == len(fld[k].f) == len(fld[k].L)
+            assert fld[k].grid[0] == pytest.approx(fld[k].grid[1] - TAIL_DX)
+            assert fld[k].grid[-1] == pytest.approx(fld[k].grid[-2] + TAIL_DX)
+            assert np.isfinite(fld[k].f).all() and np.isfinite(fld[k].L).all()
+            assert (fld[k].f > 0).all()
+
+
+def test_online_sweep_default_tail_is_flat_and_leaves_the_grid_alone():
+    sc, bank, _ = _body()
+    lv = sc.local_vol()
+    head = SplineHead()
+    a, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=head, seed=5)
+    b, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="flat"), head=head,
+                        seed=5)
+    for x, y in zip(a, b):
+        np.testing.assert_array_equal(x.grid, y.grid)
+        np.testing.assert_array_equal(x.f, y.f)
+        np.testing.assert_array_equal(x.L, y.L)

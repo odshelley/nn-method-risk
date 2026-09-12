@@ -7,6 +7,7 @@ from .nadaraya_watson import nw_local_variance
 
 V_SCALE = 0.04  # rough variance scale for output conditioning
 Z_SCALE = 0.3   # rough log-spot scale for input conditioning
+HETERO_W_MAX = 1e3  # cap on a normalised heteroscedastic weight
 
 
 class SliceNet(nn.Module):
@@ -41,7 +42,9 @@ class NNRegressor:
     and trains it `first_steps` steps, `mean_match` rescales the fitted slice so its weighted
     mean over the fit sample equals the weighted mean of the targets, `monotone_penalty` adds
     lambda * mean(relu(monotone_sign * df/dz))^2 / V_SCALE^2 to the loss (penalising slopes of
-    sign `monotone_sign`), `hetero` weights the loss by 1 / local variance of the target.
+    sign `monotone_sign`), `hetero` weights the loss by 1 / local variance of the target,
+    normalised to mean one and capped at `HETERO_W_MAX`. `mean_match` is skipped when the
+    weighted target mean is not positive: there is no scale to match there.
     """
     supports_weights = True
 
@@ -114,15 +117,22 @@ class NNRegressor:
         if self.hetero:
             wh = 1.0 / nw_local_variance(lnx, v, weights=weights)
             wh = wh / wh.mean()
+            # a region where the target is almost noiseless sends 1 / var to the 1e-8 floor's
+            # reciprocal and would drown every other particle; cap the normalised weight there
+            wh = np.clip(wh, None, HETERO_W_MAX)
             w = wh if weights is None else weights * wh
         self.last_weights = w
         self.fit(lnx, v, steps=steps, weights=w)
         if self.mean_match:
             pred = self.predict(lnx)
             wm = np.ones_like(v) if weights is None else weights
-            ratio = np.average(v, weights=wm) / max(np.average(pred, weights=wm), 1e-12)
-            with torch.no_grad():
-                self.net.log_scale += float(np.log(max(ratio, 1e-12)))
+            target_mean = float(np.average(v, weights=wm))
+            # a non-positive weighted target mean has no scale to match: the ratio would be zero
+            # or negative and `log_scale` would collapse the slice. Leave the fit alone.
+            if target_mean > 0.0:
+                ratio = target_mean / max(np.average(pred, weights=wm), 1e-12)
+                with torch.no_grad():
+                    self.net.log_scale += float(np.log(max(ratio, 1e-12)))
         if self.keep_slice_weights:
             snap = {k: v_.detach().clone() for k, v_ in self.net.state_dict().items()}
             self.slice_weights.append((float(t), snap))

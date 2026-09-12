@@ -9,6 +9,7 @@ import time
 import numpy as np
 
 from ..calibrate.config import ExplicitConfig
+from ..calibrate.explicit import extend_tail
 from ..estimators.nn import V_SCALE
 from ..estimators.rkhs import RKHSRidge
 from ..estimators.spline import PSpline
@@ -124,12 +125,27 @@ def stale_field(model_f, local_vol, s0, T, n_steps, L_max=4.0, grid=DEFAULT_GRID
     return LeverageField(slices)
 
 
+class _ModelTail:
+    """`extend_tail`'s "free" rule needs the fitted object at the anchor points; online that is
+    the frozen body's own `f` at this slice time, which is exactly what "free" means here."""
+
+    def __init__(self, model, t):
+        self.model, self.t = model, t
+
+    def predict(self, x):
+        return self.model.f(self.t, x)
+
+
 def online_sweep(model, local_vol, params, s0, T, cfg=ExplicitConfig(), head=None, seed=0):
     """calibrate_explicit with the estimator replaced by "stale + head correction".
 
     Returns (field, fit_s) where fit_s is the head time only. `head=None` is the stale-f,
     fresh-Dupire method and costs nothing: it returns `stale_field` on the fixed grid without
     simulating.
+
+    `cfg.tail` continues each fitted slice beyond its quantile grid exactly as the explicit pass
+    does, so a recipe's tail rule survives into the online sweep; "flat" (the default) leaves the
+    grid untouched and the sweep bit-for-bit.
     """
     hp = HestonParams.from_dict(params)
     if head is None:
@@ -156,6 +172,7 @@ def online_sweep(model, local_vol, params, s0, T, cfg=ExplicitConfig(), head=Non
             corr = head.correction(t, x_sub, v_sub, f_stale, model, grid)
             f_grid = model.f(t, grid) + corr
             fit_s += time.perf_counter() - t0
+            grid, f_grid = extend_tail(grid, f_grid, cfg.tail, _ModelTail(model, t))
         f_grid = np.clip(f_grid, 1e-4, None)
         sig = local_vol.sigma(max(t, local_vol.T_grid[0]), np.exp(grid), s0)
         L_grid = np.clip(sig / np.sqrt(f_grid), 0.0, L_max)

@@ -6,7 +6,7 @@ from concurrent.futures.process import BrokenProcessPool
 from ..bench.runner import run_key
 from ..estimators.recipes import recipe_exists
 from ..tracking.store import Store
-from .cold import run_cold
+from .cold import cold_extra_key, run_cold
 from .config import FULL, cold_algos
 from .lag import LAGS
 from .offline import STAGE_BODIES, run_offline
@@ -115,7 +115,8 @@ def _is_finished(store, job, settings):
         return store.find_finished("pde_reference", key) is not None
     if kind == "cold":
         _, sid, algo, seed = job
-        key = run_key(sid, algo, settings.n_online, seed)
+        key = {**run_key(sid, algo, settings.n_online, seed),
+               **(cold_extra_key(algo) or {})}
         return store.find_finished(settings.experiment("suite_cold"), key) is not None
     if kind == "offline":
         _, sid, body, n = job
