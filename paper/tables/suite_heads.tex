@@ -4,10 +4,11 @@ method & \multicolumn{5}{c}{surface lag} & \multicolumn{5}{c}{surface plus $2\%$
 \cmidrule(lr){2-6}\cmidrule(lr){7-11}\cmidrule(lr){12-13}
 & 10k & 30k & 80k & 100k & liquid & 10k & 30k & 80k & 100k & liquid & 10k & 100k\\
 \midrule
-NW re-solve on $S_1$ & 50 & 47 & 44 & 44 & 17 & 50 & 47 & 45 & 44 & 18 & \textbf{1.0} & \textbf{8.5}\\
+NW re-solve on $S_1$ & 50 & 47 & 44 & 44 & 17 & 50 & 47 & 45 & 44 & 18 & \textbf{1.0} & 8.5\\
 Tuned body, stale $f$, fresh Dupire & 50 & 50 & 50 & 50 & 28 & 88 & 88 & 88 & 88 & 56 & 0.0 & 0.0\\
-Tuned body + spline head & \textbf{46} & \textbf{45} & \textbf{43} & \textbf{43} & 16 & \textbf{46} & 46 & 44 & \textbf{43} & \textbf{16} & 1.2 & 9.8\\
+Tuned body + spline head & \textbf{46} & \textbf{45} & 43 & 43 & 16 & \textbf{46} & 46 & 44 & \textbf{43} & \textbf{16} & 1.2 & 9.8\\
+Searched body + spline head & \textbf{46} & \textbf{45} & \textbf{42} & \textbf{42} & 16 & \textbf{46} & \textbf{45} & \textbf{43} & \textbf{43} & \textbf{16} & \textbf{1.0} & \textbf{7.1}\\
 Tuned body + RKHS head & \textbf{46} & 46 & 44 & 44 & 16 & \textbf{46} & 46 & 44 & 44 & \textbf{16} & 2.3 & 18.8\\
-Tuned body + ridge head & \textbf{46} & \textbf{45} & \textbf{43} & 44 & \textbf{15} & \textbf{46} & \textbf{45} & \textbf{43} & \textbf{43} & \textbf{16} & 3.3 & 28.4\\
+Tuned body + ridge head & \textbf{46} & \textbf{45} & 43 & 44 & \textbf{15} & \textbf{46} & \textbf{45} & \textbf{43} & \textbf{43} & \textbf{16} & 3.3 & 28.4\\
 \bottomrule
 \end{tabular}
