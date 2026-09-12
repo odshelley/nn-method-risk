@@ -91,7 +91,8 @@ def _parser():
 
 def _cloud_worker(args):
     """One tuning cloud in its own process (the clouds are independent full offline passes)."""
-    from .suite.optuna_clouds import ensure_cloud
+    from .suite.optuna_clouds import EXPERIMENT as CLOUD_EXPERIMENT
+from .suite.optuna_clouds import ensure_cloud
     torch.set_num_threads(1)   # one BLAS thread per worker; the pool is the parallelism
     uri, root, sid = args
     return ensure_cloud(Store(uri, root), sid)
@@ -206,6 +207,7 @@ def main(argv=None):
         from .suite.optuna_validate import promote, validate
         if args.optuna_cmd == "clouds":
             sids = tuple(args.sids or TUNING_SIDS)
+            store.experiment_id(CLOUD_EXPERIMENT)   # pre-create: workers must not race on it
             work = [(store.tracking_uri, store.artifact_root, s) for s in sids]
             with ProcessPoolExecutor(max_workers=args.jobs) as ex:
                 for sid, rid in zip(sids, ex.map(_cloud_worker, work)):
