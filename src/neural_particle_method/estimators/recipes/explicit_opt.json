@@ -1,0 +1,16 @@
+{
+ "batch_size": 8192,
+ "depth": 4,
+ "first_steps": 500,
+ "fit_subsample": 250000,
+ "hetero": false,
+ "hidden": 32,
+ "later_steps": 400,
+ "lr": 0.0036935332527428507,
+ "mean_match": true,
+ "monotone": true,
+ "monotone_penalty": 1.4847344659411786e-05,
+ "tail": "linear",
+ "warm_start": true,
+ "weight_decay": 0.0
+}
