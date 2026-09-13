@@ -12,6 +12,7 @@ from neural_particle_method.pricing.reprice import (
     reprice_iv_otm,
 )
 from neural_particle_method.simulate.leverage import DEFAULT_GRID, LeverageField, Slice
+from neural_particle_method.simulate.stepper import heston_step
 
 
 def _flat_field(n_steps, T):
@@ -63,6 +64,43 @@ def test_tilted_reprice_agrees_with_untilted_and_reaches_the_wings():
     assert ok.sum() >= 3
     assert np.nanmax(np.abs(u[ok] - t[ok])) < 0.01          # within MC noise at 200k paths
     assert np.all(np.isfinite(t[0, [0, -1]]))                # the tilted cloud prices the far wings
+
+
+def test_tilted_prices_are_unbiased_not_self_normalised():
+    """The tilted price must be mean(w * payoff), not the self-normalised sum(w*p)/sum(w)."""
+    sc = make_registry()["s01"]
+    n_particles, n_steps, T = 2_000, 2, 1.0
+    cfg = RepriceConfig(n_particles, n_steps)
+    mix = TiltDesign("constant", 3.0).mixture(n_steps, T, sc.dynamics.rho)
+    k = np.array([-0.2, 0.2])
+    field = _flat_field(n_steps, T)
+    _, prices, _ = reprice_iv_otm(field, sc.dynamics, sc.s0, [T], k, cfg, seed=3, mixture=mix)
+
+    # replay the same cloud: the RNG order is fixed, one component draw then zb, zp per step
+    dt, sdt = T / n_steps, np.sqrt(T / n_steps)
+    rng = np.random.default_rng(3)
+    comp = rng.choice(3, size=n_particles, p=list(mix.alphas))
+    thetas, etas, alphas = np.asarray(mix.thetas), np.asarray(mix.etas), np.array(mix.alphas)
+    lnx = np.full(n_particles, np.log(sc.s0))
+    v = np.full(n_particles, sc.dynamics.v0)
+    ell = np.zeros((3, n_particles))
+    w = np.ones(n_particles)
+    for step in range(n_steps):
+        L_p = field.at(step * dt, lnx)
+        zb = rng.standard_normal(n_particles)
+        zp = rng.standard_normal(n_particles)
+        lnx, v = heston_step(lnx, v, L_p, zb, zp, sc.dynamics, dt, sdt, theta_p=thetas[comp])
+        dbperp = zp * sdt + etas[comp] * dt
+        ell += etas[:, None] * dbperp[None, :] - 0.5 * (etas ** 2)[:, None] * dt
+        w = 1.0 / (alphas @ np.exp(np.clip(ell, -60, 60)))
+    x = np.exp(lnx)
+
+    assert abs(np.mean(w) - 1.0) > 1e-12          # the sample mean weight is not exactly one
+    for j, kk in enumerate(k):
+        K = sc.s0 * np.exp(kk)
+        payoff = np.maximum(K - x, 0.0) if kk < 0 else np.maximum(x - K, 0.0)
+        assert prices[0, j] == float(np.mean(w * payoff))
+        assert abs(prices[0, j] - float(np.sum(w * payoff) / np.sum(w))) > 1e-12
 
 
 def test_far_wing_metrics_drop_quotes_below_the_price_floor():

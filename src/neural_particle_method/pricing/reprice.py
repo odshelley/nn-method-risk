@@ -29,7 +29,8 @@ FAR_PRICE_FLOOR = 1e-5   # of spot: quotes whose target OTM price is below this 
 
 
 def far_k_grid():
-    """21 log-strikes from 0.45 to 2.2 spot: the quoted 13 plus the far wings out to |k| ~ 0.8."""
+    """21 log-strikes from 0.45 to 2.2 spot, |k| out to about 0.8: a finer grid than the quoted
+    13, reaching further into the wings. It does not contain the quoted strikes."""
     return np.log(np.geomspace(0.45, 2.2, 21))
 
 
