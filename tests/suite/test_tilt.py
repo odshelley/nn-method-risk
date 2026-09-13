@@ -1,5 +1,10 @@
+import json
+import tempfile
+
+import numpy as np
 import pytest
 
+from neural_particle_method.bench.reference_runs import run_reference
 from neural_particle_method.estimators import recipes as R
 from neural_particle_method.suite.config import SuiteSettings
 from neural_particle_method.suite.lag import LAGS
@@ -9,8 +14,11 @@ from neural_particle_method.suite.tilt import (
     cold_jobs,
     mixture_for,
     online_jobs,
+    run_slice_cell,
     run_tilt_cold,
     run_tilt_online,
+    simulate_frozen,
+    slice_jobs,
 )
 from neural_particle_method.tracking.store import Store
 
@@ -91,3 +99,53 @@ def test_online_cell_is_tilted_keyed_and_weighted(store, promoted):
     assert len(store.search(TINY.experiment("tilt_online"))) == 1
     # the untilted partner lives in the budget experiment, not here
     assert store.search(TINY.experiment("suite_budget_tuned")).empty
+
+
+def test_slice_job_count():
+    jobs = slice_jobs()
+    assert len(jobs) == 6 * 3 * 7 * 5
+    assert len({j[3] for j in jobs}) == 7 and "none" in {j[3] for j in jobs}
+    assert len(slice_jobs(sids=("s11",))) == 3 * 7 * 5
+
+
+def test_simulate_frozen_untilted_has_unit_weights_and_tilted_has_bounded_weights():
+    from neural_particle_method.bench.scenarios import make_registry
+    from neural_particle_method.simulate.leverage import DEFAULT_GRID, LeverageField, Slice
+    sc = make_registry()["s01"]
+    n_steps = 8
+    field = LeverageField([Slice(k * sc.T / n_steps, DEFAULT_GRID.copy(),
+                                 np.ones_like(DEFAULT_GRID), np.full_like(DEFAULT_GRID, 0.04))
+                           for k in range(n_steps)])
+    clouds, ess = simulate_frozen(field, sc.dynamics, sc.s0, sc.T, n_steps, 2_000, 0,
+                                  keep_times=(0.5, 1.0))
+    assert set(clouds) == {0.5, 1.0} and ess == []
+    lnx, v, w = clouds[1.0]
+    assert lnx.shape == v.shape == w.shape == (2_000,) and np.all(w == 1.0)
+    mix = mixture_for("constant-3", n_steps, sc.T, sc.dynamics.rho)
+    clouds_t, ess_t = simulate_frozen(field, sc.dynamics, sc.s0, sc.T, n_steps, 2_000, 0,
+                                      mixture=mix, keep_times=(0.5, 1.0))
+    _, _, wt = clouds_t[1.0]
+    assert wt.max() <= 2 + 1e-9 and abs(wt.mean() - 1) < 0.1 and len(ess_t) == n_steps
+    assert np.std(clouds_t[1.0][0]) > np.std(lnx)     # the tilt spreads the cloud
+
+
+def test_slice_cell_logs_scores_and_clouds(store, promoted):
+    run_reference(store, "s01", n_steps=TINY.explicit.n_steps, n_x=TINY.n_x, n_v=TINY.n_v)
+    rid = run_slice_cell(store, "s01", 800, "constant-3", 0, TINY)
+    assert run_slice_cell(store, "s01", 800, "constant-3", 0, TINY) == rid
+    m = store.get_metrics(rid)
+    for k in ("wings_abs_f_rel/nw", "wings_abs_f_rel/net", "ess_final", "ess_min_slice", "max_w",
+              "sim_s", "fit_s/nw", "fit_s/net"):
+        assert k in m
+    with tempfile.TemporaryDirectory() as d:
+        doc = json.loads(store.download(rid, "slice_scores.json", d).read_text())
+        names = {a.path for a in store.client.list_artifacts(rid)}
+    n_mat, n_k = len(doc["maturities"]), 13
+    assert np.array(doc["f_ref"]).shape == (n_mat, n_k)
+    assert np.array(doc["f_hat"]["nw"]).shape == (n_mat, n_k)
+    assert np.array(doc["ess_local"]).shape == (n_mat, n_k) and len(doc["ess_slice"]) == n_mat
+    assert all(f"cloud_T{t:g}.npz" in names for t in doc["maturities"])
+    p = store.get_params(rid)
+    assert p["design"] == "constant-3" and p["n_particles"] == "800"
+    untilted = run_slice_cell(store, "s01", 800, "none", 0, TINY)
+    assert store.get_metrics(untilted)["ess_final"] == 1.0
