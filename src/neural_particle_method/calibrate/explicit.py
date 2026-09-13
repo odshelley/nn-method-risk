@@ -80,15 +80,23 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
 
     fit_s = 0.0
     theta_p = None
+    ess_min = 1.0
     if mixture is not None:
         comp = rng.choice(3, size=n_particles, p=list(mixture.alphas))
-        theta_p = np.array(mixture.thetas)[comp]
-        etas = np.array(mixture.etas)
-        eta_p = etas[comp]
+        scheduled = mixture.scheduled
+        thetas_all, etas_all = np.asarray(mixture.thetas), np.asarray(mixture.etas)
+        if not scheduled:
+            theta_p = np.array(mixture.thetas)[comp]
+            etas = np.array(mixture.etas)
+            eta_p = etas[comp]
         ell = np.zeros((3, n_particles))
     w = None
 
     for k in range(n_steps):
+        if mixture is not None and scheduled:
+            theta_p = thetas_all[:, k][comp]
+            etas = etas_all[:, k]
+            eta_p = etas[comp]
         t = k * dt
         if cfg.grid == "fixed":
             grid = DEFAULT_GRID.copy()
@@ -124,6 +132,7 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
             dbperp = zp * sdt + eta_p * dt
             ell += etas[:, None] * dbperp[None, :] - 0.5 * (etas ** 2)[:, None] * dt
             w = 1.0 / (np.array(mixture.alphas) @ np.exp(np.clip(ell, -60, 60)))
+            ess_min = min(ess_min, float(w.sum() ** 2 / (n_particles * (w ** 2).sum())))
         if k + 1 in snap_steps:
             snapshots[snap_steps[k + 1]] = lnx.copy()
             if mixture is not None:
@@ -132,5 +141,6 @@ def calibrate_explicit(local_vol, params, estimator, cfg=ExplicitConfig(), *,
     is_diag = None
     if mixture is not None:
         is_diag = {"max_w": float(w.max()),
-                   "ess_frac": float(w.sum() ** 2 / (len(w) * (w ** 2).sum()))}
+                   "ess_frac": float(w.sum() ** 2 / (len(w) * (w ** 2).sum())),
+                   "ess_min_slice": ess_min}
     return ExplicitResult(lnx, LeverageField(slices), fit_s, snapshots, snapshot_weights, w, is_diag)
