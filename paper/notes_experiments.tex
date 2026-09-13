@@ -229,4 +229,47 @@ The online reference row is NW re-solved from scratch on $S_1$ at the same budge
 
 Each run records the git hash, the full configuration as parameters, the leverage field, the implied-volatility error grid, and the trained objects. A loader (\code{nparticle suite load <run\_id>}) rebuilds the leverage field and, where present, the network or per-slice estimators from the artifacts alone, so any row of the tables can be re-scored or reused as an offline body without recomputation.
 
+\section{Importance sampling}\label{sec:tilt}
+
+\emph{Question.} The volatility-preserving Girsanov tilt (the defensive three-component mixture of \code{calibrate/importance.py}: drifts $-\theta,0,+\theta$ on log-spot with weights $\tfrac14,\tfrac12,\tfrac14$, exact discrete-time weights bounded by $2$) was a null result in the pre-floor grid, where the error was propagated bias. The tilt removes estimation variance only, so its regime is small particle budgets and short-dated far wings. The claim tested here is \emph{budget equivalence}: a tilted calibration at a small budget matching an untilted one at a larger budget.
+
+\emph{Designs.} A design is a schedule and a cost cap $c$ on $\sum_k \theta_k^2\,\Delta t/(1-\rho^2)$, the log-weight variance of a pure tilt. \emph{Constant}: $\theta=\sqrt{c(1-\rho^2)/T}$, which at $c=3$ is the mixture already in the code. \emph{Inverse square root}: $\theta_k = a/\sqrt{\max(t_k,\Delta t)}$ with $a$ fixed by the same total cost, concentrating the tilt at short times. Six designs, $c\in\{1,3,9\}$ per schedule, plus untilted.
+
+\subsection{Slice layer}\label{sec:tilt-slices}
+Particles are simulated under the frozen PDE-reference leverage of each of the six study scenarios (s01, s02, s05, s09, s11, s16), so no estimate feeds back; at the four quoted maturities NW and the searched network are fitted on the weighted cloud and evaluated at the 13 quoted strikes against the PDE conditional expectation. Budgets $10$k, $30$k, $80$k; five seeds. The error at each strike is split into its standard deviation over seeds (the variance the tilt can remove) and its mean (bias, common to both arms). The winning design is the one with the smallest NW wing standard deviation at $30$k, disqualified if it moves the bias by more than half.
+
+\begin{table}[h]\centering\footnotesize
+\caption{Slice layer: wing standard deviation over seeds (at $T=0.25$ and pooled over maturities) and wing bias, in percent of $\E[V\mid X]$, by estimator, budget and design (experiment \code{tilt\_slices}). Bold: smallest in each column.}\label{tab:tilt-slices}
+\resizebox{\textwidth}{!}{\input{tables/tilt_slices.tex}}
+\end{table}
+
+\begin{figure}[h]\centering
+\includegraphics[width=\textwidth]{../figures/out/tilt_cloud_s02.png}
+\includegraphics[width=\textwidth]{../figures/out/tilt_cloud_s11.png}
+\caption{Particle clouds at $30$k under the frozen PDE leverage, untilted (left) and under the winning design (right), at $t=0.25$ (top) and $t=1$ (bottom), with the PDE conditional expectation (solid), the NW (dashed) and network (dotted) estimates, and the quoted wing strikes; marker area is the importance weight. s02 (Feller satisfied) and s11 (Feller violated).}\label{fig:tilt-cloud}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=\textwidth]{../figures/out/tilt_leverage_s02.png}
+\includegraphics[width=\textwidth]{../figures/out/tilt_leverage_s11.png}
+\caption{The same slices in leverage: PDE (solid) against the NW and network estimates, with the weighted marginal density of the cloud behind.}\label{fig:tilt-leverage}
+\end{figure}
+
+\subsection{End to end}\label{sec:tilt-e2e}
+Cold: NW on the $20$ SSVI scenarios and the searched network on the six study scenarios, at $10$k, $30$k and $80$k particles, seeds $0$ and $1$, untilted and under the winning design, scored as \cref{sec:suite-cold} (experiment \code{tilt\_cold}). Online: the searched $500\,000$-particle body with the spline head on a tilted online cloud at $10$k and $80$k, both lags (experiment \code{tilt\_online}), against the untilted cells of \cref{tab:suite-heads}; the P-spline is fitted by weighted least squares. Repricing is untilted throughout.
+
+\begin{table}[h]\centering\footnotesize
+\caption{Cold calibration with and without the tilt by budget: pooled, wings, three-month and liquid MAE in vol bp, leverage RMSE against the PDE reference, the minimum per-slice effective sample fraction, and median seconds. Bold: smallest in each column over all rows but the floor, so a bold tilted row at a small budget reads as budget equivalence.}\label{tab:tilt-cold}
+\input{tables/tilt_cold.tex}
+\end{table}
+
+\begin{table}[h]\centering\footnotesize
+\caption{Searched body with the spline head on an untilted and a tilted online cloud, by online budget and lag: pooled, wings and liquid MAE in vol bp and online seconds.}\label{tab:tilt-online}
+\input{tables/tilt_online.tex}
+\end{table}
+
+\emph{Results.} To be written from the runs.
+
+\emph{Diagnosis.} Three checks decide a null result: whether the slice layer shows any seed variance to remove at the quoted strikes; whether the local effective sample size at those strikes actually rose under the tilt or the defensive component dominated; and whether a drop in leverage RMSE fails to appear in the implied-vol error, which means the $200$-step scoring floor is binding in the wings.
+
 \end{document}

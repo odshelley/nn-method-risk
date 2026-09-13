@@ -28,6 +28,11 @@ def _label(n):
     return f"{int(n) // 1000}k"
 
 
+def _tex(name):
+    """Design and lag names carry underscores; they are set in text mode."""
+    return str(name).replace("_", r"\_")
+
+
 def _slice_docs(store, settings):
     """One row per (sid, n, design, seed, estimator, maturity, strike) of wing relative error."""
     df = _finished(store, settings.experiment("tilt_slices"))
@@ -165,7 +170,7 @@ def online_frame(store, design, settings=FULL):
 def _slices_tex(df, design):
     names = [UNTILTED] + [d.name for d in DESIGNS]
     cols = " ".join("rrr" for _ in names)
-    head = " & ".join(f"\\multicolumn{{3}}{{c}}{{{n}}}" for n in names)
+    head = " & ".join(f"\\multicolumn{{3}}{{c}}{{{_tex(n)}}}" for n in names)
     sub = " & ".join("std $T{=}0.25$ & std & bias" for _ in names)
     lines = [f"\\begin{{tabular}}{{l {cols}}}", "\\toprule", f"estimator, $N$ & {head}\\\\",
              "& " + sub + "\\\\", "\\midrule"]
@@ -207,7 +212,7 @@ def _cold_tex(df):
 def _online_tex(df):
     lines = ["\\begin{tabular}{l rrr r}", "\\toprule",
              "budget, lag, arm & pooled & wings & liquid & online s\\\\", "\\midrule"]
-    rows = [(f"{_label(b)}, {lag}, {arm}",
+    rows = [(f"{_label(b)}, {_tex(lag)}, {arm}",
              [(r["mae"], "{:.0f}"), (r["wings"], "{:.0f}"), (r["liquid"], "{:.0f}"),
               (r["secs"], "{:.1f}")]) for (b, lag, arm), r in df.iterrows()]
     lines += _render_rows(rows, secs_cols={3})

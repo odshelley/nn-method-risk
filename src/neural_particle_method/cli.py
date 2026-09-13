@@ -86,6 +86,20 @@ def _parser():
     q.add_argument("--budget", type=int, default=80_000)
     q = os_.add_parser("promote"); q.add_argument("--study", required=True)
     q.add_argument("--trial", type=int, required=True)
+    p = sub.add_parser("tilt")
+    ts = p.add_subparsers(dest="tilt_cmd", required=True)
+    for name in ("slices", "cold", "online"):
+        q = ts.add_parser(name)
+        q.add_argument("--jobs", type=int, default=1)
+        q.add_argument("--sids", nargs="*", default=None)
+        q.add_argument("--design", default=None); q.add_argument("--smoke", action="store_true")
+        q.add_argument("--budgets", nargs="*", type=int, default=None)
+        q.add_argument("--seeds", nargs="*", type=int, default=None)
+    q = ts.add_parser("winner"); q.add_argument("--smoke", action="store_true")
+    q = ts.add_parser("tables"); q.add_argument("--design", default=None)
+    q.add_argument("--smoke", action="store_true"); q.add_argument("--out", default="paper/tables")
+    q = ts.add_parser("figures"); q.add_argument("--design", default=None)
+    q.add_argument("--smoke", action="store_true"); q.add_argument("--out", default="figures/out")
     return ap
 
 
@@ -225,5 +239,42 @@ def main(argv=None):
             return 0
         if args.optuna_cmd == "promote":
             print("wrote", promote(store, args.study, args.trial))
+            return 0
+    if args.cmd == "tilt":
+        from .suite.tilt import SMOKE_GRID, run_tilt_stage
+        from .suite.tilt_figures import make_figures
+        from .suite.tilt_tables import slice_frame, tilt_tables, winner
+        settings = SUITE_SMOKE if args.smoke else SUITE_FULL
+        grid = SMOKE_GRID if args.smoke else {}
+
+        def chosen():
+            d = getattr(args, "design", None)
+            return d if d is not None else winner(slice_frame(store, settings))
+
+        if args.tilt_cmd == "winner":
+            print(winner(slice_frame(store, settings)))
+            return 0
+        if args.tilt_cmd in ("slices", "cold", "online"):
+            sids = args.sids if args.sids is not None else grid.get("sids")
+            particles = (settings.n_online,) if args.smoke else None
+            seeds = args.seeds if args.seeds is not None else grid.get("seeds")
+            budgets = args.budgets if args.budgets is not None else (
+                (settings.n_online,) if args.smoke else None)
+            design = None if args.tilt_cmd == "slices" else chosen()
+            done, failed = run_tilt_stage(store, args.tilt_cmd, settings, n_jobs=args.jobs,
+                                          sids=sids, design=design, particles=particles,
+                                          seeds=seeds, designs=grid.get("designs"),
+                                          budgets=budgets)
+            print(f"tilt {args.tilt_cmd}: {done} done, {failed} failed", flush=True)
+            return 1 if failed else 0
+        if args.tilt_cmd == "tables":
+            for pth in tilt_tables(store, chosen(), args.out, settings):
+                print("wrote", pth)
+            return 0
+        if args.tilt_cmd == "figures":
+            kw = ({"sids": ("s01",), "n_particles": settings.n_online, "times": (0.5, 1.0)}
+                  if args.smoke else {})
+            for pth in make_figures(store, chosen(), args.out, settings, **kw):
+                print("wrote", pth)
             return 0
     return 1

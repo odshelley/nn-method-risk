@@ -6,8 +6,10 @@ calibration (`tilt_cold`) and the frozen body + spline head (`tilt_online`) with
 tilt, scored like section 4. Spec: docs/superpowers/specs/2026-09-13-importance-sampling-design.md.
 """
 import json
+import os
 import tempfile
 import time
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -22,10 +24,11 @@ from ..pricing.reprice import snap_times
 from ..simulate.dynamics import HestonParams
 from ..simulate.leverage import LeverageField
 from ..simulate.stepper import heston_step
-from ..tracking.store import git_hash
+from ..tracking.store import Store, git_hash
 from .budget import run_budget_cell
 from .cold import NN_ALGOS, cold_extra_key
 from .config import FULL, SSVI_SIDS
+from .grid import _drain
 from .lag import LAGS
 
 SLICE_SIDS = ("s01", "s02", "s05", "s09", "s11", "s16")
@@ -246,3 +249,92 @@ def slice_jobs(settings=FULL, sids=None, particles=SLICE_PARTICLES, seeds=SLICE_
     names = [UNTILTED] + [d.name for d in DESIGNS]
     return [("slice", sid, int(n), d, int(seed)) for sid in _restrict(SLICE_SIDS, sids)
             for n in particles for d in names for seed in seeds]
+
+
+SMOKE_GRID = {"sids": ("s01",), "seeds": (0,), "designs": (UNTILTED, "constant-3")}
+
+
+def run_tilt_job(store, job, settings=FULL, recipe=None):
+    kind = job[0]
+    if kind == "slice":
+        return run_slice_cell(store, job[1], job[2], job[3], job[4], settings)
+    if kind == "cold":
+        return run_tilt_cold(store, job[1], job[2], job[3], job[4], job[5], settings)
+    if kind == "online":
+        lag = {lg.kind: lg for lg in LAGS}[job[3]]
+        return run_tilt_online(store, job[1], job[2], lag, job[4], job[5], settings, recipe=recipe)
+    raise KeyError(kind)
+
+
+def _is_finished(store, job, settings):
+    kind, n_steps = job[0], int(settings.explicit.n_steps)
+    if kind == "slice":
+        key = {"sid": job[1], "n_particles": job[2], "design": job[3], "seed": job[4],
+               "n_steps": n_steps}
+        return store.find_finished(settings.experiment("tilt_slices"), key) is not None
+    if kind == "cold":
+        key = {"sid": job[1], "algo": job[2], "n_particles": job[3], "seed": job[4],
+               "design": job[5], **(cold_extra_key(job[2]) or {})}
+        return store.find_finished(settings.experiment("tilt_cold"), key) is not None
+    if kind == "online":
+        key = {"sid": job[1], "method": ONLINE_METHOD, "budget": job[2], "lag": job[3],
+               "seed": job[4], "n_steps": n_steps, "design": job[5],
+               "recipe_hash": recipe_hash(load_recipe("explicit_opt"))}
+        return store.find_finished(settings.experiment("tilt_online"), key) is not None
+    raise KeyError(kind)
+
+
+def _worker(args):
+    uri, root, job, settings, n_jobs = args
+    if n_jobs > 1:
+        import torch
+        k = max(1, (os.cpu_count() or n_jobs) // n_jobs)
+        os.environ.setdefault("OMP_NUM_THREADS", str(k))
+        torch.set_num_threads(k)
+    try:
+        run_tilt_job(Store(uri, root), job, settings)
+        return job, None
+    except Exception as e:  # noqa: BLE001 - the run is already recorded FAILED by Store.run
+        return job, repr(e)
+
+
+def tilt_jobs(stage, settings=FULL, sids=None, design=None, particles=None, seeds=None,
+              designs=None, budgets=None):
+    if stage == "slices":
+        kw = {k: v for k, v in (("particles", particles), ("seeds", seeds)) if v is not None}
+        jobs = slice_jobs(settings, sids, **kw)
+        if designs is not None:
+            jobs = [j for j in jobs if j[3] in set(designs)]
+        return jobs
+    if design is None:
+        raise ValueError(f"stage {stage!r} needs a design name (nparticle tilt winner)")
+    if stage == "cold":
+        kw = {k: v for k, v in (("particles", particles), ("seeds", seeds)) if v is not None}
+        return cold_jobs(design, settings, sids, **kw)
+    if stage == "online":
+        kw = {k: v for k, v in (("budgets", budgets), ("seeds", seeds)) if v is not None}
+        return online_jobs(design, settings, sids, **kw)
+    raise KeyError(stage)
+
+
+def run_tilt_stage(store, stage, settings=FULL, n_jobs=1, sids=None, design=None, particles=None,
+                   seeds=None, designs=None, budgets=None):
+    """Run every unfinished cell of `stage`; returns (n_done, n_failed). Pre-creates the
+    experiments (MLflow race) and, for online, the body experiment."""
+    for name in ("tilt_slices", "tilt_cold", "tilt_online", "suite_offline", "suite_budget_tuned"):
+        store.experiment_id(settings.experiment(name))
+    store.experiment_id("pde_reference")
+    jobs = tilt_jobs(stage, settings, sids, design, particles, seeds, designs, budgets)
+    if stage == "slices":
+        # the PDE reference of each scenario is computed once here, serially, so pooled workers
+        # never race on the same (sid, n_steps) reference run
+        for sid in sorted({j[1] for j in jobs}):
+            run_reference(store, sid, n_steps=settings.explicit.n_steps, n_x=settings.n_x,
+                          n_v=settings.n_v)
+    jobs = [j for j in jobs if not _is_finished(store, j, settings)]
+    print(f"tilt {stage}: {len(jobs)} jobs listed", flush=True)
+    args = [(store.tracking_uri, store.artifact_root, j, settings, n_jobs) for j in jobs]
+    if n_jobs > 1:
+        with ProcessPoolExecutor(max_workers=n_jobs) as pool:
+            return _drain(pool.map(_worker, args))
+    return _drain(map(_worker, args))

@@ -17,6 +17,7 @@ from neural_particle_method.suite.tilt import (
     run_slice_cell,
     run_tilt_cold,
     run_tilt_online,
+    run_tilt_stage,
     simulate_frozen,
     slice_jobs,
 )
@@ -149,3 +150,16 @@ def test_slice_cell_logs_scores_and_clouds(store, promoted):
     assert p["design"] == "constant-3" and p["n_particles"] == "800"
     untilted = run_slice_cell(store, "s01", 800, "none", 0, TINY)
     assert store.get_metrics(untilted)["ess_final"] == 1.0
+
+
+def test_stage_runner_skips_finished_cells(store, promoted):
+    run_reference(store, "s01", n_steps=TINY.explicit.n_steps, n_x=TINY.n_x, n_v=TINY.n_v)
+    done, failed = run_tilt_stage(store, "slices", TINY, sids=("s01",), particles=(800,),
+                                  seeds=(0,), designs=("none", "constant-3"))
+    assert (done, failed) == (2, 0)
+    done, failed = run_tilt_stage(store, "slices", TINY, sids=("s01",), particles=(800,),
+                                  seeds=(0,), designs=("none", "constant-3"))
+    assert (done, failed) == (0, 0)
+    done, failed = run_tilt_stage(store, "cold", TINY, sids=("s01",), design="constant-3",
+                                  particles=(TINY.n_online,), seeds=(0,))
+    assert (done, failed) == (4, 0)          # nw + explicit_nn_opt, untilted + tilted
