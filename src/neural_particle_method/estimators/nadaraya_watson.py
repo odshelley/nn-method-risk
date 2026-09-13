@@ -2,6 +2,26 @@
 import numpy as np
 
 
+def cloud_std(lnx, weights=None):
+    """Spread of the cloud the sample stands for: the plain standard deviation, or the weighted
+    one when the sample carries importance weights.
+
+    A tilted cloud is wider under the proposal than the physical-measure cloud it represents, so
+    a Silverman bandwidth built on the unweighted spread would smooth the tilted arm with a
+    systematically wider kernel and confound the tilt with the smoothing. The weighted spread is
+    the same quantity in both arms. With weights of one this is exactly `np.std(lnx)`.
+    """
+    if weights is None:
+        return float(np.std(lnx))
+    mu = np.average(lnx, weights=weights)
+    return float(np.sqrt(np.average((lnx - mu) ** 2, weights=weights)))
+
+
+def silverman_bandwidth(lnx, weights=None, scale=1.0):
+    """Silverman's rule on the physical-measure spread of the cloud (see `cloud_std`)."""
+    return 1.06 * cloud_std(lnx, weights) * len(lnx) ** (-1 / 5) * scale
+
+
 def nw_estimate(lnx, v, lnx_grid, weights=None, bandwidth=None):
     """Gaussian Nadaraya-Watson estimate of E[V | ln X = g] on a grid (optionally weighted)."""
     if bandwidth is None:
@@ -25,7 +45,7 @@ class NadarayaWatson:
     def fit_predict(self, t, lnx, v, grid, weights=None):
         bandwidth = self.bandwidth
         if bandwidth is None:
-            bandwidth = 1.06 * np.std(lnx) * len(lnx) ** (-1 / 5) * self.bandwidth_scale
+            bandwidth = silverman_bandwidth(lnx, weights, self.bandwidth_scale)
         return nw_estimate(lnx, v, grid, weights=weights, bandwidth=bandwidth)
 
 

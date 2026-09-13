@@ -26,20 +26,24 @@ def _doc(scale, bias, seed):
             "ess_local": np.ones((4, 13)).tolist(), "ess_slice": [1.0] * 4}
 
 
-@pytest.fixture
-def store(tmp_path):
-    s = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
-    # layer 1: untilted noisy, constant-3 half the noise, inverse_sqrt-9 quarter noise but biased
-    spec = {"none": (0.10, 0.0), "constant-3": (0.05, 0.0), "inverse_sqrt-9": (0.025, 0.4)}
-    for sid in ("s01", "s02"):
-        for n in (10_000, 30_000):
+def _log_slices(s, spec, sids=("s01", "s02"), ns=(10_000, 30_000), seeds=3):
+    for sid in sids:
+        for n in ns:
             for design, (scale, bias) in spec.items():
-                for seed in range(3):
+                for seed in range(seeds):
                     params = {"sid": sid, "n_particles": n, "design": design, "seed": seed,
                               "n_steps": 200}
                     with s.run("tilt_slices", params) as h:
                         h.log_json("slice_scores.json", _doc(scale, bias, seed))
                         h.log_metrics({"ess_final": 1.0})
+
+
+@pytest.fixture
+def store(tmp_path):
+    s = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
+    # layer 1: untilted noisy, constant-3 half the noise, inverse_sqrt-9 quarter noise but biased
+    _log_slices(s, {"none": (0.10, 0.0), "constant-3": (0.05, 0.0),
+                    "inverse_sqrt-9": (0.025, 0.4)})
     # layer 2 cold: nw untilted vs tilted at two budgets, one seed
     for n, (mae_u, mae_t) in {10_000: (57.0, 50.0), 80_000: (44.0, 43.0)}.items():
         for design, mae in (("none", mae_u), ("constant-3", mae_t)):
@@ -76,6 +80,9 @@ def test_slice_frame_splits_std_and_bias(store):
     np.testing.assert_allclose([u["bias_pooled"], b["bias_pooled"]], [0.0, 40.0], atol=1e-9)
     np.testing.assert_allclose(u["std_T0.25"], u["std_pooled"], rtol=1e-9)
     assert set(df.index.get_level_values(0)) == {"nw", "net"}
+    # 2 scenarios x 4 maturities x 7 wing strikes, three seeds in every one of them
+    assert u["n_cells"] == c["n_cells"] == b["n_cells"] == 56.0
+    assert u["n_seeds_min"] == 3.0
 
 
 def test_winner_prefers_lowest_std_but_disqualifies_bias(store):
@@ -90,6 +97,49 @@ def test_winner_prefers_lowest_std_but_disqualifies_bias(store):
     worse.loc[("nw", 30_000, "constant-3"), "std_pooled"] = 1e3
     worse.loc[("nw", 30_000, "inverse_sqrt-9"), "std_pooled"] = 1e3
     assert winner(worse) == "none"
+
+
+def test_winner_allows_bias_in_proportion_to_the_std_removed(store):
+    """The guard is on the bias the tilt *adds*, scaled to the standard deviation it buys:
+    1 point free plus half of what it removes. Untilted here is std 10, bias 0."""
+    df = slice_frame(store)
+    b, c = ("nw", 30_000, "inverse_sqrt-9"), ("nw", 30_000, "constant-3")
+    base = df.copy()
+    base.loc[c, "std_pooled"] = 1e3               # take the other design out of the running
+    base.loc[b, "std_pooled"] = 7.0               # removes 3 points of std
+    ok = base.copy()
+    ok.loc[b, "bias_pooled"] = 2.0                # 2 <= 1 + 0.5 x 3
+    assert winner(ok) == "inverse_sqrt-9"
+    bad = base.copy()
+    bad.loc[b, "bias_pooled"] = 3.0               # 3 > 2.5
+    assert winner(bad) == "none"
+    # the guard is on the difference, so a bias shared with the untilted arm costs nothing
+    shared = ok.copy()
+    shared.loc[("nw", 30_000, "none"), "bias_pooled"] = 20.0
+    shared.loc[b, "bias_pooled"] = 21.5
+    assert winner(shared) == "inverse_sqrt-9"
+
+
+def test_winner_skips_a_design_that_is_missing_cells(tmp_path, capsys):
+    """An unbalanced design averages over a different set of cells, so its std is not comparable
+    even when it is the smallest."""
+    s = Store(f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art"))
+    _log_slices(s, {"none": (0.10, 0.0), "constant-3": (0.05, 0.0)}, ns=(30_000,))
+    _log_slices(s, {"inverse_sqrt-9": (0.01, 0.0)}, sids=("s01",), ns=(30_000,))
+    df = slice_frame(s)
+    assert df.loc[("nw", 30_000, "inverse_sqrt-9"), "std_pooled"] == pytest.approx(1.0)
+    assert df.loc[("nw", 30_000, "inverse_sqrt-9"), "n_cells"] == 28.0
+    assert df.loc[("nw", 30_000, "none"), "n_cells"] == 56.0
+    assert winner(df) == "constant-3"
+    assert "skipping inverse_sqrt-9" in capsys.readouterr().out
+
+
+def test_winner_skips_a_design_with_a_single_seed_cell(store):
+    df = slice_frame(store)
+    thin = df.copy()
+    thin.loc[("nw", 30_000, "inverse_sqrt-9"), "bias_pooled"] = 0.0
+    thin.loc[("nw", 30_000, "inverse_sqrt-9"), "n_seeds_min"] = 1.0
+    assert winner(thin) == "constant-3"
 
 
 def test_cold_and_online_frames_pair_tilted_with_untilted(store, monkeypatch):
@@ -120,6 +170,9 @@ def test_tables_are_written_with_bold_best(store, tmp_path, monkeypatch):
     assert "& 0.60 &" in cold and "& -- &" in cold          # ess_min: value / untilted
     sl = (tmp_path / "tilt_slices.tex").read_text()
     assert "constant-3" in sl and "NW, 30k &" in sl and "\\textbf{2.5}" in sl
+    # the bias columns are signed, so they are never bolded: 0.0 and 40.0 are plain
+    assert "\\textbf{0.0}" not in sl and "\\textbf{40.0}" not in sl
+    assert "& 40.0\\\\" in sl
     on = (tmp_path / "tilt_online.tex").read_text()
     assert "10k, surface, tilted & 44 &" in on
     assert "80k, surface, tilted & \\textbf{42} &" in on

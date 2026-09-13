@@ -18,7 +18,7 @@ from ..bench.reference_runs import run_reference
 from ..bench.runner import run_one
 from ..bench.scenarios import full_registry, quote_k_grid
 from ..calibrate.importance import DESIGNS, UNTILTED, design_by_name
-from ..estimators.nadaraya_watson import nw_estimate
+from ..estimators.nadaraya_watson import nw_estimate, silverman_bandwidth
 from ..estimators.recipes import load_recipe, recipe_hash, regressor_from_recipe
 from ..pricing.reprice import snap_times
 from ..simulate.dynamics import HestonParams
@@ -67,14 +67,23 @@ def _restrict(sids, wanted):
     return tuple(sids) if wanted is None else tuple(s for s in sids if s in set(wanted))
 
 
-def cold_jobs(design_name, settings=FULL, sids=None, particles=COLD_PARTICLES, seeds=COLD_SEEDS):
-    """Untilted and tilted cold cells, paired by seed, for both algorithms."""
+def cold_jobs(design_name, settings=FULL, sids=None, particles=COLD_PARTICLES, seeds=COLD_SEEDS,
+              algos=None):
+    """Untilted and tilted cold cells, paired by seed, for both algorithms.
+
+    `algos` restricts the rows to a subset of `COLD_ALGO_SIDS` so the cheap NW rows and the
+    expensive searched-network rows can be run as separate stages."""
     design_by_name(design_name)      # KeyError for an unknown design
     if design_name == UNTILTED:
         raise ValueError("the untilted arm is not a design for these stages; every cell would "
                          "be emitted twice")
+    wanted = None if algos is None else set(algos)
+    if wanted is not None and not wanted <= set(COLD_ALGO_SIDS):
+        raise ValueError(f"cold rows are {tuple(COLD_ALGO_SIDS)}, got {tuple(algos)!r}")
     jobs = []
     for algo, algo_sids in COLD_ALGO_SIDS.items():
+        if wanted is not None and algo not in wanted:
+            continue
         for sid in _restrict(algo_sids, sids):
             for n in particles:
                 for seed in seeds:
@@ -149,7 +158,10 @@ def _local_ess(lnx, w, k, bandwidth):
 
 def slice_estimates(lnx, v, w, k, recipe, seed, monotone_sign):
     """NW and a fresh network fit on one weighted cloud, evaluated at the strikes `k`."""
-    bw = 1.06 * np.std(lnx) * len(lnx) ** (-1 / 5)
+    # Silverman on the *weighted* spread: a tilted cloud is wider under the proposal, and an
+    # unweighted rule would give the tilted arm a systematically wider kernel, confounding the
+    # tilt with the smoothing. With w = 1 this is bit-for-bit the unweighted rule.
+    bw = silverman_bandwidth(lnx, w)
     weights = None if np.all(w == 1.0) else w
     t0 = time.perf_counter()
     f_nw = nw_estimate(lnx, v, k, weights=weights, bandwidth=bw)
@@ -206,7 +218,10 @@ def run_slice_cell(store, sid, n_particles, design_name, seed, settings=FULL):
         doc = {"maturities": mats, "k": k.tolist(), "f_ref": [], "L_ref": [],
                "f_hat": {"nw": [], "net": []}, "L_hat": {"nw": [], "net": []},
                "f_rel_err": {"nw": [], "net": []}, "lev_rel_err": {"nw": [], "net": []},
-               "ess_local": [], "ess_slice": []}
+               "ess_local": [], "ess_slice": [], "bandwidth": [],
+               # the per-step ESS fraction of the whole cloud, one entry per step (empty
+               # untilted): the only record of how the weights degenerate with time
+               "ess_path": [float(e) for e in ess_path]}
         fit_s = {"nw": 0.0, "net": 0.0}
         rng = np.random.default_rng(seed + 77)
         for t in mats:
@@ -227,6 +242,7 @@ def run_slice_cell(store, sid, n_particles, design_name, seed, settings=FULL):
                 doc["lev_rel_err"][name].append(((L_hat - L_ref) / L_ref).tolist())
                 fit_s[name] += est["fit_s"][name]
             doc["ess_local"].append(est["ess_local"].tolist())
+            doc["bandwidth"].append(float(est["bandwidth"]))
             doc["ess_slice"].append(float(w.sum() ** 2 / (len(w) * (w ** 2).sum())))
             keep = rng.choice(len(lnx), size=min(CLOUD_KEEP, len(lnx)), replace=False)
             with tempfile.TemporaryDirectory() as d:
@@ -302,7 +318,7 @@ def _worker(args):
 
 
 def tilt_jobs(stage, settings=FULL, sids=None, design=None, particles=None, seeds=None,
-              designs=None, budgets=None):
+              designs=None, budgets=None, algos=None):
     if stage == "slices":
         kw = {k: v for k, v in (("particles", particles), ("seeds", seeds)) if v is not None}
         jobs = slice_jobs(settings, sids, **kw)
@@ -314,7 +330,8 @@ def tilt_jobs(stage, settings=FULL, sids=None, design=None, particles=None, seed
     if design == UNTILTED:
         raise ValueError(f"stage {stage!r}: the untilted arm is not a design for these stages")
     if stage == "cold":
-        kw = {k: v for k, v in (("particles", particles), ("seeds", seeds)) if v is not None}
+        kw = {k: v for k, v in (("particles", particles), ("seeds", seeds), ("algos", algos))
+              if v is not None}
         return cold_jobs(design, settings, sids, **kw)
     if stage == "online":
         kw = {k: v for k, v in (("budgets", budgets), ("seeds", seeds)) if v is not None}
@@ -323,13 +340,13 @@ def tilt_jobs(stage, settings=FULL, sids=None, design=None, particles=None, seed
 
 
 def run_tilt_stage(store, stage, settings=FULL, n_jobs=1, sids=None, design=None, particles=None,
-                   seeds=None, designs=None, budgets=None):
+                   seeds=None, designs=None, budgets=None, algos=None):
     """Run every unfinished cell of `stage`; returns (n_done, n_failed). Pre-creates the
     experiments (MLflow race) and, for online, the body experiment."""
     for name in ("tilt_slices", "tilt_cold", "tilt_online", "suite_offline", "suite_budget_tuned"):
         store.experiment_id(settings.experiment(name))
     store.experiment_id("pde_reference")
-    jobs = tilt_jobs(stage, settings, sids, design, particles, seeds, designs, budgets)
+    jobs = tilt_jobs(stage, settings, sids, design, particles, seeds, designs, budgets, algos)
     if stage == "slices":
         # the PDE reference of each scenario is computed once here, serially, so pooled workers
         # never race on the same (sid, n_steps) reference run

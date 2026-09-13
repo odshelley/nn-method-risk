@@ -225,20 +225,22 @@ def _cell(x, fmt="{:.0f}"):
 FLOOR_LABEL = "PDE (attainable floor)"
 
 
-def _render_rows(rows, secs_cols=()):
+def _render_rows(rows, secs_cols=(), plain_cols=()):
     """Render table rows, bolding the best value in every column.
 
     `rows` is a list of (prefix, cells) with cells a list of (value, fmt). The best is the
     smallest value among the rows whose prefix is not the PDE floor (the reference, never a
     contender); in the `secs_cols` columns a zero (no online work) does not count. Ties at the
-    displayed precision are all bold.
+    displayed precision are all bold. The `plain_cols` columns are never bolded: use them for
+    signed quantities, where the smallest value is not the best one.
     """
     n = max((len(cells) for _, cells in rows), default=0)
     best = []
     for j in range(n):
-        vals = [cells[j][0] for prefix, cells in rows
-                if not prefix.startswith(FLOOR_LABEL) and cells[j][0] is not None
-                and np.isfinite(cells[j][0]) and not (j in secs_cols and cells[j][0] <= 0)]
+        vals = [] if j in plain_cols else [
+            cells[j][0] for prefix, cells in rows
+            if not prefix.startswith(FLOOR_LABEL) and cells[j][0] is not None
+            and np.isfinite(cells[j][0]) and not (j in secs_cols and cells[j][0] <= 0)]
         best.append(min(vals) if vals else None)
     lines = []
     for prefix, cells in rows:

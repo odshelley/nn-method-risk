@@ -103,11 +103,16 @@ one cell). Under two hours at `--jobs 4`.
 
 Scoring (in `tilt tables`): for each (sid, N, design, estimator, maturity, strike), over the
 five seeds, `std = std(f_rel_err)` and `bias = mean(f_rel_err)`. Wing summaries average
-over the six wing strikes, then over scenarios. The **winning design** is the one with the
-smallest wing std at N = 30k for NW, averaged over the six scenarios and four maturities,
-subject to its wing bias at 30k being within 1.5x the untilted wing bias at 30k plus one
-percentage point of f (a tilt that moves the estimate is disqualified; the one-point floor keeps
-a near-zero untilted bias from disqualifying every design). A quoted maturity that snaps to
+over the six wing strikes, then over scenarios. NW's Silverman bandwidth is computed from the
+*weighted* spread of the cloud, so the tilted and untilted arms smooth on the same scale; the
+per-maturity bandwidth is stored in `slice_scores.json`. The **winning design** is the one with
+the smallest wing std at N = 30k for NW, averaged over the six scenarios and four maturities,
+among the admissible designs. A design is admissible only if the bias it *adds* is small next to
+the variance it removes: `|bias_d - bias_u| <= 1.0 + 0.5 * max(std_u - std_d, 0)` in percentage
+points of f, so one point of bias is free and half a point more is bought per point of std
+removed (the total bias is dominated by the shared Euler-versus-Fokker-Planck discretisation
+error, which no tilt can move). A design whose (sid, T, k) coverage does not match the untilted
+arm's, or with a cell of fewer than two seeds, is skipped with a warning. A quoted maturity that snaps to
 t = 0 is skipped (a one-point cloud has no bandwidth). `nparticle tilt winner` prints it; `tilt cold` and
 `tilt online` default `--design` to it.
 
@@ -191,7 +196,9 @@ versus implied-vol error in layer 2 (a leverage gain without an implied-vol gain
 ## 6. CLI
 
 `nparticle tilt {slices,cold,online,winner,tables,figures}`, flags `--jobs`, `--sids`,
-`--design` (name; default the winner for cold/online), `--budgets`, `--seeds`, `--smoke`.
+`--design` (name; default the winner for cold/online), `--budgets`, `--seeds`, `--smoke`, and
+on `cold` an `--algos` filter (`nw`, `explicit_nn_opt`; both by default) so the cheap NW rows
+and the overnight network rows can be run as separate stages.
 Smoke: one scenario, 2 000 particles, seeds (0,), designs (`none`, `constant-3`), every
 command runs end to end in under three minutes. Heavy stages never overlap.
 
@@ -208,7 +215,8 @@ command runs end to end in under three minutes. Heavy stages never overlap.
 - `online_sweep` with a mixture: weights are positive, bounded by `1/alpha0`, ESS in (0, 1];
   with `mixture=None` bit-for-bit against today.
 - Layer-1 scoring: std/bias split and winner selection on a synthetic `slice_scores` set
-  with a known answer; a design with bias 2x untilted is disqualified.
+  with a known answer; a design that adds more bias than its std saving allows is disqualified,
+  and a design missing a scenario's cells is skipped.
 - Job counts: slices 630, cold 312, online 160 (full); smoke counts.
 - Tables: fixtures render all three files with expected bold cells.
 

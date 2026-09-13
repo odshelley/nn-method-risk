@@ -95,6 +95,9 @@ def _parser():
         q.add_argument("--design", default=None); q.add_argument("--smoke", action="store_true")
         q.add_argument("--budgets", nargs="*", type=int, default=None)
         q.add_argument("--seeds", nargs="*", type=int, default=None)
+        if name == "cold":     # the cheap NW rows and the overnight network rows, separately
+            q.add_argument("--algos", nargs="*", choices=("nw", "explicit_nn_opt"),
+                           default=["nw", "explicit_nn_opt"])
     q = ts.add_parser("winner"); q.add_argument("--smoke", action="store_true")
     q = ts.add_parser("tables"); q.add_argument("--design", default=None)
     q.add_argument("--smoke", action="store_true"); q.add_argument("--out", default="paper/tables")
@@ -277,7 +280,7 @@ def main(argv=None):
             done, failed = run_tilt_stage(store, args.tilt_cmd, settings, n_jobs=args.jobs,
                                           sids=sids, design=design, particles=particles,
                                           seeds=seeds, designs=grid.get("designs"),
-                                          budgets=budgets)
+                                          budgets=budgets, algos=getattr(args, "algos", None))
             print(f"tilt {args.tilt_cmd}: {done} done, {failed} failed", flush=True)
             return 1 if failed else 0
         if args.tilt_cmd == "tables":

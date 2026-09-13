@@ -49,6 +49,13 @@ def test_cold_job_counts(promoted):
     assert {j[3] for j in jobs} == set(COLD_PARTICLES)
     only_s02 = cold_jobs("constant-3", sids=("s02",))
     assert len(only_s02) == 2 * 3 * 2 * 2 and all(j[1] == "s02" for j in only_s02)
+    # --algos splits the two-hour NW rows from the overnight network rows
+    nw_only = cold_jobs("constant-3", algos=("nw",))
+    assert len(nw_only) == 20 * 3 * 2 * 2 and {j[2] for j in nw_only} == {"nw"}
+    assert len(cold_jobs("constant-3", algos=("explicit_nn_opt",))) == 6 * 3 * 2 * 2
+    assert len(tilt_jobs("cold", design="constant-3", algos=("nw",))) == 240
+    with pytest.raises(ValueError):
+        cold_jobs("constant-3", algos=("spline",))
     assert SLICE_SIDS == ("s01", "s02", "s05", "s09", "s11", "s16")
     with pytest.raises(KeyError):
         cold_jobs("constant-2")
@@ -146,11 +153,16 @@ def test_slice_cell_logs_scores_and_clouds(store, promoted):
     assert np.array(doc["f_ref"]).shape == (n_mat, n_k)
     assert np.array(doc["f_hat"]["nw"]).shape == (n_mat, n_k)
     assert np.array(doc["ess_local"]).shape == (n_mat, n_k) and len(doc["ess_slice"]) == n_mat
+    assert len(doc["bandwidth"]) == n_mat and all(b > 0 for b in doc["bandwidth"])
+    assert len(doc["ess_path"]) == TINY.explicit.n_steps     # the whole per-step ESS path
     assert all(f"cloud_T{t:g}.npz" in names for t in doc["maturities"])
     p = store.get_params(rid)
     assert p["design"] == "constant-3" and p["n_particles"] == "800"
     untilted = run_slice_cell(store, "s01", 800, "none", 0, TINY)
     assert store.get_metrics(untilted)["ess_final"] == 1.0
+    with tempfile.TemporaryDirectory() as d:
+        u = json.loads(store.download(untilted, "slice_scores.json", d).read_text())
+    assert u["ess_path"] == []                               # no weights, no path
 
 
 def test_stage_runner_skips_finished_cells(store, promoted):

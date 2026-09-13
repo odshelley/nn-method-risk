@@ -7,6 +7,9 @@ def test_tilt_subcommands_parse():
                                                             ["s01", "s02"], False)
     b = _parser().parse_args(["tilt", "cold", "--design", "constant-3", "--smoke"])
     assert (b.tilt_cmd, b.design, b.smoke, b.jobs) == ("cold", "constant-3", True, 1)
+    assert b.algos == ["nw", "explicit_nn_opt"]              # both rows by default
+    assert _parser().parse_args(["tilt", "cold", "--algos", "nw"]).algos == ["nw"]
+    assert not hasattr(_parser().parse_args(["tilt", "slices"]), "algos")
     c = _parser().parse_args(["tilt", "online", "--budgets", "10000", "--seeds", "0"])
     assert (c.tilt_cmd, c.budgets, c.seeds, c.design) == ("online", [10_000], [0], None)
     d = _parser().parse_args(["tilt", "tables", "--out", "x"])

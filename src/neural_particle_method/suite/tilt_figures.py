@@ -93,18 +93,28 @@ def _leverage_figure(sid, docs, clouds, times, arms, out):
 
 
 def _ess_figure(sid, store, settings, n, seed, out):
+    """Panel A: the ESS fraction of the whole cloud against time, the full per-step path where
+    the cell stored one (`ess_path`, one entry per step) and otherwise the four quoted
+    maturities. Panel B: the local ESS at the outermost strikes."""
     fig, (a, b) = plt.subplots(1, 2, figsize=(10, 3.4))
     k = quote_k_grid()
     outer = [0, len(k) - 1]
+    n_steps = int(settings.explicit.n_steps)
+    T = full_registry()[sid].T
     for name in [UNTILTED] + [d.name for d in DESIGNS]:
         key = {"sid": sid, "n_particles": int(n), "design": name, "seed": int(seed),
-               "n_steps": int(settings.explicit.n_steps)}
+               "n_steps": n_steps}
         rid = store.find_finished(settings.experiment("tilt_slices"), key)
         if rid is None:
             continue
         with tempfile.TemporaryDirectory() as d:
             doc = json.loads(store.download(rid, "slice_scores.json", d).read_text())
-        a.plot(doc["maturities"], doc["ess_slice"], marker="o", label=name)
+        path = doc.get("ess_path") or []
+        if path:
+            ts = (np.arange(len(path)) + 1) * T / n_steps      # ESS after each step
+            a.plot(ts, path, lw=1.0, label=name)
+        else:
+            a.plot(doc["maturities"], doc["ess_slice"], marker="o", label=name)
         loc = np.array(doc["ess_local"])[:, outer].mean(axis=1)
         b.plot(doc["maturities"], loc, marker="o", label=name)
     a.set_xlabel("t"); a.set_ylabel("ESS fraction (slice)"); a.set_ylim(0, 1.05)

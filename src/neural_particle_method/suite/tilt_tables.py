@@ -13,8 +13,9 @@ from .tables import FLOOR_LABEL, _cell, _finished, _num, _render_rows
 from .tilt import COLD_PARTICLES, ONLINE_BUDGETS, ONLINE_METHOD, SLICE_SIDS, WING_CUT
 
 LAGS = ("surface", "surface_spot")
-BIAS_TOLERANCE = 1.5     # a design may carry at most this multiple of the untilted wing bias...
-BIAS_FLOOR = 1.0         # ...plus one percentage point, so a near-zero untilted bias is not a wall
+BIAS_FLOOR = 1.0         # percentage points of f a design may add to the bias for free...
+BIAS_PER_STD = 0.5       # ...plus this share of the wing standard deviation it removes
+MIN_SEEDS = 2            # a (sid, T, k) cell needs this many seeds to carry a standard deviation
 WINNER_N = 30_000
 ALGO_LABELS = {"nw": "NW", "explicit_nn_opt": "Explicit NN, searched"}
 EST_LABELS = {"nw": "NW", "net": "Net"}
@@ -61,16 +62,20 @@ def slice_frame(store, settings=FULL):
     each (sid, T, k), then averaged over strikes, scenarios and (for pooled) maturities."""
     long = _slice_docs(store, settings)
     if len(long) == 0:
-        return pd.DataFrame(columns=["std_T0.25", "std_pooled", "bias_pooled"])
+        return pd.DataFrame(columns=["std_T0.25", "std_pooled", "bias_pooled", "n_cells",
+                                     "n_seeds_min"])
     g = long.groupby(["est", "n", "design", "sid", "T", "k"])["err"]
-    per = pd.DataFrame({"std": g.std(ddof=1), "bias": g.mean()}).reset_index()
+    per = pd.DataFrame({"std": g.std(ddof=1), "bias": g.mean(), "seeds": g.count()}).reset_index()
     out = {}
     for (est, n, design), d in per.groupby(["est", "n", "design"]):
         first = d[np.isclose(d["T"], d["T"].min())]
+        scored = d[d["seeds"] >= MIN_SEEDS]     # cells that carry a standard deviation at all
         out[(est, int(n), design)] = pd.Series({
             "std_T0.25": 100 * first["std"].mean(),
             "std_pooled": 100 * d["std"].mean(),
             "bias_pooled": 100 * d["bias"].mean(),
+            "n_cells": float(len(scored)),
+            "n_seeds_min": float(scored["seeds"].min()) if len(scored) else 0.0,
         })
     df = pd.DataFrame(out).T
     df.index = pd.MultiIndex.from_tuples(df.index, names=["est", "n", "design"])
@@ -78,9 +83,16 @@ def slice_frame(store, settings=FULL):
 
 
 def winner(frame, n=WINNER_N, est="nw"):
-    """The design with the smallest NW wing std at `n`, unless its wing bias exceeds
-    BIAS_TOLERANCE x the untilted bias plus BIAS_FLOOR points; "none" when no admissible design
-    beats untilted (a NaN std, e.g. a single seed, never beats anything)."""
+    """The design with the smallest NW wing std at `n`; "none" when no admissible design beats
+    untilted (a NaN std, e.g. a single seed, never beats anything).
+
+    A design is admissible only if the bias it *adds* to the untilted arm is small relative to
+    the standard deviation it removes: `|bias_d - bias_u| <= BIAS_FLOOR + BIAS_PER_STD x
+    max(std_u - std_d, 0)`. The total bias is dominated by the Euler-versus-Fokker-Planck
+    discretisation error, which is common to both arms and which no tilt can touch, so only the
+    difference is the tilt's doing. A design whose (sid, T, k) coverage does not match the
+    untilted arm's, or which has a cell with fewer than MIN_SEEDS seeds, is skipped with a
+    warning: its averages are taken over a different set of cells and are not comparable."""
     if (est, n, UNTILTED) not in frame.index:
         return UNTILTED
     base = frame.loc[(est, n, UNTILTED)]
@@ -89,7 +101,13 @@ def winner(frame, n=WINNER_N, est="nw"):
         if (est, n, d.name) not in frame.index:
             continue
         row = frame.loc[(est, n, d.name)]
-        if abs(row["bias_pooled"]) > BIAS_TOLERANCE * abs(base["bias_pooled"]) + BIAS_FLOOR:
+        if row["n_cells"] != base["n_cells"] or row["n_seeds_min"] < MIN_SEEDS:
+            print(f"tilt winner: skipping {d.name}: {int(row['n_cells'])} scored cells against "
+                  f"the untilted arm's {int(base['n_cells'])}, fewest seeds in a cell "
+                  f"{int(row['n_seeds_min'])}", flush=True)
+            continue
+        bought = max(base["std_pooled"] - row["std_pooled"], 0.0)
+        if abs(row["bias_pooled"] - base["bias_pooled"]) > BIAS_FLOOR + BIAS_PER_STD * bought:
             continue
         if row["std_pooled"] < best_std:
             best, best_std = d.name, row["std_pooled"]
@@ -183,7 +201,8 @@ def _slices_tex(df, design):
                 for c in ("std_T0.25", "std_pooled", "bias_pooled"):
                     cells.append((np.nan if r is None else float(r[c]), "{:.1f}"))
             rows.append((f"{elabel}, {_label(n)}", cells))
-    lines += _render_rows(rows)
+    # the bias is signed: its column minimum is the most negative bias, not the best one
+    lines += _render_rows(rows, plain_cols={3 * i + 2 for i in range(len(names))})
     lines += ["\\bottomrule", "\\end{tabular}", f"% winner: {design}"]
     return "\n".join(lines) + "\n"
 
