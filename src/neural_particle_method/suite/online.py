@@ -97,8 +97,8 @@ def run_online(store, sid, method, offline_n, lag, seed, settings=FULL):
         elif head_kind == "stale_L":
             field, online_s = offline.field, 0.0
         else:
-            field, online_s = online_sweep(offline.model, lv, lsc.dynamics, lsc.s0, lsc.T, ecfg,
-                                           head=head, seed=seed + 1)
+            field, online_s, _ = online_sweep(offline.model, lv, lsc.dynamics, lsc.s0, lsc.T, ecfg,
+                                              head=head, seed=seed + 1)
             if head is not None:
                 online_s = time.perf_counter() - t0
         metrics, err = score_field(field, lsc, seed, settings.reprice)

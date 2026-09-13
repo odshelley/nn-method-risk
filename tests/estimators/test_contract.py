@@ -55,8 +55,3 @@ def _ctor_kwargs(est):
     if name == "GlobalRidge":
         return {"net": _global_net(), "T": 1.0}
     return {}
-
-
-def test_spline_rejects_weights():
-    with pytest.raises(ValueError, match="importance weights"):
-        make_estimator("spline").fit_predict(0.5, LNX, V, GRID, weights=np.ones(len(LNX)))

@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from neural_particle_method.calibrate.config import ExplicitConfig
 from neural_particle_method.calibrate.explicit import calibrate_explicit
@@ -78,11 +77,11 @@ def test_flat_recovery_untilted_control():
     mid = np.abs(s.grid) < 0.3
     assert np.abs(s.L[mid] - 1.0).max() < 0.15
 
-def test_spline_rejects_mixture():
+def test_spline_accepts_mixture():
     d = design_mixture(DYN, T=0.5)
     cfg = ExplicitConfig(n_steps=4, n_particles=2_000, fit_subsample=500)
-    with pytest.raises(ValueError, match="importance weights"):
-        calibrate_explicit(FlatDupire(), DYN, make_estimator("spline"), cfg, T=0.5, seed=3, mixture=d)
+    r = calibrate_explicit(FlatDupire(), DYN, make_estimator("spline"), cfg, T=0.5, seed=3, mixture=d)
+    assert np.all(np.isfinite(r.field[-1].L))
 
 def test_snapshot_weights_recorded_under_mixture():
     d = design_mixture(DYN, T=0.5)

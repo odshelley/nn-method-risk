@@ -1,8 +1,8 @@
 """Online heads on a frozen offline body, and the causal one-pass sweep that applies them.
 
-Every head implements `correction(t, lnx, v_plus, f_stale, model, grid)` returning the additive
-correction to the stale denominator on `grid`, fitted from the online cloud (`lnx`, `v_plus`) and
-the stale values `f_stale = model.f(t, lnx)` at the same particles.
+Every head implements `correction(t, lnx, v_plus, f_stale, model, grid, weights=None)` returning
+the additive correction to the stale denominator on `grid`, fitted from the online cloud (`lnx`,
+`v_plus`) and the stale values `f_stale = model.f(t, lnx)` at the same particles.
 """
 import time
 
@@ -38,7 +38,9 @@ class RKHSHead:
         self.params = {"head": "rkhs", "n_centres": n_centres, "lam": lam,
                        "width_scale": width_scale, "variance": variance, "floor_frac": floor_frac}
 
-    def correction(self, t, lnx, v_plus, f_stale, model, grid):
+    def correction(self, t, lnx, v_plus, f_stale, model, grid, weights=None):
+        if weights is not None:
+            raise ValueError("RKHS head does not support importance weights")
         var = self.variance if self.variance is not None else (
             self.width_scale * max(float(np.std(lnx)), 1e-3)) ** 2
         est = RKHSRidge(n_centres=self.n_centres, lam=self.lam, variance=var)
@@ -54,9 +56,9 @@ class SplineHead:
         self.n_knots, self.lam, self.floor_frac = n_knots, lam, floor_frac
         self.params = {"head": "spline", "n_knots": n_knots, "lam": lam, "floor_frac": floor_frac}
 
-    def correction(self, t, lnx, v_plus, f_stale, model, grid):
+    def correction(self, t, lnx, v_plus, f_stale, model, grid, weights=None):
         est = PSpline(n_knots=self.n_knots, lam=self.lam)
-        corr = est.fit_predict(t, lnx, v_plus - f_stale, grid)
+        corr = est.fit_predict(t, lnx, v_plus - f_stale, grid, weights=weights)
         return _guarded(model.f(t, grid), corr, self.floor_frac)
 
 
@@ -72,13 +74,15 @@ class FeatureRidgeHead:
         self.lam, self.max_iter, self.tol = lam, max_iter, tol
         self.params = {"head": "ridge", "lam": lam, "max_iter": max_iter}
 
-    def correction(self, t, lnx, v_plus, f_stale, model, grid):
+    def correction(self, t, lnx, v_plus, f_stale, model, grid, weights=None):
         """Ridge refit of the body's last layer on the raw variance scale.
 
         Minimises sum (softplus(A w) V_SCALE - v+)^2 + lam_eff ||w - w0||^2 by Gauss-Newton from
         the offline readout w0, where lam_eff = lam * mean diagonal of the Gauss-Newton curvature
         at w0 (so `lam` is a fraction of the data curvature, independent of V_SCALE and n).
         """
+        if weights is not None:
+            raise ValueError("ridge head does not support importance weights")
         A = model.features(t, lnx)
         w0 = model.readout(t)
         w = w0.copy()
@@ -136,12 +140,17 @@ class _ModelTail:
         return self.model.f(self.t, x)
 
 
-def online_sweep(model, local_vol, params, s0, T, cfg=ExplicitConfig(), head=None, seed=0):
+def online_sweep(model, local_vol, params, s0, T, cfg=ExplicitConfig(), head=None, seed=0,
+                 mixture=None):
     """calibrate_explicit with the estimator replaced by "stale + head correction".
 
-    Returns (field, fit_s) where fit_s is the head time only. `head=None` is the stale-f,
+    Returns (field, fit_s, is_diag) where fit_s is the head time only. `head=None` is the stale-f,
     fresh-Dupire method and costs nothing: it returns `stale_field` on the fixed grid without
     simulating.
+
+    `mixture` (a `MixtureDesign`, constant or scheduled) tilts the online cloud exactly as
+    `calibrate_explicit` does and hands the weights to the head; returns `(field, fit_s, is_diag)`,
+    `is_diag` None when untilted.
 
     `cfg.tail` continues each fitted slice beyond its quantile grid exactly as the explicit pass
     does, so a recipe's tail rule survives into the online sweep; "flat" (the default) leaves the
@@ -151,25 +160,36 @@ def online_sweep(model, local_vol, params, s0, T, cfg=ExplicitConfig(), head=Non
     if head is None:
         def f0(t, g):
             return np.full(len(g), hp.v0) if t == 0.0 else model.f(t, g)
-        return stale_field(f0, local_vol, s0, T, cfg.n_steps, L_max=cfg.L_max), 0.0
+        return stale_field(f0, local_vol, s0, T, cfg.n_steps, L_max=cfg.L_max), 0.0, None
     n_steps, n_particles = cfg.n_steps, cfg.n_particles
     fit_subsample, L_max = cfg.fit_subsample, cfg.L_max
     rng = np.random.default_rng(seed)
     dt, sdt = T / n_steps, np.sqrt(T / n_steps)
     lnx = np.full(n_particles, np.log(s0))
     v = np.full(n_particles, hp.v0)
+    theta_p, w, ess_min = None, None, 1.0
+    if mixture is not None:
+        comp = rng.choice(3, size=n_particles, p=list(mixture.alphas))
+        thetas_all, etas_all = np.asarray(mixture.thetas), np.asarray(mixture.etas)
+        alphas = np.array(mixture.alphas)
+        ell = np.zeros((3, n_particles))
     slices, fit_s = [], 0.0
     for k in range(n_steps):
         t = k * dt
+        if mixture is not None:
+            th = thetas_all[:, k] if mixture.scheduled else thetas_all
+            etas = etas_all[:, k] if mixture.scheduled else etas_all
+            theta_p, eta_p = th[comp], etas[comp]
         if k == 0:
             grid, f_grid = np.array([np.log(s0)]), np.array([hp.v0])
         else:
             grid = np.unique(np.quantile(lnx, np.linspace(0.001, 0.999, 101)))
             idx = rng.choice(n_particles, size=min(fit_subsample, n_particles), replace=False)
             x_sub, v_sub = lnx[idx], np.maximum(v[idx], 0.0)
+            w_sub = None if w is None else w[idx]
             t0 = time.perf_counter()
             f_stale = model.f(t, x_sub)
-            corr = head.correction(t, x_sub, v_sub, f_stale, model, grid)
+            corr = head.correction(t, x_sub, v_sub, f_stale, model, grid, weights=w_sub)
             f_grid = model.f(t, grid) + corr
             fit_s += time.perf_counter() - t0
             grid, f_grid = extend_tail(grid, f_grid, cfg.tail, _ModelTail(model, t))
@@ -179,5 +199,15 @@ def online_sweep(model, local_vol, params, s0, T, cfg=ExplicitConfig(), head=Non
         slices.append(Slice(t, grid.copy(), L_grid.copy(), f_grid.copy()))
         L_p = np.interp(lnx, grid, L_grid) if len(grid) > 1 else np.full(n_particles, L_grid[0])
         zb, zp = rng.standard_normal(n_particles), rng.standard_normal(n_particles)
-        lnx, v = heston_step(lnx, v, L_p, zb, zp, hp, dt, sdt)
-    return LeverageField(slices), fit_s
+        lnx, v = heston_step(lnx, v, L_p, zb, zp, hp, dt, sdt, theta_p=theta_p)
+        if mixture is not None:
+            dbperp = zp * sdt + eta_p * dt
+            ell += etas[:, None] * dbperp[None, :] - 0.5 * (etas ** 2)[:, None] * dt
+            w = 1.0 / (alphas @ np.exp(np.clip(ell, -60, 60)))
+            ess_min = min(ess_min, float(w.sum() ** 2 / (n_particles * (w ** 2).sum())))
+    is_diag = None
+    if mixture is not None:
+        is_diag = {"max_w": float(w.max()),
+                   "ess_frac": float(w.sum() ** 2 / (len(w) * (w ** 2).sum())),
+                   "ess_min_slice": ess_min}
+    return LeverageField(slices), fit_s, is_diag

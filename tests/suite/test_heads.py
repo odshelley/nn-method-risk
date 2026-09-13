@@ -6,6 +6,7 @@ import pytest
 from neural_particle_method.bench.scenarios import make_registry
 from neural_particle_method.calibrate.config import ExplicitConfig
 from neural_particle_method.calibrate.explicit import TAIL_DX, calibrate_explicit
+from neural_particle_method.calibrate.importance import TiltDesign
 from neural_particle_method.estimators.nadaraya_watson import nw_estimate
 from neural_particle_method.estimators.nn import V_SCALE, NNRegressor
 from neural_particle_method.simulate.leverage import DEFAULT_GRID
@@ -184,7 +185,8 @@ def test_stale_field_matches_calibrate_explicit_when_f_is_the_bodys_own():
 def test_online_sweep_with_no_head_is_the_stale_field():
     sc, bank, _ = _body()
     lv = sc.local_vol()
-    field, fit_s = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=None, seed=5)
+    field, fit_s, diag = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=None, seed=5)
+    assert diag is None
     ref = stale_field(_f0(bank, sc.dynamics.v0), lv, sc.s0, sc.T, E.n_steps, L_max=E.L_max)
     assert fit_s == 0.0 and len(field) == E.n_steps
     for a, b in zip(field, ref):
@@ -195,9 +197,9 @@ def test_online_sweep_with_head_runs_and_changes_f():
     sc, bank, _ = _body()
     lv = sc.local_vol()
     head = RKHSHead(n_centres=20)
-    field, fit_s = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=head, seed=5)
+    field, fit_s, diag = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=head, seed=5)
     ref = stale_field(_f0(bank, sc.dynamics.v0), lv, sc.s0, sc.T, E.n_steps, L_max=E.L_max)
-    assert fit_s > 0 and len(field) == E.n_steps
+    assert fit_s > 0 and len(field) == E.n_steps and diag is None
     assert np.array_equal(field[0].f, ref[0].f)                 # slice 0 is v0 in both
     assert any(not np.array_equal(field[k].f, ref[k].f) for k in range(1, E.n_steps))
 
@@ -211,11 +213,11 @@ def test_online_sweep_honours_the_tail_rule():
     sc, bank, _ = _body()
     lv = sc.local_vol()
     head = RKHSHead(n_centres=20)
-    flat, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=head, seed=5)
-    lin, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="linear"), head=head,
-                          seed=5)
-    free, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="free"), head=head,
-                           seed=5)
+    flat, _, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=head, seed=5)
+    lin, _, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="linear"),
+                             head=head, seed=5)
+    free, _, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="free"),
+                              head=head, seed=5)
     assert len(lin[0].grid) == len(flat[0].grid) == 1           # slice 0 is the one-point slice
     np.testing.assert_array_equal(lin[1].grid[1:-1], flat[1].grid)
     np.testing.assert_array_equal(free[1].f[1:-1], flat[1].f)
@@ -236,10 +238,47 @@ def test_online_sweep_default_tail_is_flat_and_leaves_the_grid_alone():
     sc, bank, _ = _body()
     lv = sc.local_vol()
     head = SplineHead()
-    a, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=head, seed=5)
-    b, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="flat"), head=head,
-                        seed=5)
+    a, _, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, E, head=head, seed=5)
+    b, _, _ = online_sweep(bank, lv, sc.dynamics, sc.s0, sc.T, replace(E, tail="flat"), head=head,
+                           seed=5)
     for x, y in zip(a, b):
         np.testing.assert_array_equal(x.grid, y.grid)
         np.testing.assert_array_equal(x.f, y.f)
         np.testing.assert_array_equal(x.L, y.L)
+
+
+def test_heads_take_weights_and_only_the_spline_uses_them():
+    _, bank, _ = _body()
+    rng = np.random.default_rng(7)
+    x = rng.normal(scale=0.1, size=1500)
+    f = bank.f(0.5, x)
+    resid = 0.01 * np.cos(4 * x)
+    grid = np.linspace(-0.15, 0.15, 7)
+    w = np.ones_like(x)
+    a = SplineHead().correction(0.5, x, f + resid, f, bank, grid)
+    b = SplineHead().correction(0.5, x, f + resid, f, bank, grid, weights=w)
+    np.testing.assert_allclose(a, b, rtol=1e-12, atol=1e-14)
+    for head in (RKHSHead(), FeatureRidgeHead()):
+        head.correction(0.5, x, f + resid, f, bank, grid, weights=None)
+        with pytest.raises(ValueError, match="weights"):
+            head.correction(0.5, x, f + resid, f, bank, grid, weights=w)
+
+
+def test_online_sweep_untilted_is_unchanged_and_returns_no_diag():
+    sc, bank, _ = _body()
+    field, fit_s, diag = online_sweep(bank, sc.local_vol(), sc.dynamics, sc.s0, sc.T, E,
+                                      head=SplineHead(), seed=3)
+    assert diag is None and fit_s >= 0 and len(field) == E.n_steps
+
+
+def test_online_sweep_with_a_mixture_weights_the_head():
+    sc, bank, _ = _body()
+    mix = TiltDesign("inverse_sqrt", 3.0).mixture(E.n_steps, sc.T, sc.dynamics.rho)
+    field, _, diag = online_sweep(bank, sc.local_vol(), sc.dynamics, sc.s0, sc.T, E,
+                                  head=SplineHead(), seed=3, mixture=mix)
+    assert set(diag) == {"max_w", "ess_frac", "ess_min_slice"}
+    assert diag["max_w"] <= 1 / mix.alphas[1] + 1e-9 and 0 < diag["ess_min_slice"] <= 1
+    assert len(field) == E.n_steps and np.all(np.isfinite(field[-1].L))
+    with pytest.raises(ValueError, match="weights"):
+        online_sweep(bank, sc.local_vol(), sc.dynamics, sc.s0, sc.T, E, head=RKHSHead(), seed=3,
+                     mixture=mix)

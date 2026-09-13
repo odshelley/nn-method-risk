@@ -112,8 +112,8 @@ def run_budget_cell(store, sid, method, budget, lag, seed, body=DEFAULT_BODY, se
             field = calibrate_explicit(lv, lsc.dynamics, est, ecfg, s0=lsc.s0, T=lsc.T,
                                        seed=seed + 1).field
         else:
-            field, _ = online_sweep(loaded.model, lv, lsc.dynamics, lsc.s0, lsc.T, ecfg, head=head,
-                                    seed=seed + 1)
+            field, _, _ = online_sweep(loaded.model, lv, lsc.dynamics, lsc.s0, lsc.T, ecfg,
+                                       head=head, seed=seed + 1)
         online_s = 0.0 if method.endswith("_stale") else time.perf_counter() - t0
         metrics, err = score_field(field, lsc, seed, settings.reprice)
         metrics.update({"online_s": online_s, "fit_s": online_s, "total_s": online_s})
