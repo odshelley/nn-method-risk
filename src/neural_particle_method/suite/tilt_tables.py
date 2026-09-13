@@ -337,7 +337,7 @@ def _far_tex(df):
     body = [label for label in df.index if label not in floors]
     fmt = "{:.0f}"
     rows = [(label, [(df.loc[label, c], fmt) for c in FAR_COLS]) for label in body]
-    lines += _render_rows(rows)
+    lines += _render_rows(rows, plain_cols={4})      # the quote count is not a score
     for label in floors:
         cells = " & ".join(_cell(df.loc[label, c], fmt) for c in FAR_COLS)
         lines.append(f"{label} & {cells}\\\\")

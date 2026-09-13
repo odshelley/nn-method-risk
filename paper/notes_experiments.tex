@@ -288,6 +288,6 @@ The quoted grid stops at $|k|\approx0.5$ and its three-month wings fail inversio
 \input{tables/tilt_far.tex}
 \end{table}
 
-\emph{Results.} To be written from the re-scoring.
+\emph{Results} (\cref{tab:tilt-far}). This is the first score on which the tilt pays in implied vol. For NW at $80$k the far-wing error falls from $36.6$ to $32.5\bp$, $-4.1\bp$ paired over the $40$ scenario-seed pairs ($t=-5.9$, better in $34$), a quarter of its gap to the $200$-step floor ($20.7$), with the gain at every maturity ($45.7\to39.6$ at six months, $35.4\to31.0$ at one year, $18.9\to17.6$ at two). The frozen searched body with the spline head on a \emph{tilted} online cloud improves by $2.4\bp$ under both lags ($t=-3.9$ and $-3.6$, better in $30$ of $40$), and that row beats the NW re-solve at the same budget by $5.5$ to $5.9\bp$ ($t=-6.9$ and $-8.1$): the offline body carries the wings and the tilted online cloud corrects them. The searched network cold is unchanged, as on every other score, and the front-loaded design does not help here either ($39.0$ on the six study scenarios). At $400$ steps on the six study scenarios the NW gain shrinks to $-0.5\bp$ within noise ($12$ pairs; the same six at $200$ steps give $-2.5$, $t=-1.5$), so whether finer time steps absorb the far-wing gain is open on this sample. The $13$-strike pooled column is the same runs on the quoted grid, unchanged from \cref{tab:tilt-cold}.
 
 \end{document}
