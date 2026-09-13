@@ -2,12 +2,15 @@ import pytest
 
 from neural_particle_method.estimators import recipes as R
 from neural_particle_method.suite.config import SuiteSettings
+from neural_particle_method.suite.lag import LAGS
 from neural_particle_method.suite.tilt import (
     COLD_PARTICLES,
     SLICE_SIDS,
     cold_jobs,
     mixture_for,
+    online_jobs,
     run_tilt_cold,
+    run_tilt_online,
 )
 from neural_particle_method.tracking.store import Store
 
@@ -67,3 +70,24 @@ def test_cold_cell_on_the_searched_network_carries_the_recipe_hash(store, promot
     assert p["recipe_hash"] == R.recipe_hash(FAST) and p["design"] == "constant-1"
     with pytest.raises(ValueError):
         run_tilt_cold(store, "s01", "spline", TINY.n_online, 0, "constant-1", TINY)
+
+
+def test_online_job_count_and_shape(promoted):
+    jobs = online_jobs("constant-3")
+    assert len(jobs) == 20 * 2 * 2 * 2 and all(j[5] == "constant-3" for j in jobs)
+    assert {j[2] for j in jobs} == {10_000, 80_000}
+    assert len(online_jobs("constant-3", sids=("s01", "s02"))) == 16
+
+
+def test_online_cell_is_tilted_keyed_and_weighted(store, promoted):
+    rid = run_tilt_online(store, "s01", TINY.n_online, LAGS[1], 0, "inverse_sqrt-3", TINY,
+                          recipe=FAST)
+    p, m = store.get_params(rid), store.get_metrics(rid)
+    assert p["design"] == "inverse_sqrt-3" and p["method"] == "explicit_opt_spline"
+    assert p["recipe_hash"] == R.recipe_hash(FAST)
+    assert 0 < m["ess_min_slice"] <= 1 and m["online_s"] > 0
+    assert run_tilt_online(store, "s01", TINY.n_online, LAGS[1], 0, "inverse_sqrt-3", TINY,
+                           recipe=FAST) == rid
+    assert len(store.search(TINY.experiment("tilt_online"))) == 1
+    # the untilted partner lives in the budget experiment, not here
+    assert store.search(TINY.experiment("suite_budget_tuned")).empty

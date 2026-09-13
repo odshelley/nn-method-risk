@@ -8,8 +8,10 @@ tilt, scored like section 4. Spec: docs/superpowers/specs/2026-09-13-importance-
 from ..bench.runner import run_one
 from ..bench.scenarios import full_registry
 from ..calibrate.importance import UNTILTED, design_by_name
+from .budget import run_budget_cell
 from .cold import NN_ALGOS, cold_extra_key
 from .config import FULL, SSVI_SIDS
+from .lag import LAGS
 
 SLICE_SIDS = ("s01", "s02", "s05", "s09", "s11", "s16")
 SLICE_PARTICLES = (10_000, 30_000, 80_000)
@@ -56,3 +58,20 @@ def cold_jobs(design_name, settings=FULL, sids=None, particles=COLD_PARTICLES, s
                     for d in (UNTILTED, design_name):
                         jobs.append(("cold", sid, algo, int(n), int(seed), d))
     return jobs
+
+
+def run_tilt_online(store, sid, budget, lag, seed, design_name, settings=FULL, recipe=None):
+    """Frozen searched body + weighted spline head on a tilted online cloud."""
+    design_by_name(design_name)
+    if design_name == UNTILTED:
+        raise ValueError("the untilted online cells are the suite_budget_tuned cells")
+    return run_budget_cell(store, sid, ONLINE_METHOD, int(budget), lag, int(seed),
+                           body="explicit_opt", settings=settings, recipe=recipe,
+                           design=design_name)
+
+
+def online_jobs(design_name, settings=FULL, sids=None, budgets=ONLINE_BUDGETS, seeds=ONLINE_SEEDS):
+    design_by_name(design_name)
+    return [("online", sid, int(b), lag.kind, int(seed), design_name)
+            for sid in _restrict(SSVI_SIDS, sids) for lag in LAGS
+            for seed in seeds for b in budgets]

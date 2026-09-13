@@ -16,6 +16,7 @@ from dataclasses import replace
 
 from ..bench.scenarios import full_registry
 from ..calibrate.explicit import calibrate_explicit
+from ..calibrate.importance import design_by_name
 from ..estimators import make_estimator
 from ..estimators.recipes import (
     coerce_recipe,
@@ -67,7 +68,7 @@ def body_run(store, sid, body, settings=FULL, recipe=None):
 
 
 def run_budget_cell(store, sid, method, budget, lag, seed, body=DEFAULT_BODY, settings=FULL,
-                    recipe=None):
+                    recipe=None, design=None):
     # `nw_resolve` re-solves from scratch and never touches the body, so it is one cell per
     # (sid, budget, lag, seed) shared by every body: it stays in the tuned experiment with no
     # `recipe_hash`, which is the row the tuned sweep already logged. Without this an
@@ -81,6 +82,13 @@ def run_budget_cell(store, sid, method, budget, lag, seed, body=DEFAULT_BODY, se
     if body == "explicit_opt":
         recipe = coerce_recipe(recipe if recipe is not None else load_recipe("explicit_opt"))
         key["recipe_hash"] = recipe_hash(recipe)
+    tilt = None
+    if design is not None:
+        if method == "nw_resolve" or head_for(method) is None:
+            raise ValueError("a tilt design applies to head cells only")
+        exp = settings.experiment("tilt_online")
+        key["design"] = design
+        tilt = design_by_name(design)
     existing = store.find_finished(exp, key)
     if existing is not None:
         return existing
@@ -107,16 +115,20 @@ def run_budget_cell(store, sid, method, budget, lag, seed, body=DEFAULT_BODY, se
         params.update({f"recipe.{k}": v for k, v in recipe.items()})
     with store.run(exp, params) as h:
         t0 = time.perf_counter()
+        diag = None
         if method == "nw_resolve":
             est = make_estimator("nw", seed=seed + 1, local_vol=lv, s0=lsc.s0)
             field = calibrate_explicit(lv, lsc.dynamics, est, ecfg, s0=lsc.s0, T=lsc.T,
                                        seed=seed + 1).field
         else:
-            field, _, _ = online_sweep(loaded.model, lv, lsc.dynamics, lsc.s0, lsc.T, ecfg,
-                                       head=head, seed=seed + 1)
+            sc_mix = None if tilt is None else tilt.mixture(ecfg.n_steps, lsc.T, lsc.dynamics.rho)
+            field, _, diag = online_sweep(loaded.model, lv, lsc.dynamics, lsc.s0, lsc.T, ecfg,
+                                          head=head, seed=seed + 1, mixture=sc_mix)
         online_s = 0.0 if method.endswith("_stale") else time.perf_counter() - t0
         metrics, err = score_field(field, lsc, seed, settings.reprice)
         metrics.update({"online_s": online_s, "fit_s": online_s, "total_s": online_s})
+        if diag is not None:
+            metrics.update(diag)
         h.log_metrics(metrics)
         h.log_json("leverage.json", field.to_json())
         h.log_json("iv_err_bp.json", err)
