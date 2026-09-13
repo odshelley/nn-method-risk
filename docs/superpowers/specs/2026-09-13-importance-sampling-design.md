@@ -105,8 +105,10 @@ Scoring (in `tilt tables`): for each (sid, N, design, estimator, maturity, strik
 five seeds, `std = std(f_rel_err)` and `bias = mean(f_rel_err)`. Wing summaries average
 over the six wing strikes, then over scenarios. The **winning design** is the one with the
 smallest wing std at N = 30k for NW, averaged over the six scenarios and four maturities,
-subject to its wing bias at 30k being within 1.5x the untilted wing bias at 30k (a tilt that
-moves the estimate is disqualified). `nparticle tilt winner` prints it; `tilt cold` and
+subject to its wing bias at 30k being within 1.5x the untilted wing bias at 30k plus one
+percentage point of f (a tilt that moves the estimate is disqualified; the one-point floor keeps
+a near-zero untilted bias from disqualifying every design). A quoted maturity that snaps to
+t = 0 is skipped (a one-point cloud has no bandwidth). `nparticle tilt winner` prints it; `tilt cold` and
 `tilt online` default `--design` to it.
 
 ## 3. Layer 2: end-to-end (`tilt_cold`, `tilt_online`)
@@ -146,7 +148,8 @@ returns `is_diag` as a third value (`None` untilted); the cell logs it.
 
 Grid: `SSVI_SIDS`, both `LAGS`, budgets `(10_000, 80_000)`, seeds `(0, 1)`, method
 `explicit_opt_spline`, design = winner: 160 cells. The untilted partners are the existing
-`suite_budget_opt` cells (same key without `design`); `tilt tables` reads both.
+cells in `suite_budget_tuned` keyed by the promoted `recipe_hash` (same key without `design`),
+where `scripts/budget_sweep.py --body explicit_opt` wrote them; `tilt tables` reads both.
 
 ## 4. Figures (`nparticle tilt figures`)
 
