@@ -185,6 +185,94 @@ def online_frame(store, design, settings=FULL):
     return out
 
 
+FAR_COLS = ("far", "t05", "t1", "t2", "n", "pooled")
+FAR_ROWS = (
+    "NW, 200 steps, untilted", "NW, 200 steps, tilted",
+    "NW, 400 steps, untilted", "NW, 400 steps, tilted",
+    "Explicit NN, searched, untilted", "Explicit NN, searched, tilted",
+    "NW re-solve (online)",
+    "Searched body + spline head, untilted", "Searched body + spline head, tilted",
+    "PDE floor, 200 steps", "PDE floor, 400 steps",
+)
+
+
+def _far_metrics(sel):
+    if len(sel) == 0:
+        return pd.Series({c: np.nan for c in FAR_COLS})
+    per = pd.DataFrame({
+        "sid": sel["params.sid"], "far": _num(sel, "metrics.far_wings_mae_bp"),
+        "t05": _num(sel, "metrics.far_mae_bp/T0.5"), "t1": _num(sel, "metrics.far_mae_bp/T1"),
+        "t2": _num(sel, "metrics.far_mae_bp/T2"), "n": _num(sel, "metrics.far_wings_n"),
+        "pooled": _num(sel, "metrics.pooled_mae_bp"),
+    }).groupby("sid").mean(numeric_only=True)
+    return per.mean()
+
+
+def far_frame(store, design, settings=FULL, budget=80_000):
+    """Far-wing scores per row of \\cref{tab:tilt-far}: per-scenario mean over seeds, then mean
+    over scenarios, of each metric; missing runs give NaN."""
+    cold = _finished(store, settings.experiment("tilt_cold"))
+    cold_s400 = _finished(store, settings.experiment("tilt_cold_s400"))
+    online = _finished(store, settings.experiment("tilt_online"))
+    base = _finished(store, "suite_budget_tuned")
+    floor = _finished(store, settings.experiment("suite_pde_floor"))
+    floor_s400 = _finished(store, settings.experiment("suite_pde_floor_s400"))
+
+    def cold_sel(df, algo, dname):
+        if len(df) == 0:
+            return df
+        sel = df[(df["params.algo"] == algo) & (_num(df, "params.n_particles") == budget)
+                 & (df["params.design"] == dname) & df["params.sid"].isin(SSVI_SIDS)]
+        if algo == "explicit_nn_opt" and len(sel):
+            sel = (sel[sel["params.recipe_hash"] == _promoted_hash()]
+                   if "params.recipe_hash" in sel.columns else sel.iloc[:0])
+        return sel
+
+    def resolve_sel():
+        if len(base) == 0:
+            return base
+        return base[(base["params.method"] == "nw_resolve")
+                    & (_num(base, "params.budget") == budget)
+                    & (base["params.lag"] == "surface") & base["params.sid"].isin(SSVI_SIDS)]
+
+    def head_sel(df, dname):
+        if len(df) == 0:
+            return df
+        sel = df[(df["params.method"] == "explicit_opt_spline")
+                 & (_num(df, "params.budget") == budget) & (df["params.lag"] == "surface")
+                 & df["params.sid"].isin(SSVI_SIDS)]
+        if dname is None:
+            sel = (sel[sel["params.recipe_hash"] == _promoted_hash()]
+                   if "params.recipe_hash" in sel.columns else sel.iloc[:0])
+        else:
+            sel = sel[sel["params.design"] == dname]
+        return sel
+
+    def floor_sel(df, n_steps=None):
+        if len(df) == 0:
+            return df
+        sel = df[df["params.sid"].isin(SSVI_SIDS)]
+        if n_steps is not None and "params.n_steps" in sel.columns:
+            sel = sel[_num(sel, "params.n_steps") == n_steps]
+        return sel
+
+    rows = {
+        "NW, 200 steps, untilted": _far_metrics(cold_sel(cold, "nw", UNTILTED)),
+        "NW, 200 steps, tilted": _far_metrics(cold_sel(cold, "nw", design)),
+        "NW, 400 steps, untilted": _far_metrics(cold_sel(cold_s400, "nw", UNTILTED)),
+        "NW, 400 steps, tilted": _far_metrics(cold_sel(cold_s400, "nw", design)),
+        "Explicit NN, searched, untilted": _far_metrics(
+            cold_sel(cold, "explicit_nn_opt", UNTILTED)),
+        "Explicit NN, searched, tilted": _far_metrics(cold_sel(cold, "explicit_nn_opt", design)),
+        "NW re-solve (online)": _far_metrics(resolve_sel()),
+        "Searched body + spline head, untilted": _far_metrics(head_sel(base, None)),
+        "Searched body + spline head, tilted": _far_metrics(head_sel(online, design)),
+        "PDE floor, 200 steps": _far_metrics(floor_sel(floor, n_steps=200)),
+        "PDE floor, 400 steps": _far_metrics(floor_sel(floor_s400)),
+    }
+    return pd.DataFrame({label: rows[label] for label in FAR_ROWS}).T
+
+
 def _slices_tex(df, design):
     names = [UNTILTED] + [d.name for d in DESIGNS]
     cols = " ".join("rrr" for _ in names)
@@ -239,6 +327,24 @@ def _online_tex(df):
     return "\n".join(lines) + "\n"
 
 
+def _far_tex(df):
+    """Non-floor rows go through `_render_rows` (bold = column minimum); the two floor rows are
+    appended unbolded via `_cell`, since the floor is a reference, not a contender."""
+    header = ("row & far wings & $T{=}0.5$ & $T{=}1$ & $T{=}2$ & quotes"
+              " & pooled (13-strike)\\\\")
+    lines = ["\\begin{tabular}{l rrrrrr}", "\\toprule", header, "\\midrule"]
+    floors = [label for label in df.index if label.startswith("PDE floor")]
+    body = [label for label in df.index if label not in floors]
+    fmt = "{:.0f}"
+    rows = [(label, [(df.loc[label, c], fmt) for c in FAR_COLS]) for label in body]
+    lines += _render_rows(rows)
+    for label in floors:
+        cells = " & ".join(_cell(df.loc[label, c], fmt) for c in FAR_COLS)
+        lines.append(f"{label} & {cells}\\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
 def tilt_tables(store, design, out_dir="paper/tables", settings=FULL):
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -246,6 +352,7 @@ def tilt_tables(store, design, out_dir="paper/tables", settings=FULL):
         "tilt_slices.tex": _slices_tex(slice_frame(store, settings), design),
         "tilt_cold.tex": _cold_tex(cold_frame(store, design, settings)),
         "tilt_online.tex": _online_tex(online_frame(store, design, settings)),
+        "tilt_far.tex": _far_tex(far_frame(store, design, settings)),
     }
     paths = []
     for name, text in files.items():

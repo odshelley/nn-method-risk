@@ -3,6 +3,7 @@ import pytest
 
 from neural_particle_method.suite.tilt_tables import (
     cold_frame,
+    far_frame,
     online_frame,
     slice_frame,
     tilt_tables,
@@ -45,6 +46,7 @@ def store(tmp_path):
     _log_slices(s, {"none": (0.10, 0.0), "constant-3": (0.05, 0.0),
                     "inverse_sqrt-9": (0.025, 0.4)})
     # layer 2 cold: nw untilted vs tilted at two budgets, one seed
+    far_at_80k = {"none": (30.0, 20.0), "constant-3": (25.0, 15.0)}    # far, T2 -> untilted/tilted
     for n, (mae_u, mae_t) in {10_000: (57.0, 50.0), 80_000: (44.0, 43.0)}.items():
         for design, mae in (("none", mae_u), ("constant-3", mae_t)):
             params = {"sid": "s01", "algo": "nw", "n_particles": n, "seed": 0, "design": design}
@@ -53,10 +55,16 @@ def store(tmp_path):
                      "liquid_mae_bp": mae - 30, "lev_rmse": 0.1, "fit_s": 3.0}
                 if design != "none":
                     m["ess_min_slice"] = 0.6
+                if n == 80_000:
+                    far, t2 = far_at_80k[design]
+                    m.update({"far_wings_mae_bp": far, "far_mae_bp/T2": t2, "far_wings_n": 18})
                 h.log_metrics(m)
     with s.run("suite_pde_floor", {"sid": "s01", "seed": 0, "n_steps": 200}) as h:
         h.log_metrics({"pooled_mae_bp": 42.0, "wings_mae_bp": 62.0, "mae_bp/T0.25": 100.0,
-                       "liquid_mae_bp": 13.0, "lev_rmse": 0.0, "fit_s": 0.0})
+                       "liquid_mae_bp": 13.0, "lev_rmse": 0.0, "fit_s": 0.0,
+                       "far_wings_mae_bp": 30.0, "far_mae_bp/T2": 20.0, "far_wings_n": 18})
+    with s.run("suite_pde_floor_s400", {"sid": "s01", "seed": 0, "n_steps": 400}) as h:
+        h.log_metrics({"far_wings_mae_bp": 12.0})
     # layer 2 online: untilted in suite_budget_tuned, tilted in tilt_online
     for budget, (mae_u, mae_t) in {10_000: (46.0, 44.0), 80_000: (42.4, 42.0)}.items():
         base = {"sid": "s01", "method": "explicit_opt_spline", "budget": budget,
@@ -161,7 +169,8 @@ def test_tables_are_written_with_bold_best(store, tmp_path, monkeypatch):
     import neural_particle_method.suite.tilt_tables as T
     monkeypatch.setattr(T, "_promoted_hash", lambda: "abc")
     paths = tilt_tables(store, "constant-3", out_dir=tmp_path)
-    assert [p.name for p in paths] == ["tilt_slices.tex", "tilt_cold.tex", "tilt_online.tex"]
+    assert [p.name for p in paths] == [
+        "tilt_slices.tex", "tilt_cold.tex", "tilt_online.tex", "tilt_far.tex"]
     cold = (tmp_path / "tilt_cold.tex").read_text()
     # bold is the column minimum over every non-floor row: 43 at 80k tilted, not 50 at 10k
     assert "NW, 10k, tilted & 50 &" in cold
@@ -177,3 +186,18 @@ def test_tables_are_written_with_bold_best(store, tmp_path, monkeypatch):
     assert "10k, surface, tilted & 44 &" in on
     assert "80k, surface, tilted & \\textbf{42} &" in on
     assert "80k, surface, untilted & \\textbf{42} &" in on   # ties at displayed precision
+
+
+def test_far_frame_and_table(store, tmp_path, monkeypatch):
+    import neural_particle_method.suite.tilt_tables as T
+    monkeypatch.setattr(T, "_promoted_hash", lambda: "abc")
+    f = far_frame(store, "constant-3")
+    assert f.loc["NW, 200 steps, untilted", "far"] == 30.0
+    assert f.loc["NW, 200 steps, tilted", "far"] == 25.0
+    assert f.loc["PDE floor, 400 steps", "far"] == 12.0
+    assert np.isnan(f.loc["NW, 400 steps, tilted", "far"])
+    paths = tilt_tables(store, "constant-3", out_dir=tmp_path)
+    assert paths[-1].name == "tilt_far.tex"
+    tex = (tmp_path / "tilt_far.tex").read_text()
+    assert "NW, 200 steps, tilted & \\textbf{25} &" in tex
+    assert "PDE floor, 400 steps & 12 &" in tex        # floors never bold

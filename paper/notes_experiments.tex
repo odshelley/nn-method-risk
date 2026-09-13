@@ -280,4 +280,14 @@ A \emph{front-loaded} schedule (the whole cost on $[0,0.25)$, then untilted, so 
 
 The \emph{scoring floor at $200$ steps is mostly time-discretisation bias}. On the six study scenarios the PDE-exact leverage repriced at $400$ steps scores $30.9\bp$ pooled, $43.3$ in the wings, $67.7$ at three months and $11.4$ on liquid quotes, against $54.6$, $73.8$, $137.5$ and $20.4$ at $200$ steps; NW itself, calibrated and repriced at $400$ steps, goes from $52.4$ to $39.1\bp$ pooled at $80$k. At $200$ steps NW on these scenarios sits below the ``floor'' ($52$ against $55$): a method calibrated on the discrete scheme compensates part of the scheme's bias, which the PDE-exact leverage cannot, so the $200$-step floor row is not a floor on the harder scenarios; at $400$ steps it is one, and NW's gap to it is $8\bp$. The tilt at $400$ steps lowers NW's leverage error in $11$ of $12$ pairs and leaves the implied-vol score within noise ($-0.7\bp$ pooled). The time step, not the estimator, is the lever on the absolute numbers of \cref{sec:suite}; every stored body interpolates in time, so section 4 can be re-scored at $400$ steps without retraining.
 
+\subsection{Far-wing quotes}\label{sec:tilt-far}
+The quoted grid stops at $|k|\approx0.5$ and its three-month wings fail inversion, so the score never sees the region where the tilt changes the leverage. Here every stored field is re-scored, without recalibration, on $21$ log-strikes from $0.45$ to $2.2$ spot ($|k|$ up to $0.8$) with an importance-sampled out-of-the-money repricer: puts below the money, calls above, on a cloud tilted by the constant design of cost $3$ with exact discrete-time weights, inverted through put-call parity; a quote whose target price is below $10^{-5}$ of spot is not scored, which removes the three-month far wings. The far-wing error is the mean absolute implied-vol error over the scored quotes with $|k|>0.25$.
+
+\begin{table}[h]\centering\footnotesize
+\caption{Far-wing implied-vol MAE in bp at the $80$k budget: pooled over maturities and at $0.5$, $1$ and $2$ years, the mean number of scored far-wing quotes, and the $13$-strike pooled MAE for reference. NW and the online rows over the $20$ SSVI scenarios; the searched network over the six study scenarios; the floors over the $20$. Bold: smallest in each column over the non-floor rows.}\label{tab:tilt-far}
+\input{tables/tilt_far.tex}
+\end{table}
+
+\emph{Results.} To be written from the re-scoring.
+
 \end{document}
