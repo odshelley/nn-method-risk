@@ -5,7 +5,8 @@ import numpy as np
 
 from ..simulate.dynamics import HestonParams
 
-SCHEDULES = ("constant", "inverse_sqrt")
+SCHEDULES = ("constant", "inverse_sqrt", "front")
+FRONT_T0 = 0.25   # the front-loaded schedule tilts on [0, FRONT_T0) at full strength, then stops
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,13 @@ class TiltDesign:
             return MixtureDesign(alphas=alphas, thetas=(-th, 0.0, th), rho=rho)
         dt = T / n_steps
         t = np.arange(n_steps) * dt
+        if self.schedule == "front":
+            # the whole cost spent on [0, t0): the weights stop moving after t0, so the slice
+            # ESS is frozen at its t0 value for the rest of the horizon
+            t0 = min(FRONT_T0, T)
+            th = np.where(t < t0 - 1e-12, np.sqrt(self.cost * r2 / t0), 0.0)
+            return MixtureDesign(alphas=alphas, thetas=np.stack([-th, np.zeros(n_steps), th]),
+                                 rho=rho)
         harmonic = 1.0 + np.sum(1.0 / np.arange(1, n_steps))     # 1 + H_{n-1}
         c = np.sqrt(self.cost * r2 / harmonic)
         th = c / np.sqrt(np.maximum(t, dt))
@@ -73,7 +81,8 @@ class TiltDesign:
         return MixtureDesign(alphas=alphas, thetas=thetas, rho=rho)
 
 
-DESIGNS = [TiltDesign(s, float(c)) for s in SCHEDULES for c in (1, 3, 9)]
+DESIGNS = ([TiltDesign(s, float(c)) for s in ("constant", "inverse_sqrt") for c in (1, 3, 9)]
+           + [TiltDesign("front", 3.0), TiltDesign("front", 8.0)])
 UNTILTED = "none"
 
 

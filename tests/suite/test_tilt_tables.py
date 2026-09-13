@@ -172,7 +172,7 @@ def test_tables_are_written_with_bold_best(store, tmp_path, monkeypatch):
     assert "constant-3" in sl and "NW, 30k &" in sl and "\\textbf{2.5}" in sl
     # the bias columns are signed, so they are never bolded: 0.0 and 40.0 are plain
     assert "\\textbf{0.0}" not in sl and "\\textbf{40.0}" not in sl
-    assert "& 40.0\\\\" in sl
+    assert "& 40.0 &" in sl
     on = (tmp_path / "tilt_online.tex").read_text()
     assert "10k, surface, tilted & 44 &" in on
     assert "80k, surface, tilted & \\textbf{42} &" in on

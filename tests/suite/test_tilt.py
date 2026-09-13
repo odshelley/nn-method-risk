@@ -112,9 +112,9 @@ def test_online_cell_is_tilted_keyed_and_weighted(store, promoted):
 
 def test_slice_job_count():
     jobs = slice_jobs()
-    assert len(jobs) == 6 * 3 * 7 * 5
-    assert len({j[3] for j in jobs}) == 7 and "none" in {j[3] for j in jobs}
-    assert len(slice_jobs(sids=("s11",))) == 3 * 7 * 5
+    assert len(jobs) == 6 * 3 * 9 * 5
+    assert len({j[3] for j in jobs}) == 9 and "none" in {j[3] for j in jobs}
+    assert len(slice_jobs(sids=("s11",))) == 3 * 9 * 5
 
 
 def test_simulate_frozen_untilted_has_unit_weights_and_tilted_has_bounded_weights():

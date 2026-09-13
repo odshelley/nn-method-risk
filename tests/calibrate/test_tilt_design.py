@@ -43,7 +43,19 @@ def test_inverse_sqrt_schedule_has_the_same_total_cost():
 
 def test_names_and_lookup():
     assert [d.name for d in DESIGNS] == ["constant-1", "constant-3", "constant-9",
-                                         "inverse_sqrt-1", "inverse_sqrt-3", "inverse_sqrt-9"]
+                                         "inverse_sqrt-1", "inverse_sqrt-3", "inverse_sqrt-9",
+                                         "front-3", "front-8"]
+
+
+def test_front_schedule_spends_the_whole_cost_before_t0():
+    n, T, rho = 200, 2.0, -0.6
+    d = TiltDesign("front", 8.0).mixture(n, T, rho)
+    th = np.asarray(d.thetas)
+    dt = T / n
+    on = th[2] > 0
+    assert on.sum() == 25 and not np.any(th[2][25:])           # 0.25 / 0.01 steps
+    assert abs((th[2] ** 2).sum() * dt / (1 - rho ** 2) - 8.0) < 1e-12
+    assert th[2][0] == np.sqrt(8.0 * (1 - rho ** 2) / 0.25)
     assert design_by_name("none") is None
     assert design_by_name("inverse_sqrt-9") == TiltDesign("inverse_sqrt", 9.0)
     with pytest.raises(KeyError):
