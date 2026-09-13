@@ -40,7 +40,10 @@ def _explicit(sc, n, seed, ecfg, method, mixture=None, estimator=None, knobs=Non
     return CalibResult(r.field, {"total_s": total, "fit_s": r.fit_s}, diag, model=est)
 
 
-def _nw(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "nw", knobs=knobs)
+def _nw(sc, n, seed, e, i, knobs=None, mixture=None):
+    return _explicit(sc, n, seed, e, "nw", mixture=mixture, knobs=knobs)
+
+
 def _nn(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "nn", knobs=knobs)
 def _ridge(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "ridge", knobs=knobs)
 def _spline(sc, n, seed, e, i, knobs=None): return _explicit(sc, n, seed, e, "spline", knobs=knobs)
@@ -134,19 +137,27 @@ def _nn_tuned(sc, n, seed, e, i, knobs=None):
                      knobs={**TUNED_KNOBS, **(knobs or {})})
 
 
-def _nn_opt(sc, n, seed, e, i, knobs=None):
+def _nn_opt(sc, n, seed, e, i, knobs=None, mixture=None):
     """Per-slice network with the promoted Optuna recipe (estimators/recipes/explicit_opt.json)."""
     recipe = load_recipe("explicit_opt")
     est = regressor_from_recipe(recipe, seed=seed,
                                 monotone_sign=-float(np.sign(sc.dynamics.rho) or 1.0),
                                 **(knobs or {}))
-    return _explicit(sc, n, seed, explicit_config_from_recipe(e, recipe), "nn", estimator=est)
+    return _explicit(sc, n, seed, explicit_config_from_recipe(e, recipe), "nn", estimator=est,
+                     mixture=mixture)
 
 
 # Suite-only algorithms, kept out of ALGOS so the paper/baseline grids and goldens are unchanged.
 SUITE_ALGOS = {"explicit_nn_tuned": _nn_tuned, "explicit_nn_opt": _nn_opt}
 
+TILT_ALGOS = ("nw", "explicit_nn_opt")
 
-def run_algo(name, scenario, n_particles, seed, explicit=ExplicitConfig(), implicit=ImplicitConfig(), knobs=None):
-    return {**ALGOS, **MECHANISM_ALGOS, **SUITE_ALGOS}[name](
-        scenario, n_particles, seed, explicit, implicit, knobs=knobs)
+
+def run_algo(name, scenario, n_particles, seed, explicit=ExplicitConfig(),
+            implicit=ImplicitConfig(), knobs=None, mixture=None):
+    fn = {**ALGOS, **MECHANISM_ALGOS, **SUITE_ALGOS}[name]
+    if mixture is None:
+        return fn(scenario, n_particles, seed, explicit, implicit, knobs=knobs)
+    if name not in TILT_ALGOS:
+        raise ValueError(f"algorithm {name!r} does not take a tilt mixture; use one of {TILT_ALGOS}")
+    return fn(scenario, n_particles, seed, explicit, implicit, knobs=knobs, mixture=mixture)
