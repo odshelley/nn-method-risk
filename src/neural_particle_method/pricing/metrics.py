@@ -1,8 +1,9 @@
 """IV error metrics, and exact SSVI target IVs at the times reprice_iv actually reaches."""
 import numpy as np
 
+from ..market.bs import bs_call
 from ..market.ssvi import implied_vol_ssvi
-from .reprice import snap_times
+from .reprice import FAR_PRICE_FLOOR, snap_times
 
 
 def iv_metrics(iv_model, iv_target, k_grid, maturities, wing_cut=0.25, liquid_T=0.5):
@@ -51,6 +52,36 @@ def iv_metrics(iv_model, iv_target, k_grid, maturities, wing_cut=0.25, liquid_T=
             "n_failed": int((~ok).sum()), "per_maturity": per,
             "pooled_mae_bp": mae(all_mask), "wings_mae_bp": mae(wing_mask),
             "mae_per_maturity": mae_per, "liquid_mae_bp": mae(liquid)}
+
+
+def far_wing_metrics(iv_model, iv_target, k_grid, times, s0, wing_cut=0.25,
+                     price_floor=FAR_PRICE_FLOOR):
+    """MAE in vol bp over the far-wing quotes that are priceable: |k| > wing_cut and target OTM
+    price >= price_floor * s0. `times` are the snapped maturities the IVs were inverted at.
+
+    Returns (metrics, err_bp) with err_bp NaN wherever a quote is dropped or failed."""
+    k = np.asarray(k_grid, dtype=float)
+    K = s0 * np.exp(k)
+    tgt = np.asarray(iv_target, dtype=float)
+    call = np.stack([bs_call(s0, K, float(t), tgt[i]) for i, t in enumerate(times)])
+    otm = np.where(k[None, :] < 0, call - s0 + K[None, :], call)
+    err = (np.asarray(iv_model, dtype=float) - tgt) * 1e4
+    keep = (otm >= price_floor * s0) & np.isfinite(err)
+    wings = np.tile(np.abs(k) > wing_cut, (len(times), 1))
+    err = np.where(keep, err, np.nan)
+
+    def mae(mask):
+        e = err[mask & keep]
+        return float("nan") if e.size == 0 else float(np.mean(np.abs(e)))
+
+    out = {"far_wings_mae_bp": mae(wings), "far_wings_n": int((wings & keep).sum()),
+           "far_all_mae_bp": mae(np.ones_like(keep))}
+    for i, t in enumerate(times):
+        row = np.zeros_like(keep)
+        row[i] = True
+        out[f"far_mae_bp/T{float(t):g}"] = mae(row & wings)
+        out[f"far_n/T{float(t):g}"] = int((row & wings & keep).sum())
+    return {kk: v for kk, v in out.items() if not (isinstance(v, float) and np.isnan(v))}, err
 
 
 def target_ivs(ssvi_params, k_grid, maturities, n_steps):
