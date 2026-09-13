@@ -20,6 +20,7 @@ from neural_particle_method.suite.tilt import (
     run_tilt_stage,
     simulate_frozen,
     slice_jobs,
+    tilt_jobs,
 )
 from neural_particle_method.tracking.store import Store
 
@@ -163,3 +164,15 @@ def test_stage_runner_skips_finished_cells(store, promoted):
     done, failed = run_tilt_stage(store, "cold", TINY, sids=("s01",), design="constant-3",
                                   particles=(TINY.n_online,), seeds=(0,))
     assert (done, failed) == (4, 0)          # nw + explicit_nn_opt, untilted + tilted
+
+
+def test_untilted_is_rejected_as_a_design_for_the_cold_and_online_stages():
+    # a winner() of "none" must not reach the stages: cold would emit every cell twice and
+    # every online cell would die in run_tilt_online
+    with pytest.raises(ValueError):
+        cold_jobs("none")
+    with pytest.raises(ValueError):
+        tilt_jobs("cold", design="none")
+    with pytest.raises(ValueError):
+        tilt_jobs("online", design="none")
+    assert len(tilt_jobs("cold", sids=("s02",), design="constant-3")) == 2 * 3 * 2 * 2

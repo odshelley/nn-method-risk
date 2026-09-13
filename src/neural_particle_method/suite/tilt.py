@@ -70,6 +70,9 @@ def _restrict(sids, wanted):
 def cold_jobs(design_name, settings=FULL, sids=None, particles=COLD_PARTICLES, seeds=COLD_SEEDS):
     """Untilted and tilted cold cells, paired by seed, for both algorithms."""
     design_by_name(design_name)      # KeyError for an unknown design
+    if design_name == UNTILTED:
+        raise ValueError("the untilted arm is not a design for these stages; every cell would "
+                         "be emitted twice")
     jobs = []
     for algo, algo_sids in COLD_ALGO_SIDS.items():
         for sid in _restrict(algo_sids, sids):
@@ -308,6 +311,8 @@ def tilt_jobs(stage, settings=FULL, sids=None, design=None, particles=None, seed
         return jobs
     if design is None:
         raise ValueError(f"stage {stage!r} needs a design name (nparticle tilt winner)")
+    if design == UNTILTED:
+        raise ValueError(f"stage {stage!r}: the untilted arm is not a design for these stages")
     if stage == "cold":
         kw = {k: v for k, v in (("particles", particles), ("seeds", seeds)) if v is not None}
         return cold_jobs(design, settings, sids, **kw)

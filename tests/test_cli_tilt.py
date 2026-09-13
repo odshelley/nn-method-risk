@@ -13,3 +13,26 @@ def test_tilt_subcommands_parse():
     assert (d.tilt_cmd, d.out) == ("tables", "x")
     assert _parser().parse_args(["tilt", "winner"]).tilt_cmd == "winner"
     assert _parser().parse_args(["tilt", "figures", "--design", "none"]).design == "none"
+
+
+def test_cold_exits_1_when_no_design_won_the_slice_layer(tmp_path, monkeypatch):
+    """A winner() of "none" is the documented null result; the stages must not run on it."""
+    import neural_particle_method.suite.tilt as T
+    import neural_particle_method.suite.tilt_tables as TT
+    from neural_particle_method.cli import main
+
+    def boom(*a, **k):
+        raise AssertionError("the stage must not run when no design won")
+
+    monkeypatch.setattr(TT, "slice_frame", lambda *a, **k: None)
+    monkeypatch.setattr(TT, "winner", lambda *a, **k: "none")
+    monkeypatch.setattr(T, "run_tilt_stage", boom)
+    uri, root = f"sqlite:///{tmp_path / 'db'}", str(tmp_path / "art")
+    base = ["--tracking-uri", uri, "--artifact-root", root, "tilt"]
+    assert main(base + ["cold", "--smoke"]) == 1
+    assert main(base + ["online", "--smoke"]) == 1
+    assert main(base + ["tables", "--out", str(tmp_path / "t")]) == 1
+    assert main(base + ["figures", "--out", str(tmp_path / "f")]) == 1
+    assert not (tmp_path / "t").exists() and not (tmp_path / "f").exists()
+    # an explicit --design still runs, and "winner" still reports the null result
+    assert main(base + ["winner"]) == 0
