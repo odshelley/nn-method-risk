@@ -98,6 +98,8 @@ def _parser():
         if name == "cold":     # the cheap NW rows and the overnight network rows, separately
             q.add_argument("--algos", nargs="*", choices=("nw", "explicit_nn_opt"),
                            default=["nw", "explicit_nn_opt"])
+    q = ts.add_parser("farwings"); q.add_argument("--jobs", type=int, default=1)
+    q.add_argument("--force", action="store_true"); q.add_argument("--smoke", action="store_true")
     q = ts.add_parser("winner"); q.add_argument("--smoke", action="store_true")
     q = ts.add_parser("tables"); q.add_argument("--design", default=None)
     q.add_argument("--smoke", action="store_true"); q.add_argument("--out", default="paper/tables")
@@ -263,6 +265,13 @@ def main(argv=None):
                 return None
             return d
 
+        if args.tilt_cmd == "farwings":
+            from .suite.far_wings import run_farwings
+            done, failed = run_farwings(store, settings,
+                                        budget=settings.n_online if args.smoke else 80_000,
+                                        n_jobs=args.jobs, force=args.force)
+            print(f"farwings: {done} done, {failed} failed")
+            return 1 if failed else 0
         if args.tilt_cmd == "winner":
             print(winner(slice_frame(store, settings)))
             return 0

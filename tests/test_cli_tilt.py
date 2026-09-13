@@ -39,3 +39,8 @@ def test_cold_exits_1_when_no_design_won_the_slice_layer(tmp_path, monkeypatch):
     assert not (tmp_path / "t").exists() and not (tmp_path / "f").exists()
     # an explicit --design still runs, and "winner" still reports the null result
     assert main(base + ["winner"]) == 0
+
+
+def test_farwings_parses():
+    a = _parser().parse_args(["tilt", "farwings", "--jobs", "3", "--force"])
+    assert (a.tilt_cmd, a.jobs, a.force) == ("farwings", 3, True)
