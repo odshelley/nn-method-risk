@@ -154,10 +154,10 @@ def test_cold_and_online_frames_pair_tilted_with_untilted(store, monkeypatch):
     import neural_particle_method.suite.tilt_tables as T
     monkeypatch.setattr(T, "_promoted_hash", lambda: "abc")
     c = cold_frame(store, "constant-3")
-    assert c.loc[("NW", 10_000, "tilted"), "mae"] == 50.0
-    assert c.loc[("NW", 10_000, "untilted"), "mae"] == 57.0
-    assert np.isnan(c.loc[("NW", 10_000, "untilted"), "ess_min"])
-    assert c.loc[("NW", 10_000, "tilted"), "ess_min"] == 0.6
+    assert c.loc[("NW (20 scenarios)", 10_000, "tilted"), "mae"] == 50.0
+    assert c.loc[("NW (20 scenarios)", 10_000, "untilted"), "mae"] == 57.0
+    assert np.isnan(c.loc[("NW (20 scenarios)", 10_000, "untilted"), "ess_min"])
+    assert c.loc[("NW (20 scenarios)", 10_000, "tilted"), "ess_min"] == 0.6
     assert c.loc[("PDE (attainable floor)", 0, ""), "mae"] == 42.0
     o = online_frame(store, "constant-3")
     assert o.loc[(10_000, "surface", "tilted"), "mae"] == 44.0
@@ -173,8 +173,8 @@ def test_tables_are_written_with_bold_best(store, tmp_path, monkeypatch):
         "tilt_slices.tex", "tilt_cold.tex", "tilt_online.tex", "tilt_far.tex"]
     cold = (tmp_path / "tilt_cold.tex").read_text()
     # bold is the column minimum over every non-floor row: 43 at 80k tilted, not 50 at 10k
-    assert "NW, 10k, tilted & 50 &" in cold
-    assert "NW, 80k, tilted & \\textbf{43} &" in cold
+    assert "NW (20 scenarios), 10k, tilted & 50 &" in cold
+    assert "NW (20 scenarios), 80k, tilted & \\textbf{43} &" in cold
     assert "PDE (attainable floor) & 42 &" in cold
     assert "& 0.60 &" in cold and "& -- &" in cold          # ess_min: value / untilted
     sl = (tmp_path / "tilt_slices.tex").read_text()

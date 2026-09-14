@@ -284,7 +284,7 @@ The \emph{scoring floor at $200$ steps is mostly time-discretisation bias}. On t
 The quoted grid stops at $|k|\approx0.5$ and its three-month wings fail inversion, so the score never sees the region where the tilt changes the leverage. Here every stored field is re-scored, without recalibration, on $21$ log-strikes from $0.45$ to $2.2$ spot ($|k|$ up to $0.8$) with an importance-sampled out-of-the-money repricer: puts below the money, calls above, on a cloud tilted by the constant design of cost $3$ with exact discrete-time weights, inverted through put-call parity; a quote whose target price is below $10^{-5}$ of spot is not scored, which removes the three-month far wings. The far-wing error is the mean absolute implied-vol error over the scored quotes with $|k|>0.25$.
 
 \begin{table}[h]\centering\footnotesize
-\caption{Far-wing implied-vol MAE in bp at the $80$k budget: pooled over maturities and at $0.5$, $1$ and $2$ years, the mean number of scored far-wing quotes, and the $13$-strike pooled MAE for reference. NW and the online rows over the $20$ SSVI scenarios; the searched network over the six study scenarios; the floors over the $20$. Bold: smallest in each column over the non-floor rows.}\label{tab:tilt-far}
+\caption{Far-wing implied-vol MAE in bp at the $80$k budget: pooled over maturities and at $0.5$, $1$ and $2$ years, the mean number of scored far-wing quotes, and the $13$-strike pooled MAE for reference. Every row is over the same $20$ SSVI scenarios and two seeds. Bold: smallest in each column over the non-floor rows.}\label{tab:tilt-far}
 \input{tables/tilt_far.tex}
 \end{table}
 

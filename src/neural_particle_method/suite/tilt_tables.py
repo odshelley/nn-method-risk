@@ -17,7 +17,8 @@ BIAS_FLOOR = 1.0         # percentage points of f a design may add to the bias f
 BIAS_PER_STD = 0.5       # ...plus this share of the wing standard deviation it removes
 MIN_SEEDS = 2            # a (sid, T, k) cell needs this many seeds to carry a standard deviation
 WINNER_N = 30_000
-ALGO_LABELS = {"nw": "NW", "explicit_nn_opt": "Explicit NN, searched"}
+ALGO_LABELS = {"nw": "NW (20 scenarios)",
+               "explicit_nn_opt": "Explicit NN, searched (six study scenarios)"}
 EST_LABELS = {"nw": "NW", "net": "Net"}
 
 
@@ -135,9 +136,13 @@ def cold_frame(store, design, settings=FULL):
     for algo, label in ALGO_LABELS.items():
         for n in COLD_PARTICLES:
             for arm, dname in (("untilted", UNTILTED), ("tilted", design)):
+                # the network's cold rows were run on the six study scenarios at every budget;
+                # the 80k budget also exists on the other 14 (for the far-wing table), so pin the
+                # set here to keep the three budgets comparable within this table
+                sids = SLICE_SIDS if algo == "explicit_nn_opt" else SSVI_SIDS
                 sel = df.iloc[:0] if len(df) == 0 else df[
                     (df["params.algo"] == algo) & (_num(df, "params.n_particles") == n)
-                    & (df["params.design"] == dname) & df["params.sid"].isin(SSVI_SIDS)]
+                    & (df["params.design"] == dname) & df["params.sid"].isin(sids)]
                 if algo == "explicit_nn_opt" and len(sel):
                     sel = (sel[sel["params.recipe_hash"] == _promoted_hash()]
                            if "params.recipe_hash" in sel.columns else sel.iloc[:0])
