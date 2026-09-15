@@ -241,8 +241,8 @@ A design is a schedule for $\theta$ and a cap $c$ on $\sum_k\theta_k^2\,\Delta t
 The tilt acts on estimation variance, so it is measured first on its own, without the feedback of the calibration loop. Particles are simulated under the frozen PDE-reference leverage of each of the six study scenarios (s01, s02, s05, s09, s11, s16), and at the four quoted maturities NW and the searched network are fitted on the weighted cloud and evaluated at the $13$ quoted strikes against the PDE conditional expectation, at $10$k, $30$k and $80$k particles with five seeds. The error at each strike splits into its standard deviation over seeds, which the tilt can remove, and its mean, the shared Euler-versus-Fokker--Planck bias, which it cannot. NW's bandwidth is Silverman's rule on the weighted spread of the cloud, so both arms smooth on the same scale. A design wins on the smallest NW wing standard deviation at $30$k, and is disqualified if the bias it adds exceeds one percentage point plus half the standard deviation it removes.
 
 \begin{table}[h]\centering\footnotesize
-\caption{Slice layer: wing standard deviation over seeds (at $T=0.25$ and pooled over maturities) and wing bias, in percent of $\E[V\mid X]$, by estimator, budget and design (experiment \code{tilt\_slices}). Bold: smallest in each standard-deviation column; the bias columns are signed and are not bolded.}\label{tab:tilt-slices}
-\resizebox{\textwidth}{!}{\input{tables/tilt_slices.tex}}
+\caption{Slice layer: wing standard deviation over seeds (at $T=0.25$ and pooled over maturities) and wing bias, in percent of $\E[V\mid X]$, by estimator and budget, untilted and under the constant designs of cost $3$ and $9$ and the front-loaded design of cost $8$; the inverse-square-root designs and the other costs are in experiment \code{tilt\_slices}. Bold: smallest in each standard-deviation column; the bias columns are signed and are not bolded.}\label{tab:tilt-slices}
+\input{tables/tilt_slices.tex}
 \end{table}
 
 \begin{figure}[h]\centering

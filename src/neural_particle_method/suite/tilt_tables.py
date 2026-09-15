@@ -284,8 +284,11 @@ def far_frame(store, design, settings=FULL, budget=80_000):
     return pd.DataFrame({label: rows[label] for label in FAR_ROWS}).T
 
 
+SLICE_TABLE_DESIGNS = ("constant-3", "constant-9", "front-8")   # readable subset; rest in the store
+
+
 def _slices_tex(df, design):
-    names = [UNTILTED] + [d.name for d in DESIGNS]
+    names = [UNTILTED] + [d.name for d in DESIGNS if d.name in SLICE_TABLE_DESIGNS]
     cols = " ".join("rrr" for _ in names)
     head = " & ".join(f"\\multicolumn{{3}}{{c}}{{{_tex(n)}}}" for n in names)
     sub = " & ".join("std $T{=}0.25$ & std & bias" for _ in names)

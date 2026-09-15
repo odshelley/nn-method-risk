@@ -178,10 +178,11 @@ def test_tables_are_written_with_bold_best(store, tmp_path, monkeypatch):
     assert "PDE (attainable floor) & 42 &" in cold
     assert "& 0.60 &" in cold and "& -- &" in cold          # ess_min: value / untilted
     sl = (tmp_path / "tilt_slices.tex").read_text()
-    assert "constant-3" in sl and "NW, 30k &" in sl and "\\textbf{2.5}" in sl
-    # the bias columns are signed, so they are never bolded: 0.0 and 40.0 are plain
-    assert "\\textbf{0.0}" not in sl and "\\textbf{40.0}" not in sl
-    assert "& 40.0 &" in sl
+    # the readable subset: untilted, constant-3, constant-9, front-8; inverse_sqrt-9 stays in the store
+    assert "constant-3" in sl and "NW, 30k &" in sl and "inverse" not in sl
+    assert "\\textbf{5.0}" in sl                      # constant-3 std at 30k is the column minimum
+    # the bias columns are signed, so they are never bolded
+    assert "\\textbf{0.0}" not in sl and "& 0.0 &" in sl
     on = (tmp_path / "tilt_online.tex").read_text()
     assert "10k, surface, tilted & 44 &" in on
     assert "80k, surface, tilted & \\textbf{42} &" in on
