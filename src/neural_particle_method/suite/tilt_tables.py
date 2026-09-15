@@ -18,7 +18,8 @@ BIAS_PER_STD = 0.5       # ...plus this share of the wing standard deviation it 
 MIN_SEEDS = 2            # a (sid, T, k) cell needs this many seeds to carry a standard deviation
 WINNER_N = 30_000
 ALGO_LABELS = {"nw": "NW (20 scenarios)",
-               "explicit_nn_opt": "Explicit NN, searched (six study scenarios)"}
+               "explicit_nn_opt": "Explicit NN, searched (six study scenarios)",
+               "explicit_nn_opt_dw": "Explicit NN, density-weighted (six study scenarios)"}
 EST_LABELS = {"nw": "NW", "net": "Net"}
 
 
@@ -139,11 +140,11 @@ def cold_frame(store, design, settings=FULL):
                 # the network's cold rows were run on the six study scenarios at every budget;
                 # the 80k budget also exists on the other 14 (for the far-wing table), so pin the
                 # set here to keep the three budgets comparable within this table
-                sids = SLICE_SIDS if algo == "explicit_nn_opt" else SSVI_SIDS
+                sids = SLICE_SIDS if algo.startswith("explicit_nn_opt") else SSVI_SIDS
                 sel = df.iloc[:0] if len(df) == 0 else df[
                     (df["params.algo"] == algo) & (_num(df, "params.n_particles") == n)
                     & (df["params.design"] == dname) & df["params.sid"].isin(sids)]
-                if algo == "explicit_nn_opt" and len(sel):
+                if algo.startswith("explicit_nn_opt") and len(sel):
                     sel = (sel[sel["params.recipe_hash"] == _promoted_hash()]
                            if "params.recipe_hash" in sel.columns else sel.iloc[:0])
                 rows[(label, int(n), arm)] = _cold_metrics(sel)
@@ -195,6 +196,7 @@ FAR_ROWS = (
     "NW, 200 steps, untilted", "NW, 200 steps, tilted",
     "NW, 400 steps, untilted", "NW, 400 steps, tilted",
     "Explicit NN, searched, untilted", "Explicit NN, searched, tilted",
+    "Explicit NN, density-weighted, untilted", "Explicit NN, density-weighted, tilted",
     "NW re-solve (online)",
     "Searched body + spline head, untilted", "Searched body + spline head, tilted",
     "PDE floor, 200 steps", "PDE floor, 400 steps",
@@ -228,7 +230,7 @@ def far_frame(store, design, settings=FULL, budget=80_000):
             return df
         sel = df[(df["params.algo"] == algo) & (_num(df, "params.n_particles") == budget)
                  & (df["params.design"] == dname) & df["params.sid"].isin(SSVI_SIDS)]
-        if algo == "explicit_nn_opt" and len(sel):
+        if algo.startswith("explicit_nn_opt") and len(sel):
             sel = (sel[sel["params.recipe_hash"] == _promoted_hash()]
                    if "params.recipe_hash" in sel.columns else sel.iloc[:0])
         return sel
@@ -269,6 +271,10 @@ def far_frame(store, design, settings=FULL, budget=80_000):
         "Explicit NN, searched, untilted": _far_metrics(
             cold_sel(cold, "explicit_nn_opt", UNTILTED)),
         "Explicit NN, searched, tilted": _far_metrics(cold_sel(cold, "explicit_nn_opt", design)),
+        "Explicit NN, density-weighted, untilted": _far_metrics(
+            cold_sel(cold, "explicit_nn_opt_dw", UNTILTED)),
+        "Explicit NN, density-weighted, tilted": _far_metrics(
+            cold_sel(cold, "explicit_nn_opt_dw", design)),
         "NW re-solve (online)": _far_metrics(resolve_sel()),
         "Searched body + spline head, untilted": _far_metrics(head_sel(base, None)),
         "Searched body + spline head, tilted": _far_metrics(head_sel(online, design)),
