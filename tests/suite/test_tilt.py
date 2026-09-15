@@ -187,4 +187,4 @@ def test_untilted_is_rejected_as_a_design_for_the_cold_and_online_stages():
         tilt_jobs("cold", design="none")
     with pytest.raises(ValueError):
         tilt_jobs("online", design="none")
-    assert len(tilt_jobs("cold", sids=("s02",), design="constant-3")) == 2 * 3 * 2 * 2
+    assert len(tilt_jobs("cold", sids=("s02",), design="constant-3")) == 3 * 3 * 2 * 2
