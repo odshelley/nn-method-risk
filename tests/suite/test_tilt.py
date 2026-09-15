@@ -44,7 +44,7 @@ def promoted(tmp_path, monkeypatch):
 
 def test_cold_job_counts(promoted):
     jobs = cold_jobs("constant-3")
-    assert len(jobs) == (20 + 6) * 3 * 2 * 2
+    assert len(jobs) == (20 + 6 + 6) * 3 * 2 * 2
     assert {j[5] for j in jobs} == {"none", "constant-3"}
     assert {j[3] for j in jobs} == set(COLD_PARTICLES)
     only_s02 = cold_jobs("constant-3", sids=("s02",))
@@ -175,7 +175,7 @@ def test_stage_runner_skips_finished_cells(store, promoted):
     assert (done, failed) == (0, 0)
     done, failed = run_tilt_stage(store, "cold", TINY, sids=("s01",), design="constant-3",
                                   particles=(TINY.n_online,), seeds=(0,))
-    assert (done, failed) == (4, 0)          # nw + explicit_nn_opt, untilted + tilted
+    assert (done, failed) == (6, 0)          # nw, explicit_nn_opt, explicit_nn_opt_dw; both arms
 
 
 def test_untilted_is_rejected_as_a_design_for_the_cold_and_online_stages():

@@ -148,9 +148,17 @@ def _nn_opt(sc, n, seed, e, i, knobs=None, mixture=None):
 
 
 # Suite-only algorithms, kept out of ALGOS so the paper/baseline grids and goldens are unchanged.
-SUITE_ALGOS = {"explicit_nn_tuned": _nn_tuned, "explicit_nn_opt": _nn_opt}
+def _nn_opt_dw(sc, n, seed, e, i, knobs=None, mixture=None):
+    """The promoted recipe with the density-equalised loss (`design_weight`), so the sparse wings
+    count by their particles: the fix for the wing collapse of the plain least-squares fit."""
+    return _nn_opt(sc, n, seed, e, i, knobs={"design_weight": True, **(knobs or {})},
+                   mixture=mixture)
 
-TILT_ALGOS = ("nw", "explicit_nn_opt")
+
+SUITE_ALGOS = {"explicit_nn_tuned": _nn_tuned, "explicit_nn_opt": _nn_opt,
+               "explicit_nn_opt_dw": _nn_opt_dw}
+
+TILT_ALGOS = ("nw", "explicit_nn_opt", "explicit_nn_opt_dw")
 
 
 def run_algo(name, scenario, n_particles, seed, explicit=ExplicitConfig(),

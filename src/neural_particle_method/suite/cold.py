@@ -7,8 +7,8 @@ from .config import COLD_ALGOS, FULL
 
 __all__ = ["COLD_ALGOS", "run_cold"]
 
-NN_ALGOS = ("explicit_nn", "explicit_nn_tuned", "explicit_nn_opt")
-RECIPE_ALGO = "explicit_nn_opt"
+NN_ALGOS = ("explicit_nn", "explicit_nn_tuned", "explicit_nn_opt", "explicit_nn_opt_dw")
+RECIPE_ALGOS = ("explicit_nn_opt", "explicit_nn_opt_dw")
 
 
 def cold_extra_key(algo):
@@ -17,7 +17,7 @@ def cold_extra_key(algo):
     Without it `find_finished` matches by containment and a second promotion would read back the
     first recipe's runs, exactly as for the offline bodies and the online cells.
     """
-    if algo != RECIPE_ALGO:
+    if algo not in RECIPE_ALGOS:
         return None
     return {"recipe_hash": recipe_hash(load_recipe("explicit_opt"))}
 

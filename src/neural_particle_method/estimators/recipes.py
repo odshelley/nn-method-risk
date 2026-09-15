@@ -35,7 +35,10 @@ def recipe_hash(recipe):
     return hashlib.sha1(json.dumps(recipe, sort_keys=True).encode()).hexdigest()[:10]
 
 
-def regressor_from_recipe(recipe, seed=0, keep_slice_weights=False, monotone_sign=1.0):
+def regressor_from_recipe(recipe, seed=0, keep_slice_weights=False, monotone_sign=1.0,
+                          design_weight=False, design_cap=50.0):
+    """`design_weight` is not part of the recipe (and so not of its hash): it is the estimator's
+    density-equalised loss, switched on by the `_dw` cold row and body kind."""
     r = coerce_recipe(recipe)
     return NNRegressor(seed=seed, first_steps=r["first_steps"], later_steps=r["later_steps"],
                        hidden=r["hidden"], depth=r["depth"], lr=r["lr"],
@@ -43,7 +46,8 @@ def regressor_from_recipe(recipe, seed=0, keep_slice_weights=False, monotone_sig
                        warm_start=r["warm_start"], mean_match=r["mean_match"],
                        monotone_penalty=r["monotone_penalty"] if r["monotone"] else 0.0,
                        monotone_sign=monotone_sign, hetero=r["hetero"],
-                       keep_slice_weights=keep_slice_weights)
+                       keep_slice_weights=keep_slice_weights, design_weight=design_weight,
+                       design_cap=design_cap)
 
 
 def explicit_config_from_recipe(cfg, recipe):

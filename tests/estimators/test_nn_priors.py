@@ -106,3 +106,31 @@ def test_hetero_weights_are_capped(monkeypatch):
     est.fit_predict(0.5, x, v, GRID)
     assert est.last_weights.max() <= HETERO_W_MAX
     assert (est.last_weights[1:] > 0).all()
+
+
+def test_design_weights_equalise_a_sparse_wing():
+    """A dense bulk plus a sparse rising wing: plain least squares ignores the wing; the
+    density-equalised weights recover it, and both stay unbiased where the data are dense."""
+    import numpy as np
+
+    from neural_particle_method.estimators.nn import NNRegressor, design_weights
+
+    rng = np.random.default_rng(0)
+    bulk = rng.normal(-0.1, 0.08, 20_000)
+    wing = rng.uniform(0.15, 0.5, 300)
+    x = np.concatenate([bulk, wing])
+    f_true = np.where(x < 0.05, 0.2 * np.clip(0.05 - x, 0, None), 0.15 * (x - 0.05))
+    v = f_true + rng.normal(0, 0.01, x.size)
+    g = design_weights(x)
+    assert abs(g.mean() - 1) < 1e-12 and g.min() > 0
+    assert g[x > 0.15].mean() > 10 * g[x < 0].mean()          # the wing is up-weighted
+    grid = np.array([-0.2, 0.0, 0.3, 0.45])
+    plain = NNRegressor(seed=0, first_steps=600, hidden=32, depth=3, lr=3e-3, batch_size=4096)
+    dw = NNRegressor(seed=0, first_steps=600, hidden=32, depth=3, lr=3e-3, batch_size=4096,
+                     design_weight=True)
+    fp = plain.fit_predict(0.0, x, v, grid)
+    fd = dw.fit_predict(0.0, x, v, grid)
+    truth = np.where(grid < 0.05, 0.2 * np.clip(0.05 - grid, 0, None), 0.15 * (grid - 0.05))
+    assert np.abs(fd[2:] - truth[2:]).max() < 0.015                 # wing recovered
+    assert np.abs(fd[:2] - truth[:2]).max() < 0.01                  # bulk still right
+    assert np.all(np.isfinite(fp))                                  # plain fit still runs

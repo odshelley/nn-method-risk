@@ -8,6 +8,27 @@ from .nadaraya_watson import nw_local_variance
 V_SCALE = 0.04  # rough variance scale for output conditioning
 Z_SCALE = 0.3   # rough log-spot scale for input conditioning
 HETERO_W_MAX = 1e3  # cap on a normalised heteroscedastic weight
+DESIGN_GRID = 400   # kernel-density grid for the design weights
+
+
+def design_weights(lnx, weights=None, cap=50.0):
+    """Loss weights that equalise the fit's attention across log-spot: the importance weight
+    (one if none) divided by a Gaussian kernel estimate of the physical density of X, the
+    density floored at 1/cap of its mode, the result normalised to mean one.
+
+    A positive weight that depends on x alone leaves the least-squares minimiser at E[V | X], so
+    the fit stays unbiased; the sparse wings just count by their particle number instead of
+    their probability mass, which is what a global least-squares fit otherwise ignores."""
+    lnx = np.asarray(lnx, dtype=float)
+    w = np.ones_like(lnx) if weights is None else np.asarray(weights, dtype=float)
+    m = np.average(lnx, weights=w)
+    sd = np.sqrt(np.average((lnx - m) ** 2, weights=w))
+    bw = max(1.06 * sd * len(lnx) ** (-1 / 5), 1e-6)
+    grid = np.linspace(lnx.min(), lnx.max(), DESIGN_GRID)
+    dens = (np.exp(-0.5 * ((grid[:, None] - lnx[None, :]) / bw) ** 2) * w[None, :]).sum(axis=1)
+    dens = np.interp(lnx, grid, dens / max(dens.max(), 1e-300))
+    g = w / np.maximum(dens, 1.0 / cap)
+    return g / g.mean()
 
 
 class SliceNet(nn.Module):
@@ -51,8 +72,13 @@ class NNRegressor:
     def __init__(self, seed=0, first_steps=400, later_steps=120, hidden=64,
                  keep_slice_weights=False, depth=2, lr=1e-2, batch_size=None, weight_decay=0.0,
                  warm_start=True, mean_match=False, monotone_penalty=0.0, monotone_sign=1.0,
-                 hetero=False):
+                 hetero=False, design_weight=False, design_cap=50.0):
         self.seed, self.hidden, self.depth, self.lr = seed, hidden, depth, lr
+        # `design_weight` divides each particle's loss weight by the (importance-weighted) kernel
+        # density of X at the particle, capped at `design_cap` times the modal density, so a
+        # sparse wing counts by its particles rather than by its probability mass; any positive
+        # weight that depends on x alone leaves the minimiser at E[V | X].
+        self.design_weight, self.design_cap = design_weight, design_cap
         self.weight_decay = weight_decay
         self._build(seed)
         self.first_steps, self.later_steps = first_steps, later_steps
@@ -114,13 +140,15 @@ class NNRegressor:
         steps = self.first_steps if (self._n_fits == 0 or not self.warm_start) else self.later_steps
         self._n_fits += 1
         w = weights
+        if self.design_weight:
+            w = design_weights(lnx, weights, cap=self.design_cap)
         if self.hetero:
             wh = 1.0 / nw_local_variance(lnx, v, weights=weights)
             wh = wh / wh.mean()
             # a region where the target is almost noiseless sends 1 / var to the 1e-8 floor's
             # reciprocal and would drown every other particle; cap the normalised weight there
             wh = np.clip(wh, None, HETERO_W_MAX)
-            w = wh if weights is None else weights * wh
+            w = wh if w is None else w * wh
         self.last_weights = w
         self.fit(lnx, v, steps=steps, weights=w)
         if self.mean_match:
