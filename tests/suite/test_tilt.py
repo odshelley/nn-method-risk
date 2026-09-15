@@ -48,7 +48,7 @@ def test_cold_job_counts(promoted):
     assert {j[5] for j in jobs} == {"none", "constant-3"}
     assert {j[3] for j in jobs} == set(COLD_PARTICLES)
     only_s02 = cold_jobs("constant-3", sids=("s02",))
-    assert len(only_s02) == 2 * 3 * 2 * 2 and all(j[1] == "s02" for j in only_s02)
+    assert len(only_s02) == 3 * 3 * 2 * 2 and all(j[1] == "s02" for j in only_s02)
     # --algos splits the two-hour NW rows from the overnight network rows
     nw_only = cold_jobs("constant-3", algos=("nw",))
     assert len(nw_only) == 20 * 3 * 2 * 2 and {j[2] for j in nw_only} == {"nw"}
