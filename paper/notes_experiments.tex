@@ -242,7 +242,7 @@ The tilt acts on estimation variance, so it is measured first on its own, withou
 
 \begin{table}[h]\centering\footnotesize
 \caption{Slice layer: wing standard deviation over seeds (at $T=0.25$ and pooled over maturities) and wing bias, in percent of $\E[V\mid X]$, by estimator and budget, untilted and under the constant designs of cost $3$ and $9$ and the front-loaded design of cost $8$; the inverse-square-root designs and the other costs are in experiment \code{tilt\_slices}. Bold: smallest in each standard-deviation column; the bias columns are signed and are not bolded.}\label{tab:tilt-slices}
-\input{tables/tilt_slices.tex}
+\resizebox{\textwidth}{!}{\input{tables/tilt_slices.tex}}
 \end{table}
 
 \begin{figure}[h]\centering
@@ -264,7 +264,7 @@ Cold: NW on the $20$ SSVI scenarios and the searched network on the six study sc
 
 \begin{table}[h]\centering\footnotesize
 \caption{Cold calibration with and without the tilt by budget: pooled, wings, three-month and liquid MAE in vol bp, leverage RMSE against the PDE reference, the minimum per-slice effective sample fraction, and median seconds. NW rows are over the $20$ SSVI scenarios; the network rows are over the six study scenarios, as their labels say, and the floor row is over the $20$. Bold: smallest in each column over all rows but the floor, so a bold tilted row at a small budget reads as budget equivalence.}\label{tab:tilt-cold}
-\input{tables/tilt_cold.tex}
+\resizebox{\textwidth}{!}{\input{tables/tilt_cold.tex}}
 \end{table}
 
 \begin{table}[h]\centering\footnotesize
