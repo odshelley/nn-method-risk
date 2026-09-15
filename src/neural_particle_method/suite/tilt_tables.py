@@ -347,8 +347,11 @@ def _far_tex(df):
     header = ("row & far wings & $T{=}0.5$ & $T{=}1$ & $T{=}2$ & quotes"
               " & pooled (13-strike)\\\\")
     lines = ["\\begin{tabular}{l rrrrrr}", "\\toprule", header, "\\midrule"]
-    floors = [label for label in df.index if label.startswith("PDE floor")]
-    body = [label for label in df.index if label not in floors]
+    # the 400-step rows (NW and the floor only) are kept in the store but out of the table: a
+    # finer time scheme is not a better estimator and they are not comparable with the 200-step rows
+    labels = [label for label in df.index if "400 steps" not in label]
+    floors = [label for label in labels if label.startswith("PDE floor")]
+    body = [label for label in labels if label not in floors]
     fmt = "{:.0f}"
     rows = [(label, [(df.loc[label, c], fmt) for c in FAR_COLS]) for label in body]
     lines += _render_rows(rows, plain_cols={4})      # the quote count is not a score

@@ -201,4 +201,5 @@ def test_far_frame_and_table(store, tmp_path, monkeypatch):
     assert paths[-1].name == "tilt_far.tex"
     tex = (tmp_path / "tilt_far.tex").read_text()
     assert "NW, 200 steps, tilted & \\textbf{25} &" in tex
-    assert "PDE floor, 400 steps & 12 &" in tex        # floors never bold
+    assert "400 steps" not in tex                       # the 400-step rows stay in the store
+    assert "PDE floor, 200 steps & 30 &" in tex        # floors never bold
