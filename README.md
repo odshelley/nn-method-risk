@@ -1,10 +1,10 @@
-# neural_particle_method
+# nn-method-risk
 
 Neural L2 calibration of LSV models (Risk paper workspace).
 
 ## Layout
 
-- `src/neural_particle_method/` — the package; `cli.py` exposes the `nparticle` console script
+- `src/neural_particle_method/` — the Python package (the import name predates the repo name); `cli.py` exposes the `nparticle` console script
   - `market` — Black-Scholes, Heston, SSVI, Dupire local vol
   - `simulate` — Heston-plus-leverage Euler step and the `LeverageField`
   - `estimators` — conditional-expectation estimators behind one `fit_predict` interface
